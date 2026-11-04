@@ -210,9 +210,25 @@ cargo run -p wallet-cli -- history <address>
 
 Notes:
 - MVP supports ATOLL only; MIND/PROOF per-address balances deferred.
-- Keystore defaults to `~/.atoll/keystore.json` (plaintext JSON; encryption is post-MVP).
+- Keystore defaults to `~/.atoll/keystore.json` (encrypted JSON; encryption is post-MVP).
 - All chain operations run against a local offline ChainState; `send` emits signed transaction hex for manual submission via a node RPC (RPC integration deferred).
 - Address derivation: `BLAKE3(public_key)[..20]`, matching the 20-byte `Address` type.
+
+### Passphrase handling
+
+The wallet resolves the passphrase in this priority order:
+
+1. `--passphrase` CLI flag
+2. `ATOLL_PASSPHRASE` environment variable
+3. Interactive terminal prompt (hidden input via `rpassword`, no echo)
+
+**Security limitations:**
+
+- The `--passphrase` flag is visible in `ps` output and may be retained in shell history.
+- The `ATOLL_PASSPHRASE` environment variable is visible to other processes running under the same user.
+- For sensitive environments, prefer the interactive prompt (which does not echo input) and run the CLI with restricted permissions so only the intended user can invoke it.
+- In non-TTY / CI environments the interactive prompt is unavailable; use `--passphrase` or `ATOLL_PASSPHRASE` instead.
+- Losing the passphrase means losing the keys — there is no key escrow or recovery in MVP.
 
 ## Security
 

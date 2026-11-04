@@ -23,6 +23,11 @@ pub mod telemetry;
 pub mod tokens;
 pub mod vm;
 
+// Password hashing (argon2id) is re-exported so that dependent crates
+// (e.g. wallet-cli) can derive keystore keys without adding a second
+// direct copy of the `argon2` dependency.
+pub use argon2;
+
 // Protocol version
 pub const CHIMERA_VERSION: u32 = 1;
 // TODO(Atoll): Rename constant to ATOLL_VERSION after codebase rename sweep

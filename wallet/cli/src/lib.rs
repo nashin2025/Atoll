@@ -7,6 +7,7 @@
 
 #![warn(clippy::all)]
 
+mod crypto;
 mod keystore;
 
 pub use keystore::Keystore;
@@ -38,11 +39,18 @@ pub enum WalletError {
     Json(serde_json::Error),
     Hex(hex::FromHexError),
     Crypto(String),
+    /// The passphrase could not be resolved (missing flag, env var, or prompt input).
+    Passphrase(String),
+    /// An existing keystore is stored unencrypted plaintext and must be re-encrypted.
+    PlaintextKeystore(String),
     Address(String),
     Amount(String),
     KeyNotFound(Address),
     UnsupportedToken(String),
-    InsufficientBalance { available: u128, requested: u128 },
+    InsufficientBalance {
+        available: u128,
+        requested: u128,
+    },
 }
 
 impl fmt::Display for WalletError {
@@ -52,6 +60,10 @@ impl fmt::Display for WalletError {
             WalletError::Json(e) => write!(f, "serialization error: {e}"),
             WalletError::Hex(e) => write!(f, "invalid hex: {e}"),
             WalletError::Crypto(message) => write!(f, "crypto error: {message}"),
+            WalletError::Passphrase(message) => write!(f, "passphrase error: {message}"),
+            WalletError::PlaintextKeystore(message) => {
+                write!(f, "unencrypted plaintext keystore: {message}")
+            }
             WalletError::Address(message) => write!(f, "invalid address: {message}"),
             WalletError::Amount(message) => write!(f, "invalid amount: {message}"),
             WalletError::KeyNotFound(address) => {
@@ -101,6 +113,52 @@ impl From<hex::FromHexError> for WalletError {
     }
 }
 
+/// Resolves the passphrase: `--passphrase` flag > `ATOLL_PASSPHRASE` env var
+/// > interactive stdin prompt.
+///
+/// Returns an error when no passphrase is available; there is no silent
+/// plaintext fallback.
+///
+/// # Security notes
+///
+/// The `--passphrase` flag is visible in `ps` output and may be retained in
+/// shell history. The `ATOLL_PASSPHRASE` environment variable is visible to
+/// other processes running under the same user. For sensitive environments,
+/// prefer the interactive prompt (which does not echo input) and run the CLI
+/// with restricted permissions so only the intended user can invoke it.
+pub fn resolve_passphrase(flag: Option<&str>) -> Result<String, WalletError> {
+    if let Some(passphrase) = flag {
+        if passphrase.is_empty() {
+            return Err(WalletError::Passphrase(
+                "the --passphrase flag must not be empty".to_string(),
+            ));
+        }
+        return Ok(passphrase.to_string());
+    }
+    if let Ok(passphrase) = std::env::var("ATOLL_PASSPHRASE") {
+        if passphrase.is_empty() {
+            return Err(WalletError::Passphrase(
+                "the ATOLL_PASSPHRASE environment variable must not be empty".to_string(),
+            ));
+        }
+        return Ok(passphrase);
+    }
+    match rpassword::prompt_password("Passphrase: ") {
+        Ok(passphrase) => {
+            if passphrase.is_empty() {
+                return Err(WalletError::Passphrase(
+                    "passphrase must not be empty".to_string(),
+                ));
+            }
+            Ok(passphrase)
+        }
+        Err(_) => Err(WalletError::Passphrase(
+            "interactive prompt unavailable in non-TTY environment; use --passphrase or ATOLL_PASSPHRASE"
+                .to_string(),
+        )),
+    }
+}
+
 /// CLI entry point.
 #[derive(Parser)]
 #[command(name = "wallet", about = "Atoll Protocol CLI wallet")]
@@ -122,11 +180,16 @@ pub struct Cli {
 #[derive(clap::Subcommand)]
 pub enum Commands {
     /// Generate a new Ed25519 key pair and save it to the keystore.
-    New,
+    New {
+        #[arg(long, help = "Passphrase to encrypt the keystore")]
+        passphrase: Option<String>,
+    },
     /// Import an Ed25519 secret key from hex (32 bytes / 64 hex characters).
     Import {
         #[arg(help = "Secret key as hex")]
         secret_key: String,
+        #[arg(long, help = "Passphrase to encrypt the keystore")]
+        passphrase: Option<String>,
     },
     /// Query the ATOLL balance of an address (offline).
     Balance {
@@ -143,6 +206,8 @@ pub enum Commands {
         amount: String,
         #[arg(help = "Token symbol (ATOLL only)")]
         token: String,
+        #[arg(long, help = "Passphrase to encrypt the keystore")]
+        passphrase: Option<String>,
     },
     /// Show transaction history for an address (offline).
     History {
@@ -154,35 +219,51 @@ pub enum Commands {
 /// Executes the parsed command.
 pub fn run(cli: Cli) -> Result<(), WalletError> {
     match cli.command {
-        Commands::New => cmd_new(&cli.keystore),
-        Commands::Import { secret_key } => cmd_import(&cli.keystore, &secret_key),
+        Commands::New { passphrase } => cmd_new(&cli.keystore, passphrase.as_deref()),
+        Commands::Import {
+            secret_key,
+            passphrase,
+        } => cmd_import(&cli.keystore, &secret_key, passphrase.as_deref()),
         Commands::Balance { address } => cmd_balance(&address),
         Commands::Send {
             from,
             to,
             amount,
             token,
-        } => cmd_send(&cli.keystore, &from, &to, &amount, &token),
+            passphrase,
+        } => cmd_send(
+            &cli.keystore,
+            &from,
+            &to,
+            &amount,
+            &token,
+            passphrase.as_deref(),
+        ),
         Commands::History { address } => cmd_history(&address),
     }
 }
 
-fn cmd_new(keystore_path: &Path) -> Result<(), WalletError> {
+fn cmd_new(keystore_path: &Path, passphrase: Option<&str>) -> Result<(), WalletError> {
     let signing_key = SigningKey::generate(&mut OsRng);
     let verifying_key = signing_key.verifying_key();
     let public_key = verifying_key.to_bytes();
     let secret_key = signing_key.to_bytes().to_vec();
     let address = derive_address(&public_key);
 
-    let mut keystore = Keystore::load(keystore_path.to_path_buf())?;
+    let passphrase = resolve_passphrase(passphrase)?;
+    let mut keystore = Keystore::load(keystore_path.to_path_buf(), &passphrase)?;
     keystore.add(address, secret_key);
-    keystore.save()?;
+    keystore.save(&passphrase)?;
 
     println!("{address}");
     Ok(())
 }
 
-fn cmd_import(keystore_path: &Path, secret_key_hex: &str) -> Result<(), WalletError> {
+fn cmd_import(
+    keystore_path: &Path,
+    secret_key_hex: &str,
+    passphrase: Option<&str>,
+) -> Result<(), WalletError> {
     let secret_bytes = hex::decode(secret_key_hex)?;
     if secret_bytes.len() != 32 {
         return Err(WalletError::Crypto(
@@ -197,9 +278,10 @@ fn cmd_import(keystore_path: &Path, secret_key_hex: &str) -> Result<(), WalletEr
     let public_key = verifying_key.to_bytes();
     let address = derive_address(&public_key);
 
-    let mut keystore = Keystore::load(keystore_path.to_path_buf())?;
+    let passphrase = resolve_passphrase(passphrase)?;
+    let mut keystore = Keystore::load(keystore_path.to_path_buf(), &passphrase)?;
     keystore.add(address, secret_bytes);
-    keystore.save()?;
+    keystore.save(&passphrase)?;
 
     println!("{address}");
     Ok(())
@@ -220,6 +302,7 @@ fn cmd_send(
     to: &str,
     amount: &str,
     token: &str,
+    passphrase: Option<&str>,
 ) -> Result<(), WalletError> {
     if token != ATOLL {
         return Err(WalletError::UnsupportedToken(token.to_string()));
@@ -250,7 +333,8 @@ fn cmd_send(
         });
     }
 
-    let keystore = Keystore::load(keystore_path.to_path_buf())?;
+    let passphrase = resolve_passphrase(passphrase)?;
+    let keystore = Keystore::load(keystore_path.to_path_buf(), &passphrase)?;
     let secret_bytes = keystore
         .get(&from_addr)
         .ok_or(WalletError::KeyNotFound(from_addr))?;
@@ -393,11 +477,18 @@ mod tests {
         let keystore_path = temp_path("send_zero_amount");
         let _ = fs::remove_file(&keystore_path);
 
-        let mut keystore = Keystore::load(keystore_path.clone()).unwrap();
+        let mut keystore = Keystore::load(keystore_path.clone(), "test-passphrase").unwrap();
         keystore.add(from, vec![3u8; 32]);
-        keystore.save().unwrap();
+        keystore.save("test-passphrase").unwrap();
 
-        let result = cmd_send(&keystore_path, &from.to_hex(), &to.to_hex(), "0", ATOLL);
+        let result = cmd_send(
+            &keystore_path,
+            &from.to_hex(),
+            &to.to_hex(),
+            "0",
+            ATOLL,
+            None,
+        );
         assert!(
             matches!(result, Err(WalletError::Amount(_))),
             "zero amount must be rejected"
@@ -413,12 +504,19 @@ mod tests {
         let keystore_path = temp_path("send_insufficient_balance");
         let _ = fs::remove_file(&keystore_path);
 
-        let mut keystore = Keystore::load(keystore_path.clone()).unwrap();
+        let mut keystore = Keystore::load(keystore_path.clone(), "test-passphrase").unwrap();
         keystore.add(from, vec![3u8; 32]);
-        keystore.save().unwrap();
+        keystore.save("test-passphrase").unwrap();
 
         // ChainState::new() has no accounts, so every address has balance 0.
-        let result = cmd_send(&keystore_path, &from.to_hex(), &to.to_hex(), "100", ATOLL);
+        let result = cmd_send(
+            &keystore_path,
+            &from.to_hex(),
+            &to.to_hex(),
+            "100",
+            ATOLL,
+            None,
+        );
         assert!(
             matches!(
                 result,
@@ -431,5 +529,40 @@ mod tests {
         );
 
         let _ = fs::remove_file(&keystore_path);
+    }
+
+    #[test]
+    fn resolve_passphrase_uses_flag() {
+        let passphrase = resolve_passphrase(Some("flag-pass")).unwrap();
+        assert_eq!(passphrase, "flag-pass");
+    }
+
+    /// Guards `ATOLL_PASSPHRASE` manipulation so env-based resolution tests
+    /// cannot interleave when `cargo test` runs them in parallel threads.
+    static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn resolve_passphrase_uses_env_var() {
+        let _guard = ENV_MUTEX.lock().unwrap();
+        env::remove_var("ATOLL_PASSPHRASE");
+        env::set_var("ATOLL_PASSPHRASE", "env-pass");
+        let passphrase = resolve_passphrase(None).unwrap();
+        assert_eq!(passphrase, "env-pass");
+        env::remove_var("ATOLL_PASSPHRASE");
+    }
+
+    #[test]
+    fn resolve_passphrase_flag_takes_precedence_over_env() {
+        let _guard = ENV_MUTEX.lock().unwrap();
+        env::set_var("ATOLL_PASSPHRASE", "env-pass");
+        let passphrase = resolve_passphrase(Some("flag-pass")).unwrap();
+        assert_eq!(passphrase, "flag-pass");
+        env::remove_var("ATOLL_PASSPHRASE");
+    }
+
+    #[test]
+    fn resolve_passphrase_empty_flag_is_rejected() {
+        let result = resolve_passphrase(Some(""));
+        assert!(matches!(result, Err(WalletError::Passphrase(_))));
     }
 }
