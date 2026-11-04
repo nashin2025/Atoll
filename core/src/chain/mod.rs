@@ -1,11 +1,9 @@
 //! Chain module for the Atoll Protocol.
 //!
-//! Blockchain state, beacon chain, DAG, and sharding.
+//! Blockchain state management, DAG structure with GHOSTDAG fork choice,
+//! and beacon chain for shard coordination.
 
 pub mod blockchain;
 pub mod state;
-pub mod beacon_chain;
 pub mod dag;
-pub mod sharding;
-
-// Placeholder - full implementations after Phase 0 research
+pub mod beacon_chain;
