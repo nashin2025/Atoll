@@ -129,7 +129,11 @@ impl StarkVerifier {
         public_inputs: &[Vec<u8>],
     ) -> Result<bool, String> {
         #[cfg(feature = "production-zk")]
-        return winterfell_backend::verify_winterfell(&proof.proof_of_work, computation_hash, public_inputs);
+        return winterfell_backend::verify_winterfell(
+            &proof.proof_of_work,
+            computation_hash,
+            public_inputs,
+        );
 
         #[cfg(not(feature = "production-zk"))]
         {
@@ -359,16 +363,16 @@ mod tests {
 #[cfg(feature = "production-zk")]
 mod winterfell_backend {
     use super::{Hash512, StarkProof};
-    use winterfell::{
-        Air, AirContext, Assertion, BatchingMethod, CompositionPoly,
-        CompositionPolyTrace, DefaultConstraintCommitment, DefaultConstraintEvaluator,
-        DefaultTraceLde, EvaluationFrame, FieldExtension, PartitionOptions, Prover,
-        Proof, ProofOptions, StarkDomain, Trace, TraceInfo, TracePolyTable, TraceTable,
-        TransitionConstraintDegree, verify, AcceptableOptions,
-    };
     use winterfell::crypto::{hashers::Blake3_256, DefaultRandomCoin, MerkleTree};
     use winterfell::math::{fields::f128::BaseElement, FieldElement, ToElements};
     use winterfell::matrix::ColMatrix;
+    use winterfell::{
+        verify, AcceptableOptions, Air, AirContext, Assertion, BatchingMethod, CompositionPoly,
+        CompositionPolyTrace, DefaultConstraintCommitment, DefaultConstraintEvaluator,
+        DefaultTraceLde, EvaluationFrame, FieldExtension, PartitionOptions, Proof, ProofOptions,
+        Prover, StarkDomain, Trace, TraceInfo, TracePolyTable, TraceTable,
+        TransitionConstraintDegree,
+    };
     use winterfell::{AuxRandElements, ConstraintCompositionCoefficients};
 
     // Trace length: power of two, >= 8. MVP default 2^12 = 4096. Shared by the
@@ -652,11 +656,11 @@ mod winterfell_backend {
         // accepted; any verification failure means the proof is invalid.
         let min_opts = AcceptableOptions::MinConjecturedSecurity(95);
         match verify::<
-                IterationAir,
-                Blake3_256<BaseElement>,
-                DefaultRandomCoin<Blake3_256<BaseElement>>,
-                MerkleTree<Blake3_256<BaseElement>>,
-            >(proof, pub_inputs, &min_opts)
+            IterationAir,
+            Blake3_256<BaseElement>,
+            DefaultRandomCoin<Blake3_256<BaseElement>>,
+            MerkleTree<Blake3_256<BaseElement>>,
+        >(proof, pub_inputs, &min_opts)
         {
             Ok(()) => Ok(true),
             Err(_) => Ok(false),
