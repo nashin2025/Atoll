@@ -1,14 +1,12 @@
 //! Penta-Consensus: five simultaneous consensus layers with HotStuff BFT finality.
 //!
-//! Layers:
-//! 1. Proof of Useful Work (PoUW) - computationally useful problems
-//! 2. Proof of Stake with VRF (PoS-VRF) - validator selection
-//! 3. Proof of Spacetime (PoST) - storage provision
-//! 4. Proof of Reputation (PoR) - participant trustworthiness
-//! 5. Proof of Humanness (PoH) - Sybil resistance
-//!
-//! All five layers must pass for block validation. Composite score determines
-//! block priority. HotStuff BFT provides finality.
+//! Production implementation with all five layers, composite scoring,
+//! slashing conditions, and HotStuff BFT finality.
+
+use crate::consensus::finality::hotstuff::{BFTVote, HotStuffState, HotStuffBFT, VoteType};
+use crate::primitives::address::Address;
+use crate::primitives::hash::Hash512;
+use serde::{Deserialize, Serialize};
 
 pub mod pouw;
 pub mod pos_vrf;
@@ -16,11 +14,12 @@ pub mod post;
 pub mod por;
 pub mod poh;
 
-use crate::primitives::hash::Hash512;
-use crate::primitives::address::Address;
+// ---------------------------------------------------------------------------
+// Consensus Weights
+// ---------------------------------------------------------------------------
 
 /// Weights for each consensus layer in composite scoring
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ConsensusWeights {
     pub useful_work: f64,   // 0.30
     pub stake_vrf: f64,     // 0.25
@@ -52,7 +51,7 @@ pub const MIN_REPUTATION_SCORE: f64 = 0.3;
 // ---------------------------------------------------------------------------
 
 /// Result of validating a block against all five consensus layers
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PentaValidation {
     pub pouw_valid: bool,
     pub pouw_score: f64,
@@ -80,7 +79,7 @@ impl PentaValidation {
 // Consensus Errors
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConsensusError {
     PoUWFailed,
     PoSFailed,
@@ -100,6 +99,7 @@ pub enum ConsensusError {
 /// Penta-Consensus engine coordinating all five layers
 pub struct PentaConsensus {
     weights: ConsensusWeights,
+    hotstuff: HotStuffBFT,
 }
 
 impl Default for PentaConsensus {
@@ -113,12 +113,24 @@ impl PentaConsensus {
     pub fn new() -> Self {
         Self {
             weights: ConsensusWeights::default(),
+            hotstuff: HotStuffBFT::new(),
         }
     }
 
     /// Creates a PentaConsensus engine with custom weights
     pub fn with_weights(weights: ConsensusWeights) -> Self {
-        Self { weights }
+        Self {
+            weights,
+            hotstuff: HotStuffBFT::new(),
+        }
+    }
+
+    /// Creates a PentaConsensus engine with validator count for HotStuff
+    pub fn with_validators(total_validators: u64) -> Self {
+        Self {
+            weights: ConsensusWeights::default(),
+            hotstuff: HotStuffBFT::new(),
+        }
     }
 
     /// Validates a block against all five consensus layers
@@ -184,14 +196,50 @@ impl PentaConsensus {
             poh_valid: true,
             poh_score,
             composite_score: composite,
-            finality_achieved: true, // Set by HotStuff finality check
+            finality_achieved: false, // Set by HotStuff finality check
             all_layers_pass: true,
         })
+    }
+
+    /// Validates a block with HotStuff BFT finality check
+    pub fn validate_block_with_finality(
+        &self,
+        pouw_result: &pouw::PoUWResult,
+        pos_result: &pos_vrf::PoSResult,
+        post_result: &post::PoSTResult,
+        por_result: &por::PoRResult,
+        poh_result: &poh::PoHResult,
+        hotstuff_state: &HotStuffState,
+        block_hash: &Hash512,
+    ) -> Result<PentaValidation, ConsensusError> {
+        let mut validation = self.validate_block(
+            pouw_result, pos_result, post_result, por_result, poh_result,
+        )?;
+
+        // Check HotStuff BFT finality
+        let finality = self.hotstuff.check_finality(hotstuff_state, block_hash);
+        validation.finality_achieved = finality;
+
+        if !finality {
+            return Err(ConsensusError::FinalityNotAchieved);
+        }
+
+        Ok(validation)
     }
 
     /// Returns the consensus weights
     pub fn weights(&self) -> ConsensusWeights {
         self.weights
+    }
+
+    /// Returns the HotStuff BFT instance
+    pub fn hotstuff(&self) -> &HotStuffBFT {
+        &self.hotstuff
+    }
+
+    /// Returns mutable reference to HotStuff BFT
+    pub fn hotstuff_mut(&mut self) -> &mut HotStuffBFT {
+        &mut self.hotstuff
     }
 }
 
@@ -200,7 +248,7 @@ impl PentaConsensus {
 // ---------------------------------------------------------------------------
 
 /// Slashing action for a validator
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SlashAction {
     pub validator: Address,
     pub penalty_percent: u8,
@@ -209,7 +257,7 @@ pub struct SlashAction {
 }
 
 /// Evidence for slashing a validator
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SlashingEvidence {
     /// Validator voted for two different blocks at the same height
     DoubleVote {
@@ -277,6 +325,7 @@ impl PentaConsensus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::consensus::finality::hotstuff::VoteType;
 
     fn valid_pouw() -> pouw::PoUWResult {
         pouw::PoUWResult {
@@ -309,9 +358,7 @@ mod tests {
     }
 
     fn valid_poh() -> poh::PoHResult {
-        poh::PoHResult {
-            is_verified: true,
-        }
+        poh::PoHResult { is_verified: true }
     }
 
     #[test]
@@ -428,5 +475,62 @@ mod tests {
         let w = ConsensusWeights::default();
         let total = w.useful_work + w.stake_vrf + w.spacetime + w.reputation + w.humanness;
         assert!((total - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn validate_block_with_finality() {
+        let consensus = PentaConsensus::new();
+        let mut hotstuff_state = HotStuffState::new(100);
+        hotstuff_state.current_height = 1;
+        hotstuff_state.current_round = 1;
+
+        // Add commit votes for quorum
+        let block_hash = Hash512::zero();
+        let validator = Address::zero();
+        for _ in 0..67 {
+            hotstuff_state.add_vote(BFTVote {
+                validator: validator.clone(),
+                block_hash,
+                height: 1,
+                round: 1,
+                vote_type: VoteType::Commit,
+                signature: vec![1; 64],
+            });
+        }
+
+        let result = consensus.validate_block_with_finality(
+            &valid_pouw(),
+            &valid_pos(),
+            &valid_post(),
+            &valid_por(),
+            &valid_poh(),
+            &hotstuff_state,
+            &block_hash,
+        );
+        assert!(result.is_ok());
+        let v = result.unwrap();
+        assert!(v.finality_achieved);
+        assert!(v.is_valid());
+    }
+
+    #[test]
+    fn validate_block_without_finality_fails() {
+        let consensus = PentaConsensus::new();
+        let hotstuff_state = HotStuffState::new(100); // No votes, no quorum
+
+        let block_hash = Hash512::zero();
+        let result = consensus.validate_block_with_finality(
+            &valid_pouw(),
+            &valid_pos(),
+            &valid_post(),
+            &valid_por(),
+            &valid_poh(),
+            &hotstuff_state,
+            &block_hash,
+        );
+        assert_eq!(
+            result,
+            Err(ConsensusError::FinalityNotAchieved)
+        );
     }
 }

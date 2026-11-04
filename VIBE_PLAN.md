@@ -44,7 +44,7 @@ Cryptocurrency researchers, developers, and users who value formal verification,
 | 14 | Phase 1: Blockchain/DAG layer (blockchain state, DAG, GHOSTDAG fork choice, beacon chain) | Forge | ✅ Done |
 | 15 | Phase 1: Smart Contract VMs (EVM, WASM, Move, RISC-V, AI VM, ZK VM) | Forge | ✅ Done |
 | 16 | Phase 2: Morph-Hash Production (32 algorithms in Rust/C/ASM, 4GB memory, S-box evolution) | Forge | ✅ Done |
-| 17 | Phase 3: Penta-Consensus Production (5 layers, composite scoring, HotStuff BFT production) | Forge | next |
+| 17 | Phase 3: Penta-Consensus Production (5 layers, composite scoring, HotStuff BFT production) | Forge | in_progress |
 
 ## Decisions
 - Coin name: **ATOLL** (renamed from Chimera)

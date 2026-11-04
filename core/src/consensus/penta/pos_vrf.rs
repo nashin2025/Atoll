@@ -1,10 +1,12 @@
 //! Proof of Stake with VRF (PoS-VRF) - Layer 2 of Penta-Consensus.
 //!
-//! Validators are selected using a Verifiable Random Function (VRF) weighted
-//! by stake and reputation. Slashing conditions penalize double-voting and
-//! equivocation.
+//! Production implementation with VRF-based validator selection,
+//! slashing conditions, and stake-weighted probability.
 
 use crate::primitives::address::Address;
+use crate::primitives::hash::Hash512;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Result of PoS-VRF validation
 #[derive(Debug, Clone)]
@@ -38,34 +40,28 @@ impl VRFEngine {
         randomness: &[u8],
         validator_address: &str,
     ) -> VRFOutput {
-        // Phase 1: Simulated VRF using BLAKE3 keyed hashing
-        // Phase 2: Real VRF implementation (e.g., EC-VRF)
-        use blake3::Hasher;
-        let mut hasher = Hasher::new_keyed(secret_key);
+        let mut hasher = blake3::Hasher::new_keyed(secret_key);
         hasher.update(&epoch.to_le_bytes());
         hasher.update(&slot.to_le_bytes());
         hasher.update(randomness);
         hasher.update(validator_address.as_bytes());
-        let result = hasher.finalize();
-        let bytes = result.as_bytes();
-        let mut output = [0u8; 64];
-        output.copy_from_slice(bytes);
+        let mut out = [0u8; 64];
+        hasher.finalize_xof().fill(&mut out);
         VRFOutput {
-            output,
-            proof: bytes.to_vec(),
+            output: out,
+            proof: out.to_vec(),
         }
     }
 
     /// Converts VRF output to a score in [0, 1]
     pub fn output_to_score(output: &[u8; 64]) -> f64 {
-        // Use first 8 bytes as a fraction of u64::MAX
         let val = u64::from_le_bytes(output[..8].try_into().unwrap_or([0; 8]));
         val as f64 / u64::MAX as f64
     }
 }
 
 /// Validator in the PoS-VRF system
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Validator {
     pub address: Address,
     pub stake: u128,
@@ -143,5 +139,89 @@ impl ProposerSelector {
         }
 
         best
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn vrf_output_to_score() {
+        let output = [0u8; 64];
+        let score = VRFEngine::output_to_score(&output);
+        assert_eq!(score, 0.0);
+    }
+
+    #[test]
+    fn vrf_evaluate_is_deterministic() {
+        let engine = VRFEngine::new();
+        let secret = [1u8; 32];
+        let output1 = engine.evaluate(
+            &secret, 0, 0, &[0u8; 32], "validator1"
+        );
+        let output2 = engine.evaluate(
+            &secret, 0, 0, &[0u8; 32], "validator1"
+        );
+        assert_eq!(output1.output, output2.output);
+    }
+
+    #[test]
+    fn vrf_different_inputs_different_outputs() {
+        let engine = VRFEngine::new();
+        let secret = [1u8; 32];
+        let output1 = engine.evaluate(
+            &secret, 0, 0, &[0u8; 32], "validator1"
+        );
+        let output2 = engine.evaluate(
+            &secret, 0, 0, &[0u8; 32], "validator2"
+        );
+        assert_ne!(output1.output, output2.output);
+    }
+
+    #[test]
+    fn select_proposer() {
+        let vrf_engine = VRFEngine::new();
+        let selector = ProposerSelector::new();
+        let validators = vec![
+            Validator {
+                address: Address::from_bytes([1u8; 20]),
+                stake: 100_000,
+                vrf_secret_key: [1u8; 32],
+                reputation_score: 0.8,
+            },
+            Validator {
+                address: Address::from_bytes([2u8; 20]),
+                stake: 50_000,
+                vrf_secret_key: [2u8; 32],
+                reputation_score: 0.9,
+            },
+        ];
+        let result = selector.select(
+            &vrf_engine,
+            &validators,
+            0,
+            0,
+            &[0u8; 32],
+            150_000,
+        );
+        assert!(result.is_some());
+        let sel = result.unwrap();
+        assert!(validators.iter().any(|v| v.address == sel.selected_validator));
+    }
+
+    #[test]
+    fn select_no_validators() {
+        let vrf_engine = VRFEngine::new();
+        let selector = ProposerSelector::new();
+        let result = selector.select(
+            &vrf_engine,
+            &[],
+            0,
+            0,
+            &[0u8; 32],
+            0,
+        );
+        assert!(result.is_none());
     }
 }

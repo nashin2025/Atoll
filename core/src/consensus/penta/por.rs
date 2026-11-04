@@ -1,13 +1,13 @@
 //! Proof of Reputation (PoR) - Layer 4 of Penta-Consensus.
 //!
-//! Reputation score based on uptime, block validity, transaction honesty,
-//! useful work contribution, governance participation, endorsements, and age.
-//! Score decays over time.
+//! Production implementation with reputation scoring, time decay,
+//! and eligibility tracking.
 
 use crate::primitives::address::Address;
+use serde::{Deserialize, Serialize};
 
 /// Weights for reputation scoring components
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ReputationWeights {
     pub uptime: f64,                    // 0.20
     pub block_validity_rate: f64,       // 0.25
@@ -41,7 +41,7 @@ pub struct PoRResult {
 }
 
 /// Participant history for reputation calculation
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParticipantHistory {
     pub online_blocks: u64,
     pub total_blocks: u64,
@@ -52,7 +52,7 @@ pub struct ParticipantHistory {
     pub useful_work_completed: u64,
     pub governance_votes: u64,
     pub eligible_votes: u64,
-    pub endorsements: Vec<crate::primitives::address::Address>,
+    pub endorsements: Vec<Address>,
     pub first_seen_height: u64,
 }
 
@@ -101,7 +101,7 @@ impl ReputationCalculator {
     /// Calculates reputation score for a participant
     pub fn calculate(
         &self,
-        _participant: &crate::primitives::address::Address,
+        _participant: &Address,
         history: &ParticipantHistory,
         current_height: u64,
     ) -> PoRResult {
@@ -143,7 +143,7 @@ impl ReputationCalculator {
 
         // Age bonus (logarithmic, capped at 1.0)
         let age_blocks = current_height.saturating_sub(history.first_seen_height);
-        let age_score = ((age_blocks as f64).ln() + 1.0).min(20.0) / 20.0;
+        let age_score = ((age_blocks as f64 + 1.0).ln()).min(20.0) / 20.0;
 
         let raw = uptime * w.uptime
             + validity * w.block_validity_rate
@@ -153,8 +153,11 @@ impl ReputationCalculator {
             + endorsement_score * w.community_endorsements
             + age_score * w.age_bonus;
 
-        // Apply time decay
-        let decayed = raw * (-self.decay_rate * age_blocks as f64).exp().max(0.5);
+        // Apply time decay (10% per year, blocks per year ~31,536,000)
+        let blocks_per_year = 31_536_000u64;
+        let years = age_blocks as f64 / blocks_per_year as f64;
+        let decay_factor = (-self.decay_rate * years).exp().max(0.5);
+        let decayed = raw * decay_factor;
 
         PoRResult {
             raw_score: raw,
@@ -167,6 +170,11 @@ impl ReputationCalculator {
     pub fn minimum_score(&self) -> f64 {
         self.minimum_score
     }
+
+    /// Returns the decay rate
+    pub fn decay_rate(&self) -> f64 {
+        self.decay_rate
+    }
 }
 
 /// Reputation proof for block inclusion
@@ -175,4 +183,70 @@ pub struct ReputationProof {
     pub address: Address,
     pub score: f64,
     pub block_height: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn calculate_full_reputation() {
+        let calc = ReputationCalculator::new();
+        let history = ParticipantHistory {
+            online_blocks: 1000,
+            total_blocks: 1000,
+            proposed_blocks: 100,
+            valid_blocks: 99,
+            total_transactions: 1000,
+            reverted_transactions: 5,
+            useful_work_completed: 50,
+            governance_votes: 50,
+            eligible_votes: 50,
+            endorsements: vec![Address::zero(); 10],
+            first_seen_height: 1000,
+        };
+        let result = calc.calculate(&Address::zero(), &history, 2000);
+        assert!(result.is_eligible);
+        assert!(result.raw_score > 0.7);
+        assert!(result.decayed_score > 0.6);
+    }
+
+    #[test]
+    fn calculate_low_reputation() {
+        let calc = ReputationCalculator::new();
+        let history = ParticipantHistory {
+            online_blocks: 100,
+            total_blocks: 1000,
+            proposed_blocks: 10,
+            valid_blocks: 5,
+            total_transactions: 100,
+            reverted_transactions: 90,
+            useful_work_completed: 0,
+            governance_votes: 0,
+            eligible_votes: 100,
+            endorsements: vec![],
+            first_seen_height: 19000,
+        };
+        let result = calc.calculate(&Address::zero(), &history, 20000);
+        assert!(!result.is_eligible);
+    }
+
+    #[test]
+    fn new_participant_neutral() {
+        let calc = ReputationCalculator::new();
+        let history = ParticipantHistory::default();
+        let result = calc.calculate(&Address::zero(), &history, 0);
+        // Should not panic and should produce a valid result
+        assert!(result.decayed_score >= 0.0);
+        assert!(result.decayed_score <= 1.0);
+    }
+
+    #[test]
+    fn weights_sum_to_one() {
+        let w = ReputationWeights::default();
+        let total = w.uptime + w.block_validity_rate + w.transaction_honesty
+            + w.useful_work_contribution + w.governance_participation
+            + w.community_endorsements + w.age_bonus;
+        assert!((total - 1.0).abs() < 0.001);
+    }
 }
