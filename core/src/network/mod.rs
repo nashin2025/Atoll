@@ -8,6 +8,7 @@
 pub mod discovery;
 pub mod encrypted_mempool;
 pub mod gossip;
+pub mod node_identity;
 pub mod p2p;
 pub mod peer_manager;
 pub mod sync;
