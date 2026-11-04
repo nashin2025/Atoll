@@ -1,0 +1,50 @@
+name: Atoll CI/CD
+
+on:
+  push:
+    branches: [main, feature/*]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+      
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Run cargo check
+        run: cargo check
+      
+      - name: Run cargo test
+        run: cargo test
+      
+      - name: Run cargo clippy
+        run: cargo clippy -- -D warnings
+      
+      - name: Run cargo fmt check
+        run: cargo fmt --check
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run cargo audit
+        run: |
+          cargo install cargo-audit
+          cargo audit
