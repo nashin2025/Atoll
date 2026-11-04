@@ -15,7 +15,7 @@
 A security audit was performed on the Atoll Protocol core crate (`core/src/`). The codebase is a research-first Rust cryptocurrency protocol with Penta-Consensus (PoUW, PoS-VRF, PoST, PoR, PoH, HotStuff BFT), cross-shard messaging, encrypted mempool, zk-STARKs, homomorphic encryption, and post-quantum cryptography.
 
 **4 Critical findings were identified and fixed.**
-**1 High finding was fixed; 4 High findings require architectural work.**
+**2 High findings fixed; 3 High findings require architectural work.**
 **5 Medium findings, 6 Low findings, 3 Info findings documented.**
 
 `cargo build` passes. `cargo audit` reports 1 allowed warning (bincode unmaintained). One pre-existing test failure in `primitives::block` is unrelated to this audit.
@@ -114,9 +114,9 @@ With `panic = "abort"` in the release profile, overflow aborts the node (DoS); w
 
 The module is explicitly labeled "Phase 1: Interface and simulation" but is used for private transaction proofs.
 
-**Remediation:** Replace with a real zk-STARK verifier (FRI + low-degree testing) or gate behind a feature flag making simulation-only use explicit. Not fixed silently — requires a cryptographic library and Phase-2 implementation.
+**Remediation (applied):** Replaced the simulated verifier with a production Winterfell-backed zk-STARK prover and verifier (`core/src/privacy/zk_starks.rs`), feature-gated behind `production-zk`. Winterfell's `winter-fri` crate performs FRI low-degree testing — the exact gap identified in this finding. Forged proofs are now rejected by the verifier instead of being accepted. The simulated mode is preserved as a fallback when the feature is off.
 
-**Status:** NOT FIXED (requires Phase-2 crypto library)
+**Status:** FIXED — PR #2 merged to main (commit 6a7b02e). See `core/src/privacy/zk_starks_air_design.md` for the AIR design.
 
 ---
 
@@ -366,6 +366,7 @@ Balance comparisons (`from_balance < amount` in `state.rs`), signature compariso
 | 3 | `core/src/privacy/post_quantum.rs` | PQ verify accepts any signature | Critical | Verify binds to `blake3(message || public_key)` |
 | 4 | `core/src/privacy/post_quantum.rs` | Hardcoded zeros secret key in hybrid | Critical | Classical key now random via `OsRng` |
 | 5 | `core/src/network/p2p.rs` | No max message size (DoS) | High | 16 MiB `MAX_MESSAGE_SIZE` limit; generic errors |
+| 6 | `core/src/privacy/zk_starks.rs` | Simulated zk-STARK verification | High | Winterfell-backed prover/verifier with FRI (feature-gated `production-zk`) |
 
 ## Files Modified
 
