@@ -4,6 +4,7 @@
 //! and tracks the current tip and finalized height.
 
 use crate::consensus::penta::{poh, por, pos_vrf, post, pouw, PentaConsensus, PentaValidation};
+use crate::crypto::morph_hash::MorphHashEngine;
 use crate::primitives::address::Address;
 use crate::primitives::block::{Block, BlockBody, BlockHeader};
 use crate::primitives::hash::Hash512;
@@ -23,16 +24,16 @@ pub struct Blockchain {
     finalized_height: u64,
     /// State root at each height
     state_roots: HashMap<u64, Hash512>,
+    /// Cached Morph-Hash engine with reused 4KB memory buffer
+    morph_hash_engine: MorphHashEngine,
 }
 
 impl Blockchain {
     /// Creates a new blockchain with genesis block
     pub fn new(genesis: Block) -> Self {
-        let genesis_hash = crate::crypto::morph_hash::MorphHashEngine::new().morph_hash(
-            &genesis.serialize_bytes(),
-            &Hash512::zero(),
-            0,
-        );
+        let mut morph_hash_engine = MorphHashEngine::new();
+        let genesis_hash =
+            morph_hash_engine.morph_hash(&genesis.serialize_bytes(), &Hash512::zero(), 0);
 
         let mut blocks = HashMap::new();
         let mut blocks_by_height = HashMap::new();
@@ -46,6 +47,7 @@ impl Blockchain {
             tip_height: 0,
             finalized_height: 0,
             state_roots: HashMap::new(),
+            morph_hash_engine,
         }
     }
 
@@ -96,7 +98,7 @@ impl Blockchain {
         }
 
         // Compute block hash
-        let block_hash = crate::crypto::morph_hash::MorphHashEngine::new().morph_hash(
+        let block_hash = self.morph_hash_engine.morph_hash(
             &block.serialize_bytes(),
             &block.header.prev_hash,
             block.header.height,
@@ -314,5 +316,35 @@ mod tests {
         bc.state_roots.insert(0, state_root);
         assert_eq!(bc.state_root_at(0), Some(&state_root));
         assert_eq!(bc.state_root_at(1), None);
+    }
+
+    #[test]
+    fn cached_engine_equivalence_with_fresh_engine() {
+        let bc = Blockchain::default();
+
+        // Replicate the genesis block from Default::default()
+        let genesis = Block {
+            header: BlockHeader {
+                version: 1,
+                height: 0,
+                shard_id: 0,
+                timestamp: 0,
+                prev_hash: Hash512::zero(),
+                state_root: Hash512::zero(),
+                transaction_root: Hash512::zero(),
+                proposer: Address::zero(),
+                difficulty: 1,
+            },
+            body: BlockBody {
+                transactions: Vec::new(),
+            },
+        };
+
+        // Fresh engine computing the same genesis hash
+        let mut fresh_engine = MorphHashEngine::new();
+        let fresh_hash = fresh_engine.morph_hash(&genesis.serialize_bytes(), &Hash512::zero(), 0);
+
+        // Cached engine (used in Blockchain::new) must match fresh engine
+        assert_eq!(bc.tip_hash(), fresh_hash);
     }
 }

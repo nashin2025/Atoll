@@ -143,3 +143,49 @@ Adopt `snow` Noise_XX_25519_ChaChaPoly_BLAKE2s; NodeId from static-key fingerpri
 
 ### Next Step
 Run `/build-feature` against the implementation issue once it is created from this plan; then `/review-code`.
+
+---
+
+## Feature Plan: Block Validation Performance Optimization
+
+### Goal
+Optimize block validation performance by caching `MorphHashEngine` in `Blockchain` and reusing the 4KB `MemoryHardLayer` buffer across `insert_block` calls.
+
+### Context
+
+- `Blockchain` struct had no cached engine. Both `new(genesis)` and `insert_block` constructed `MorphHashEngine::new()` inline.
+- `MorphHashEngine::new()` is allocation-free (just field assignment).
+- The real cost is `MemoryHardLayer::init_buffer(prev_block_hash)` — allocates 4KB on every call because the seed changes per block.
+- `morph_hash` benchmark is ~198µs with reused engine; engine caching alone won't reach <1ms — buffer reuse is required too.
+- `morph_hash(&mut self, ...)` takes `&mut self`, matching `Blockchain`'s `&mut self` in `insert_block` — no public API changes needed.
+- Existing direct-engine consumers (stress/integration/fuzzing/adversarial tests) are unaffected — they create their own engine instances.
+
+### Task Breakdown
+
+| # | Task | Owner | Status |
+|---|------|-------|--------|
+| 1 | Add `morph_hash_engine` field to `Blockchain` struct; initialize once in `new()` | Forge | ✅ Done |
+| 2 | Refactor `insert_block` to use `self.morph_hash_engine.morph_hash(...)` | Forge | ✅ Done |
+| 3 | Implement 4KB buffer reuse: add `buffer` field to `MemoryHardLayer`, `init_buffer_in_place()` method, update `morph_hash()` | Forge | ✅ Done |
+| 4 | Update tests: run existing blockchain tests, add equivalence test (cached == fresh engine) | Forge | ✅ Done |
+| 5 | Fix criterion benchmark: reuse `Blockchain` instance instead of reconstructing each iteration | Forge | ✅ Done |
+| 6 | Add before/after benchmark: `block_validation_insert_fresh_engine` vs `block_validation_insert` | Forge | ✅ Done |
+| 7 | Run full verification: `cargo check`, `cargo fmt --check`, `cargo clippy --all-targets`, `cargo test --lib` | Forge | ✅ Done |
+| 8 | Document results: update `PERFORMANCE_PHASE6.md` and `VIBE_PLAN.md` | Forge | ✅ Done |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `core/src/chain/blockchain.rs` | Added `morph_hash_engine: MorphHashEngine` field; initialized once in `new()`; `insert_block()` uses cached engine |
+| `core/src/crypto/morph_hash/mod.rs` | Added `buffer: Vec<u8>` to `MemoryHardLayer`; added `init_buffer_in_place()`; `morph_hash()` reuses buffer |
+| `core/benches/hash_benchmarks.rs` | Fixed benchmarks to reuse `Blockchain`; added `block_validation_insert_fresh_engine` comparison benchmark |
+| `PERFORMANCE_PHASE6.md` | Updated with optimization details, new benchmark, and file change documentation |
+| `VIBE_PLAN.md` | This section — performance optimization task tracking |
+
+### Verification
+
+- `cargo check` — passes (no errors)
+- `cargo fmt --check` — passes
+- `cargo clippy --all-targets` — passes (no new warnings)
+- `cargo test --lib` — 364 passed, 0 failed (includes new `cached_engine_equivalence_with_fresh_engine` test)

@@ -517,6 +517,8 @@ fn evolved_sbox_transform(data: &[u8], generation: u64) -> Vec<u8> {
 pub struct MemoryHardLayer {
     buffer_size: usize,
     access_rounds: usize,
+    /// Pre-allocated reusable buffer (avoids re-allocation on every hash call).
+    buffer: Vec<u8>,
 }
 
 impl MemoryHardLayer {
@@ -524,6 +526,7 @@ impl MemoryHardLayer {
         Self {
             buffer_size: MEMORY_BUFFER_SIZE,
             access_rounds: MEMORY_ACCESS_ROUNDS,
+            buffer: vec![0u8; MEMORY_BUFFER_SIZE],
         }
     }
 
@@ -531,6 +534,7 @@ impl MemoryHardLayer {
         Self {
             buffer_size,
             access_rounds: MEMORY_ACCESS_ROUNDS,
+            buffer: vec![0u8; buffer_size],
         }
     }
 
@@ -553,6 +557,36 @@ impl MemoryHardLayer {
         for _ in 0..3 {
             for i in 0..self.buffer_size {
                 let j = (i.wrapping_mul(2_654_435_761).wrapping_add(1)) % self.buffer_size;
+                let temp = buffer[i];
+                buffer[i] ^= buffer[j];
+                buffer[j] = buffer[j].wrapping_add(temp);
+            }
+        }
+
+        buffer
+    }
+
+    /// Initializes the internal buffer in-place (reusing the existing allocation)
+    /// and returns a mutable reference to it. Avoids re-allocating on every hash call.
+    pub fn init_buffer_in_place(&mut self, seed: &Hash512) -> &mut [u8] {
+        let buffer = &mut self.buffer;
+        let mut counter = 0u64;
+        let chunk_size = 64;
+
+        for chunk in buffer.chunks_mut(chunk_size) {
+            let mut input = seed.to_bytes();
+            input.extend_from_slice(&counter.to_le_bytes());
+            let hash = blake3::hash(&input);
+            let hash_bytes = hash.as_bytes();
+            for (i, byte) in chunk.iter_mut().enumerate() {
+                *byte = hash_bytes[i % 32];
+            }
+            counter += 1;
+        }
+
+        for _ in 0..3 {
+            for i in 0..buffer.len() {
+                let j = (i.wrapping_mul(2_654_435_761).wrapping_add(1)) % buffer.len();
                 let temp = buffer[i];
                 buffer[i] ^= buffer[j];
                 buffer[j] = buffer[j].wrapping_add(temp);
@@ -655,11 +689,11 @@ impl MorphHashEngine {
         block_height: u64,
     ) -> Hash512 {
         let chain = select_algorithm_chain(prev_block_hash, block_height);
-        let memory_buffer = self.memory_layer.init_buffer(prev_block_hash);
+        let memory_buffer = self.memory_layer.init_buffer_in_place(prev_block_hash);
 
         let mut state = input.to_vec();
         for (i, algo) in chain.iter().enumerate() {
-            let mem_index = Self::derive_memory_index(&state, i, &memory_buffer);
+            let mem_index = Self::derive_memory_index(&state, i, memory_buffer);
             let mem_data =
                 &memory_buffer[mem_index..mem_index + 64.min(memory_buffer.len() - mem_index)];
             state = Self::xor_mix(&state, mem_data);

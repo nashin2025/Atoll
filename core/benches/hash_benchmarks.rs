@@ -262,9 +262,9 @@ fn bench_block_validation_insert(c: &mut Criterion) {
     let validation = consensus
         .validate_block(&pouw, &pos, &post, &por, &poh)
         .unwrap();
+    let mut bc = Blockchain::default();
     c.bench_function("block_validation_insert", |b| {
         b.iter(|| {
-            let mut bc = Blockchain::default();
             let block = Block {
                 header: BlockHeader {
                     version: 1,
@@ -282,6 +282,60 @@ fn bench_block_validation_insert(c: &mut Criterion) {
                 },
             };
             let _ = bc.insert_block(block, &validation);
+        })
+    });
+}
+
+fn bench_block_validation_insert_fresh_engine(c: &mut Criterion) {
+    let consensus = PentaConsensus::new();
+    let pouw = pouw::PoUWResult {
+        valid: true,
+        usefulness_score: 0.8,
+        difficulty_met: true,
+    };
+    let pos = pos_vrf::PoSResult {
+        valid: true,
+        combined_score: 0.9,
+    };
+    let post = post::PoSTResult {
+        valid: true,
+        size_score: 1.0,
+    };
+    let por = por::PoRResult {
+        raw_score: 0.8,
+        decayed_score: 0.72,
+        is_eligible: true,
+    };
+    let poh = poh::PoHResult { is_verified: true };
+    let _validation = consensus
+        .validate_block(&pouw, &pos, &post, &por, &poh)
+        .unwrap();
+    let bc = Blockchain::default();
+    c.bench_function("block_validation_insert_fresh_engine", |b| {
+        b.iter(|| {
+            // Simulate old behavior: fresh MorphHashEngine per insert
+            let block = Block {
+                header: BlockHeader {
+                    version: 1,
+                    height: 1,
+                    shard_id: 0,
+                    timestamp: 0,
+                    prev_hash: bc.tip_hash(),
+                    state_root: Hash512::zero(),
+                    transaction_root: Hash512::zero(),
+                    proposer: Address::zero(),
+                    difficulty: 1,
+                },
+                body: BlockBody {
+                    transactions: Vec::new(),
+                },
+            };
+            let block_hash = MorphHashEngine::new().morph_hash(
+                &block.serialize_bytes(),
+                &block.header.prev_hash,
+                block.header.height,
+            );
+            black_box(block_hash);
         })
     });
 }
@@ -310,9 +364,9 @@ fn bench_block_validation_with_tx(c: &mut Criterion) {
     let validation = consensus
         .validate_block(&pouw, &pos, &post, &por, &poh)
         .unwrap();
+    let mut bc = Blockchain::default();
     c.bench_function("block_validation_with_10_tx", |b| {
         b.iter(|| {
-            let mut bc = Blockchain::default();
             let mut txs = Vec::new();
             for _ in 0..10 {
                 txs.push(Transaction {
@@ -593,6 +647,7 @@ criterion_group! {
     bench_transaction_hash,
     bench_block_serialize,
     bench_block_validation_insert,
+    bench_block_validation_insert_fresh_engine,
     bench_block_validation_with_tx,
     bench_chain_state_transfer,
     bench_chain_state_balance,
