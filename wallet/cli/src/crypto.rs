@@ -4,11 +4,19 @@
 //! iterations / 1 lane) and keystore payloads are encrypted with
 //! XChaCha20-Poly1305 AEAD. The encrypted envelope is
 //! `salt(16) || nonce(24) || ciphertext`.
+//!
+//! Argon2id parameters (64 MiB memory, 3 iterations, 1 lane): 64 MiB memory
+//! cost raises the price of offline brute-force attacks while remaining
+//! tolerable on a CLI; 3 iterations is the argon2id default and a reasonable
+//! work factor; 1 lane matches the single-threaded CLI use case. These values
+//! are a defensive starting point and should be revisited before production
+//! deployment (see KEYSTORE_ENCRYPTION_PLAN.md risk "Argon2 parameter choice").
 
 use aead::Aead;
 use atoll_core::argon2::{Algorithm, Argon2, Params, Version};
 use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce};
 use rand::RngCore;
+use zeroize::Zeroizing;
 
 /// Argon2id memory cost in KiB (64 MiB = 65 536 KiB).
 pub const ARGON2_MEMORY_KIB: u32 = 64 * 1024;
@@ -24,18 +32,23 @@ pub const SALT_LEN: usize = 16;
 pub const NONCE_LEN: usize = 24;
 
 /// Derives a 32-byte encryption key from `passphrase` and `salt` with argon2id.
-pub fn derive_key(passphrase: &str, salt: &[u8; SALT_LEN]) -> [u8; KEY_LEN] {
+///
+/// The passphrase is wrapped in [`Zeroizing`] so its bytes are scrubbed from
+/// memory when the wrapper is dropped (M1: passphrase does not linger in
+/// process memory).
+pub fn derive_key(passphrase: &str, salt: &[u8; SALT_LEN]) -> Result<[u8; KEY_LEN], String> {
     let argon2 = Argon2::new(
         Algorithm::Argon2id,
         Version::V0x13,
         Params::new(ARGON2_MEMORY_KIB, ARGON2_ITERATIONS, ARGON2_LANES, None)
-            .expect("argon2id parameters (64 MiB / 3 iterations / 1 lane) are valid"),
+            .map_err(|e| format!("invalid argon2id parameters: {e}"))?,
     );
     let mut key = [0u8; KEY_LEN];
+    let password = Zeroizing::new(passphrase.as_bytes().to_vec());
     argon2
-        .hash_password_into(passphrase.as_bytes(), salt, &mut key)
-        .expect("argon2id hashing with valid parameters must not fail");
-    key
+        .hash_password_into(&password, salt, &mut key)
+        .map_err(|e| format!("argon2id key derivation failed: {e}"))?;
+    Ok(key)
 }
 
 /// Encrypts `plaintext` with `passphrase` and returns
@@ -44,7 +57,7 @@ pub fn encrypt_keystore(plaintext: &[u8], passphrase: &str) -> Result<Vec<u8>, S
     let mut salt = [0u8; SALT_LEN];
     rand::thread_rng().fill_bytes(&mut salt);
 
-    let key = derive_key(passphrase, &salt);
+    let key = derive_key(passphrase, &salt)?;
     let cipher = XChaCha20Poly1305::new_from_slice(&key)
         .map_err(|e| format!("failed to initialize XChaCha20-Poly1305 cipher: {e}"))?;
 
@@ -76,7 +89,7 @@ pub fn decrypt_keystore(ciphertext: &[u8], passphrase: &str) -> Result<Vec<u8>, 
     let (nonce_bytes, encrypted) = rest.split_at(NONCE_LEN);
     let nonce = XNonce::from_slice(nonce_bytes);
 
-    let key = derive_key(passphrase, salt);
+    let key = derive_key(passphrase, salt)?;
     let cipher = XChaCha20Poly1305::new_from_slice(&key)
         .map_err(|e| format!("failed to initialize XChaCha20-Poly1305 cipher: {e}"))?;
 
@@ -93,8 +106,8 @@ mod tests {
     fn derive_key_is_deterministic() {
         let salt = [1u8; SALT_LEN];
         assert_eq!(
-            derive_key("passphrase", &salt),
-            derive_key("passphrase", &salt)
+            derive_key("passphrase", &salt).unwrap(),
+            derive_key("passphrase", &salt).unwrap()
         );
     }
 
@@ -102,8 +115,8 @@ mod tests {
     fn derive_key_differs_for_different_passphrases() {
         let salt = [1u8; SALT_LEN];
         assert_ne!(
-            derive_key("passphrase-a", &salt),
-            derive_key("passphrase-b", &salt)
+            derive_key("passphrase-a", &salt).unwrap(),
+            derive_key("passphrase-b", &salt).unwrap()
         );
     }
 
@@ -111,8 +124,8 @@ mod tests {
     fn derive_key_differs_for_different_salts() {
         let passphrase = "passphrase";
         assert_ne!(
-            derive_key(passphrase, &[1u8; SALT_LEN]),
-            derive_key(passphrase, &[2u8; SALT_LEN])
+            derive_key(passphrase, &[1u8; SALT_LEN]).unwrap(),
+            derive_key(passphrase, &[2u8; SALT_LEN]).unwrap()
         );
     }
 

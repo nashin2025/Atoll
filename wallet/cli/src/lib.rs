@@ -114,11 +114,18 @@ impl From<hex::FromHexError> for WalletError {
 }
 
 /// Resolves the passphrase: `--passphrase` flag > `ATOLL_PASSPHRASE` env var
-/// > interactive stdin prompt. Returns an error when no passphrase is
 /// > interactive stdin prompt.
 ///
 /// Returns an error when no passphrase is available; there is no silent
 /// plaintext fallback.
+///
+/// # Security notes
+///
+/// The `--passphrase` flag is visible in `ps` output and may be retained in
+/// shell history. The `ATOLL_PASSPHRASE` environment variable is visible to
+/// other processes running under the same user. For sensitive environments,
+/// prefer the interactive prompt (which does not echo input) and run the CLI
+/// with restricted permissions so only the intended user can invoke it.
 pub fn resolve_passphrase(flag: Option<&str>) -> Result<String, WalletError> {
     if let Some(passphrase) = flag {
         if passphrase.is_empty() {
@@ -136,22 +143,20 @@ pub fn resolve_passphrase(flag: Option<&str>) -> Result<String, WalletError> {
         }
         return Ok(passphrase);
     }
-    use std::io::{self, Write};
-    print!("Enter passphrase: ");
-    io::stdout()
-        .flush()
-        .map_err(|e| WalletError::Passphrase(format!("failed to flush prompt: {e}")))?;
-    let mut line = String::new();
-    io::stdin().read_line(&mut line).map_err(|e| {
-        WalletError::Passphrase(format!("failed to read passphrase from stdin: {e}"))
-    })?;
-    let passphrase = line.trim().to_string();
-    if passphrase.is_empty() {
-        return Err(WalletError::Passphrase(
-            "passphrase must not be empty".to_string(),
-        ));
+    match rpassword::prompt_password("Passphrase: ") {
+        Ok(passphrase) => {
+            if passphrase.is_empty() {
+                return Err(WalletError::Passphrase(
+                    "passphrase must not be empty".to_string(),
+                ));
+            }
+            Ok(passphrase)
+        }
+        Err(_) => Err(WalletError::Passphrase(
+            "interactive prompt unavailable in non-TTY environment; use --passphrase or ATOLL_PASSPHRASE"
+                .to_string(),
+        )),
     }
-    Ok(passphrase)
 }
 
 /// CLI entry point.

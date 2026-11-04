@@ -18,3 +18,7 @@ rand = "0.8"
 # aead is needed for the XChaCha20-Poly1305 `encrypt`/`decrypt` trait methods.
 chacha20poly1305 = "0.10"
 aead = "0.5"
+# rpassword provides hidden (non-echoing) interactive passphrase prompts (H1).
+rpassword = "7"
+# zeroize provides Zeroizing to scrub passphrase bytes from memory on drop (M1).
+zeroize = "1"
