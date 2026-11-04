@@ -173,8 +173,7 @@ impl PoSTVerifier {
             if response.len() != 8 + 64 {
                 return false;
             }
-            let index =
-                u64::from_le_bytes(response[..8].try_into().unwrap()) as usize; // len == 72
+            let index = u64::from_le_bytes(response[..8].try_into().unwrap()) as usize; // len == 72
             let leaf = Hash512::from_bytes(&response[8..72]); // len == 72
 
             // Path: serialized Hash512 nodes, 64 bytes each
@@ -305,13 +304,7 @@ fn wesolowski_challenge(x: &BigUint, y: &BigUint, T: u64, N: &BigUint) -> BigUin
 /// where `e = blake3(x || y || T)` interpreted as a BigUint.
 ///
 /// Returns `true` if the proof is valid, `false` otherwise.
-pub fn verify_wesolowski(
-    x: &BigUint,
-    y: &BigUint,
-    pi: &BigUint,
-    T: u64,
-    N: &BigUint,
-) -> bool {
+pub fn verify_wesolowski(x: &BigUint, y: &BigUint, pi: &BigUint, T: u64, N: &BigUint) -> bool {
     // Reject degenerate moduli; modpow panics on modulus 0.
     if N == &BigUint::from(0u32) || N == &BigUint::from(1u32) {
         return false;
@@ -326,11 +319,7 @@ pub fn verify_wesolowski(
     // x^(2^(T mod 2)) mod N:
     //   T even → x^1   = x
     //   T odd  → x^2   = (x * x) mod N
-    let x_factor = if T % 2 == 0 {
-        x % N
-    } else {
-        (x * x) % N
-    };
+    let x_factor = if T % 2 == 0 { x % N } else { (x * x) % N };
 
     let lhs = (pi_pow * x_factor) % N;
     let rhs = y % N;
@@ -372,9 +361,9 @@ mod tests {
         //   T even => x_factor = x = 2
         //   y must equal x_factor = 2
         TimeProof {
-            vdf_output: vec![2u8],       // y = 2
-            vdf_proof: vec![1u8],        // pi = 1
-            elapsed_seconds: 30,         // even
+            vdf_output: vec![2u8], // y = 2
+            vdf_proof: vec![1u8],  // pi = 1
+            elapsed_seconds: 30,   // even
         }
     }
 

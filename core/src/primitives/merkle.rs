@@ -260,7 +260,12 @@ mod tests {
         let leaves: Vec<Hash512> = (0..4).map(leaf).collect();
         let tree = MerkleTree::build(&leaves);
         let proof = tree.prove(0).unwrap();
-        assert!(!MerkleTree::verify_proof(Hash512::zero(), leaves[0], 0, &proof));
+        assert!(!MerkleTree::verify_proof(
+            Hash512::zero(),
+            leaves[0],
+            0,
+            &proof
+        ));
     }
 
     #[test]

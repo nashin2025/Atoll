@@ -575,9 +575,9 @@ mod tests {
     ///   y must equal x_factor = 2
     fn valid_time_proof() -> post::TimeProof {
         post::TimeProof {
-            vdf_output: vec![2u8],      // y = 2
-            vdf_proof: vec![1u8],       // pi = 1
-            elapsed_seconds: 30,        // even
+            vdf_output: vec![2u8], // y = 2
+            vdf_proof: vec![1u8],  // pi = 1
+            elapsed_seconds: 30,   // even
         }
     }
 
