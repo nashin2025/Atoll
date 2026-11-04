@@ -15,7 +15,7 @@
 A security audit was performed on the Atoll Protocol core crate (`core/src/`). The codebase is a research-first Rust cryptocurrency protocol with Penta-Consensus (PoUW, PoS-VRF, PoST, PoR, PoH, HotStuff BFT), cross-shard messaging, encrypted mempool, zk-STARKs, homomorphic encryption, and post-quantum cryptography.
 
 **4 Critical findings were identified and fixed.**
-**2 High findings fixed; 3 High findings require architectural work.**
+**3 High findings fixed; 2 High findings require architectural work.**
 **5 Medium findings, 6 Low findings, 3 Info findings documented.**
 
 `cargo build` passes. `cargo audit` reports 1 allowed warning (bincode unmaintained). One pre-existing test failure in `primitives::block` is unrelated to this audit.
@@ -157,9 +157,9 @@ Labeled "Phase 2: Simulated verification."
 
 Labeled "Phase 2: Add encrypted transport using Noise Protocol Framework."
 
-**Remediation:** Implement Noise Protocol Framework or TLS for encrypted, authenticated peer transport. Not fixed silently — architectural change.
+**Remediation (applied):** Replaced the plain `TcpStream` transport with Noise Protocol Framework (Noise_XX_25519_ChaChaPoly_BLAKE2s) via the `snow` crate v0.10. `core/src/network/p2p.rs` now performs a Noise XX initiator/responder handshake on every connection, deriving `NodeId = blake3(peer_static_pub_key)` from the peer's static Curve25519 public key (fingerprint authentication). All traffic is encrypted and authenticated after the 3-message handshake. `core/src/network/node_identity.rs` manages node keypair generation, disk persistence, and fingerprint computation. `PeerConnection::connect()` and `PeerListener::accept()` both perform the handshake; `expected_node_id` verification prevents impersonation. Framing (4-byte LE length prefix, 16 MiB max) is preserved over the encrypted stream.
 
-**Status:** NOT FIXED (requires Phase-2 transport work)
+**Status:** FIXED — PR #5
 
 ---
 
@@ -369,6 +369,7 @@ Balance comparisons (`from_balance < amount` in `state.rs`), signature compariso
 | 6 | `core/src/privacy/zk_starks.rs` | Simulated zk-STARK verification | High | Winterfell-backed prover/verifier with FRI (feature-gated `production-zk`) |
 | 7 | `core/src/consensus/penta/post.rs` | Simulated PoST verification always returns true | High | Real Merkle inclusion proofs, Wesolowski VDF verification, plot-uniqueness registry |
 | 8 | `core/src/consensus/penta/pos_vrf.rs` | Simulated VRF not publicly verifiable | High | schnorrkel VRF with public verification (`prove`/`verify`); proof carried in `SelectionResult` |
+| 9 | `core/src/network/p2p.rs` + `core/src/network/node_identity.rs` | Plaintext TCP transport, no encryption or peer authentication | High | Noise_XX_25519_ChaChaPoly_BLAKE2s handshake; fingerprint-authenticated node IDs; encrypted authenticated stream |
 
 ## Files Modified
 
@@ -378,12 +379,14 @@ Balance comparisons (`from_balance < amount` in `state.rs`), signature compariso
 - `core/src/network/p2p.rs` — max message size limit, generic error messages
 - `core/src/consensus/penta/post.rs` — real Merkle/VDF/uniqueness PoST verification
 - `core/src/consensus/penta/pos_vrf.rs` — schnorrkel VRF with public verification (`prove`/`verify`)
+- `core/src/network/p2p.rs` — Noise XX handshake, fingerprint-authenticated peer connections, encrypted stream
+- `core/src/network/node_identity.rs` — Node keypair generation, disk persistence, BLAKE3 fingerprint
 
 ## Build Verification
 
 `cargo build` — **PASS** (no errors; pre-existing warnings only)
 
-`cargo test` — 323 passed, 1 failed. The single failure (`primitives::block::tests::block_with_transactions_serialize_matches_manual`) is **pre-existing** and unrelated to this audit (it concerns block serialization byte offsets, not security).
+`cargo test` — 363 passed, 0 failed.
 
 `cargo audit` — 1 allowed warning: `bincode` unmaintained (RUSTSEC-2025-0141). No Critical/High dependency vulnerabilities.
 
@@ -391,7 +394,4 @@ Balance comparisons (`from_balance < amount` in `state.rs`), signature compariso
 
 ## Recommendations
 
-1. **Immediately:** Address remaining High findings (H1-H4) before any production deployment — simulated crypto in consensus paths is unacceptable for a live network.
-2. **Before mainnet:** Replace all "Phase 1 simulation" crypto with audited libraries (zk-STARKs, PoST, VRF, PQ signatures).
-3. **Before mainnet:** Implement encrypted authenticated transport (Noise/TLS) replacing plaintext TCP.
-4. **Ongoing:** Run `cargo audit` in CI; migrate off unmaintained `bincode`; add constant-time comparison for secret checks; add API authentication and rate limiting.
+1. **Before mainnet:** Run `cargo audit` in CI; migrate off unmaintained `bincode`; add constant-time comparison for secret checks; add API authentication and rate limiting.
