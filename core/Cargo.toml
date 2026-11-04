@@ -43,6 +43,7 @@ bincode = "2"
 tokio = { version = "1", features = ["full"] }
 
 # Networking
+snow = "0.10"
 
 # CLI
 clap = { version = "4", features = ["derive"] }

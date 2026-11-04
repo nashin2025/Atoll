@@ -72,3 +72,74 @@ Phase 4: Sharding Production - COMPLETE
 Phase 5: Privacy & Security - COMPLETE
 
 Phase 6: Testing & Auditing - COMPLETE
+
+---
+
+## Feature Plan: Encrypted Authenticated P2P Transport (Security Finding H4)
+
+### Goal
+Remediate audit finding H4 (NOT FIXED): replace plaintext TCP transport in `core/src/network/p2p.rs` with an encrypted, authenticated peer transport so peers cannot be spoofed, traffic cannot be injected, and connections are confidential. Node IDs must be derived from a node's public-key fingerprint instead of its IP address.
+
+### Target User
+Atoll Protocol node operators and the P2P mesh layer; all upstream consumers (`discovery`, `gossip`, `sync`, `peer_manager`, `encrypted_mempool`) that rely on `NodeId`/`PeerInfo` and `send_message`/`receive_message`.
+
+### Library Choice
+**`snow` (Noise Protocol Framework, pure Rust) — `snow = "0.9"`**.
+
+Rejected: TLS 1.3 via `tokio-rustls`/`rustls`. TLS requires X.509 certificate provisioning, CA trust, and renewal — heavyweight infrastructure for a P2P mesh and out of MVP scope. Noise XX gives mutual authentication (both sides present static public keys), encryption, and forward secrecy in a single handshake with no PKI, matching the audit's stated remediation ("Phase 2: Add encrypted transport using Noise Protocol Framework"). `snow` is pure Rust (no C toolchain), depends only on crates already compatible with this codebase (`curve25519-dalek`, `chacha20poly1305`, `blake2`, `digest`, `rand`), and pairs cleanly with `tokio::net::TcpStream`.
+
+Noise pattern: **Noise_XX_25519_ChaChaPoly_BLAKE2s** — mutual static-key authentication, ephemeral DH for forward secrecy, ChaCha20-Poly1305 AEAD, BLAKE2s hashing.
+
+### Integration Approach (design only — no implementation code yet)
+
+The change is confined to `core/src/network/p2p.rs`. The `NetworkMessage` serialization format, length-prefixed framing (4-byte LE u32 length + payload), `MAX_MESSAGE_SIZE` (16 MiB, H5 fix preserved), `NodeId = [u8; 32]`, and `PeerInfo` shape are all unchanged so existing consumers and unit tests interoperate.
+
+1. **Node identity**: each node generates a static Curve25519 Noise keypair at startup and persists it to disk (e.g. `data/node_key.json` via `serde`, already a dependency). `NodeId` = BLAKE3 fingerprint (first 32 bytes) of the static public key. A lost key = lost identity; document backup/rotation.
+2. **`PeerConnection::connect(node_id, address)`**: `TcpStream::connect` → Noise XX **initiator** handshake (send static key, receive and authenticate peer's static key) → derive peer `NodeId` from peer's static-key fingerprint and verify it matches the expected `node_id` when known → wrap stream in Noise transport (encrypt/decrypt).
+3. **`PeerListener::accept()`**: `TcpListener::accept` → Noise XX **responder** handshake → derive `NodeId` from peer's static-key fingerprint.
+4. **Framing**: keep existing length-prefixed framing over the Noise-encrypted stream; `send_message`/`receive_message` signatures and `NetworkMessage` byte format unchanged. Noise `encrypt`/`decrypt` operate on whole messages, so each length-prefixed payload is sent as one Noise message.
+5. **Consumers**: `peer_manager`, `discovery`, `gossip`, `sync`, `encrypted_mempool` use `NodeId`/`PeerInfo` and the `send_message`/`receive_message` API — no semantic changes expected; verify compilation after the transport rework.
+
+### Dependencies to Add
+- `snow = "0.9"` (Noise Protocol Framework; pulls in curve25519-dalek, chacha20poly1305, blake2, digest, rand)
+- `serde` is already a dependency (derive feature) — reuse for keypair persistence
+- `blake3` is already a dependency — reuse for NodeId fingerprinting
+
+No new `noise`, `rustls`, or `tokio-rustls` crates.
+
+### Task Breakdown (max 10)
+
+| # | Task | Owner | Status |
+|---|------|-------|--------|
+| 1 | Add `snow` dependency to `core/Cargo.toml`; verify `cargo build` passes | Forge | Planned |
+| 2 | Implement node identity: static Noise keypair generation, load/save to disk, `NodeId = blake3(static_pub_key)` fingerprint | Forge | Planned |
+| 3 | Rework `PeerConnection::connect()`: TCP connect → Noise XX initiator handshake → authenticate peer static key → wrap stream; verify peer fingerprint vs expected `node_id` | Forge | Planned |
+| 4 | Rework `PeerListener::accept()`: TCP accept → Noise XX responder handshake → derive `NodeId` from peer fingerprint | Forge | Planned |
+| 5 | Adapt length-prefixed framing over Noise-encrypted transport; keep `NetworkMessage` serialization byte-for-byte unchanged | Forge | Planned |
+| 6 | Add unit tests: handshake roundtrip between two nodes, encrypted send/receive, fingerprint derivation, key-mismatch rejection | Forge | Planned |
+| 7 | Verify all consumers compile (`peer_manager`, `discovery`, `gossip`, `sync`, `encrypted_mempool`); fix type mismatches | Forge | Planned |
+| 8 | Run `cargo build`, `cargo test`, `cargo clippy`; resolve warnings/errors | Forge | Planned |
+| 9 | Update VIBE_PLAN.md + audit tracking artifact marking H4 remediated; document key backup/rotation and backward-compatibility notes | Atlas | Planned |
+
+### Risks
+- **Identity loss**: losing the static key changes the node's `NodeId`; existing peers won't recognize it. Mitigation: document key backup; treat `node_key.json` like a wallet seed.
+- **Handshake complexity**: initiator/responder state machine, handshake failure handling without panicking, and partial-handshake timeouts need care.
+- **Backward compatibility**: plain-TCP nodes cannot connect to Noise nodes. Mitigation: version/upgrade coordination; dual-port or cleartext-optional mode is a post-MVP consideration.
+- **`snow` + tokio ergonomics**: adapting `snow` transports to `tokio::io::AsyncRead`/`AsyncWrite` may require small wrappers.
+- **DoS on handshake**: Noise DH is compute-heavy; rate limiting on connection attempts is deferred to a follow-up task.
+- **Fingerprint collision**: astronomically unlikely with 256-bit BLAKE3; noted but not mitigated in MVP.
+
+### Timeline
+Estimated complexity: **Medium (≈ 3 business days)** per plan-feature sizing (M = 3 days), plus 1 day for testing/docs. Target: one work week end-to-end for MVP.
+
+### Behavior Preserved (must not break)
+- `serialize_message`/`deserialize_message` byte format for all `NetworkMessage` variants (Ping, Pong, FindNode, etc.) — pure-function unit tests in `p2p.rs` and `mod.rs` must continue to pass.
+- 4-byte LE length-prefixed framing and `MAX_MESSAGE_SIZE` 16 MiB cap.
+- `NodeId = [u8; 32]` and `PeerInfo { node_id, address, port, last_seen }` shapes — all consumers keep compiling.
+- `nonce_counter` field retained on `PeerConnection`.
+
+### Decision
+Adopt `snow` Noise_XX_25519_ChaChaPoly_BLAKE2s; NodeId from static-key fingerprint; framing and message serialization unchanged.
+
+### Next Step
+Run `/build-feature` against the implementation issue once it is created from this plan; then `/review-code`.
