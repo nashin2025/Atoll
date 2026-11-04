@@ -30,9 +30,9 @@ Cryptocurrency researchers, developers, and users who value formal verification,
 |---|------|-------|--------|
 | 1 | Initialize repository and project structure (Atoll naming) | Forge | ✅ Done |
 | 2 | Phase 0: Literature review - consensus mechanisms, hash functions, blockchain architectures | Scout | ✅ Done |
-| 3 | Phase 0: Theoretical design - Morph-Hash spec, Penta-Consensus formal model | Atlas | in_progress |
-| 4 | Phase 0: Proof of concept - Python prototypes of core algorithms | Forge | pending |
-| 5 | Phase 0: Academic paper submissions and formal verification setup | Scribe | pending |
+| 3 | Phase 0: Theoretical design - Morph-Hash spec, Penta-Consensus formal model | Atlas | ✅ Done |
+| 4 | Phase 0: Proof of concept - Python prototypes of core algorithms | Forge | ✅ Done |
+| 5 | Phase 0: Academic paper submissions and formal verification setup | Scribe | in_progress |
 | 6 | Phase 0: Development roadmap finalization | Atlas | pending |
 | 7 | Set up CI/CD pipeline with research → test → PR workflow | Clockwork | ✅ Done |
 | 8 | Create .env.example and documentation scaffolding | Scribe | ✅ Done |
