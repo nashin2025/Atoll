@@ -55,6 +55,7 @@ Cryptocurrency researchers, developers, and users who value formal verification,
 - Consensus: Penta-Consensus (5 layers)
 - Hash: Morph-Hash
 - License: Apache 2.0 + MIT dual
+- **README updates required for every PR** — every PR must update README.md to reflect current project state, feature status, test counts, and audit results before merging
 
 ## Risks
 - Massive scope; must break into small verifiable increments
