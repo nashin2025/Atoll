@@ -5,7 +5,8 @@
 //! Phase 1: Interface and simulation.
 //! Phase 2: Full homomorphic encryption implementation.
 
-use crate::primitives::hash::Hash512;
+use rand::rngs::OsRng;
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -104,17 +105,25 @@ impl HomomorphicEngine {
 
     /// Generates a key pair
     pub fn generate_key_pair(&mut self) -> Result<(), String> {
-        let public_key = Hash512::blake3(b"he_public_key").to_bytes();
-        let secret_key = Hash512::blake3(b"he_secret_key").to_bytes();
+        let mut rng = OsRng;
+
+        let mut public_key = vec![0u8; 64];
+        let mut secret_key = vec![0u8; 64];
+        rng.fill_bytes(&mut public_key);
+        rng.fill_bytes(&mut secret_key);
 
         let relinearization_key = if self.context.scheme == HomomorphicScheme::BFV {
-            Some(Hash512::blake3(b"he_relin_key").to_bytes())
+            let mut relin_key = vec![0u8; 64];
+            rng.fill_bytes(&mut relin_key);
+            Some(relin_key)
         } else {
             None
         };
 
         let galois_keys = if self.context.scheme == HomomorphicScheme::CKKS {
-            Some(Hash512::blake3(b"he_galois_key").to_bytes())
+            let mut galois_key = vec![0u8; 64];
+            rng.fill_bytes(&mut galois_key);
+            Some(galois_key)
         } else {
             None
         };

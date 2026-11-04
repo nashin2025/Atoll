@@ -5,6 +5,8 @@
 //! Phase 2: Full Dilithium, SPHINCS+, and Kyber implementation.
 
 use crate::primitives::hash::Hash512;
+use rand::rngs::OsRng;
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -115,10 +117,15 @@ impl PQSignatureEngine {
 
         // Phase 1: Simulated signing
         // Phase 2: Full Dilithium/SPHINCS+ signing
+        //
+        // The signature is bound to the message and the public key so that
+        // verification with a different public key fails. This is a simulation
+        // placeholder and must be replaced with real Dilithium/SPHINCS+
+        // signatures before production use.
 
         let mut signature = Hash512::blake3(&[
             message,
-            &keypair.secret_key,
+            &keypair.public_key,
         ].concat()).0.to_vec();
 
         // Pad to scheme-specific size
@@ -138,19 +145,31 @@ impl PQSignatureEngine {
     /// Verifies a PQ signature
     pub fn verify(
         &self,
-        _message: &[u8],
+        message: &[u8],
         signature: &PQSignature,
-        _public_key: &[u8],
+        public_key: &[u8],
     ) -> Result<bool, String> {
         if signature.signature.is_empty() {
             return Ok(false);
         }
 
         // Phase 1: Simulated verification
-        // In a real implementation, this would verify the signature using
-        // the public key and the signature algorithm (Dilithium/SPHINCS+)
-        // For Phase 1, we accept any non-empty signature
-        Ok(true)
+        // Re-derives the expected signature from the message and public key.
+        // A signature produced by `sign` with the matching keypair will verify;
+        // a signature produced with a different keypair will not.
+        //
+        // Phase 2: Full Dilithium/SPHINCS+ verification
+
+        let expected = Hash512::blake3(&[message, public_key].concat()).0.to_vec();
+        let expected_size = self.signature_size(signature.scheme);
+        let mut expected_padded = expected;
+        if expected_padded.len() < expected_size {
+            expected_padded.resize(expected_size, 0);
+        } else {
+            expected_padded.truncate(expected_size);
+        }
+
+        Ok(signature.signature == expected_padded)
     }
 
     /// Returns key sizes for a scheme
@@ -274,7 +293,8 @@ impl HybridSignatureEngine {
             PQSignatureScheme::Dilithium5,
         )?;
 
-        let classical = Hash512::blake3(b"hybrid_classical").0;
+        let mut classical = [0u8; 64];
+        OsRng.fill_bytes(&mut classical);
 
         Ok(HybridKeyPair {
             classical: classical.to_vec(),
@@ -387,7 +407,10 @@ mod tests {
         let message = b"test message";
 
         let signature = engine.sign(message, &keypair1).unwrap();
-        // Phase 1: Prototype accepts any non-empty signature
+        // Correct key verifies
+        let valid = engine.verify(message, &signature, &keypair1.public_key).unwrap();
+        assert!(valid);
+        // Phase 1: Prototype accepts any non-empty signature regardless of key
         let valid = engine.verify(message, &signature, &keypair2.public_key).unwrap();
         assert!(valid);
     }
@@ -441,14 +464,22 @@ mod tests {
         let message = b"hybrid test message";
 
         let signature = engine.sign(message, &keypair1).unwrap();
-        // Phase 1: Prototype accepts any non-empty signature
+        // Correct keys verify
+        let valid = engine.verify(
+            message,
+            &signature,
+            &keypair1.classical,
+            &keypair1.pq_dilithium,
+        ).unwrap();
+        assert!(valid);
+        // Wrong keys fail because classical signature is key-dependent
         let valid = engine.verify(
             message,
             &signature,
             &keypair2.classical,
             &keypair2.pq_dilithium,
         ).unwrap();
-        assert!(valid);
+        assert!(!valid);
     }
 
     #[test]

@@ -15,3 +15,16 @@ impl Default for NetworkParams {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn network_params_default_values() {
+        let params = NetworkParams::default();
+        assert_eq!(params.target_block_time, crate::TARGET_BLOCK_TIME);
+        assert_eq!(params.max_block_size, 2 * 1024 * 1024);
+        assert_eq!(params.max_tx_per_block, 10_000);
+    }
+}

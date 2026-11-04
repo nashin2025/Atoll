@@ -45,8 +45,8 @@ impl PeerConnection {
 
         // Send length-prefixed payload
         let len = (payload.len() as u32).to_le_bytes();
-        self.stream.write_all(&len).await.map_err(|e| format!("Send length failed: {}", e))?;
-        self.stream.write_all(&payload).await.map_err(|e| format!("Send data failed: {}", e))?;
+        self.stream.write_all(&len).await.map_err(|_| "Send length failed".to_string())?;
+        self.stream.write_all(&payload).await.map_err(|_| "Send data failed".to_string())?;
 
         Ok(())
     }
@@ -55,12 +55,18 @@ impl PeerConnection {
     pub async fn receive_message(&mut self) -> Result<NetworkMessage, String> {
         // Read length prefix
         let mut len_bytes = [0u8; 4];
-        self.stream.read_exact(&mut len_bytes).await.map_err(|e| format!("Read length failed: {}", e))?;
+        self.stream.read_exact(&mut len_bytes).await.map_err(|_e| "Read length failed".to_string())?;
         let len = u32::from_le_bytes(len_bytes) as usize;
+
+        // Reject unreasonably large payloads to prevent memory exhaustion
+        const MAX_MESSAGE_SIZE: usize = 16 * 1024 * 1024; // 16 MB
+        if len > MAX_MESSAGE_SIZE {
+            return Err(format!("Message too large: {} bytes", len));
+        }
 
         // Read payload
         let mut payload = vec![0u8; len];
-        self.stream.read_exact(&mut payload).await.map_err(|e| format!("Read data failed: {}", e))?;
+        self.stream.read_exact(&mut payload).await.map_err(|_e| "Read data failed".to_string())?;
 
         Self::deserialize_message(&payload)
     }
