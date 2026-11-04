@@ -120,6 +120,11 @@ atoll-protocol/
 ├── specification/              # Protocol specifications
 ├── prototypes/                 # Phase 0 Python prototypes
 ├── audits/                     # Security audit reports
+├── wallet/                     # Wallet implementations
+│   ├── cli/                    # CLI wallet MVP (new/import keys, balances, signed txs)
+│   ├── gui/
+│   ├── mobile-android/
+│   └── mobile-ios/
 ├── PERFORMANCE_PHASE6.md       # Phase 6 benchmark results
 ├── SECURITY_AUDIT_PHASE6.md    # Phase 6 security audit report
 ├── VIBE_PLAN.md                # Project plan and task tracking
@@ -178,6 +183,36 @@ GitHub Actions CI pipeline runs on every push and PR:
 ## License
 
 Apache 2.0 + MIT dual license.
+
+## CLI Wallet
+
+A command-line wallet for holding ATOLL and building/signing transactions offline. Implemented as the `wallet-cli` crate in `wallet/cli/`.
+
+```bash
+# Build
+cargo build -p wallet-cli
+
+# Generate a new Ed25519 key and save it to the keystore
+cargo run -p wallet-cli -- --keystore ~/.atoll/keystore.json new
+
+# Import an existing 32-byte secret key (64 hex characters)
+cargo run -p wallet-cli -- import <secret-key-hex>
+
+# Query ATOLL balance (offline ChainState)
+cargo run -p wallet-cli -- balance <address>
+
+# Build, sign, and output a transaction as hex for manual submission
+cargo run -p wallet-cli -- send <from> <to> <amount> ATOLL
+
+# View transaction history (offline mode)
+cargo run -p wallet-cli -- history <address>
+```
+
+Notes:
+- MVP supports ATOLL only; MIND/PROOF per-address balances deferred.
+- Keystore defaults to `~/.atoll/keystore.json` (plaintext JSON; encryption is post-MVP).
+- All chain operations run against a local offline ChainState; `send` emits signed transaction hex for manual submission via a node RPC (RPC integration deferred).
+- Address derivation: `BLAKE3(public_key)[..20]`, matching the 20-byte `Address` type.
 
 ## Security
 

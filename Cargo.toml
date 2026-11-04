@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "core",
+    "wallet/cli",
 ]
 
 resolver = "2"
