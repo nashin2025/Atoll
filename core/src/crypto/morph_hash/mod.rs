@@ -3,12 +3,15 @@
 //! Self-evolving hash with rotating algorithm pools, AI-evolved S-boxes,
 //! memory-hard computation, and post-quantum finalization.
 //!
-//! This is the Phase 1 Rust implementation based on the theoretical design
-//! in `specification/research/theoretical-design.md`. It matches the Python
-//! prototype outputs for deterministic test vectors.
+//! Phase 2: Production implementation with real cryptographic algorithms.
+//! SHA-512, SHA3-512, BLAKE3, Argon2id, and Scrypt use real crypto crates.
+//! Other algorithms use simplified implementations (to be replaced with
+//! full implementations in Phase 3).
 
 use crate::primitives::hash::Hash512;
-use serde::{Deserialize, Serialize};
+use digest::{Digest, OutputSizeUser};
+use sha2::Sha512;
+use sha3::{Digest as Sha3Digest, Sha3_512};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
@@ -32,7 +35,7 @@ pub const MEMORY_ACCESS_ROUNDS: usize = 1024;
 // ---------------------------------------------------------------------------
 
 /// The 32 algorithm variants in the Morph-Hash rotation pool.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MorphAlgorithm {
     // Sponge-based
     Keccak512,
@@ -160,6 +163,291 @@ impl MorphAlgorithm {
 }
 
 // ---------------------------------------------------------------------------
+// Real Algorithm Implementations
+// ---------------------------------------------------------------------------
+
+/// Applies a single morph algorithm to input data, producing 64 bytes.
+///
+/// Uses real cryptographic implementations where available:
+/// - SHA-512, SHA3-512, BLAKE3 via Rust crypto crates
+/// - Argon2id, Scrypt via password hashing crates
+/// - Custom ATOLL primitives via native implementations
+/// - All other algorithms via simplified placeholder implementations
+fn apply_algorithm(algo: MorphAlgorithm, input: &[u8]) -> Vec<u8> {
+    match algo {
+        MorphAlgorithm::SHA512 => {
+            let mut hasher = Sha512::new();
+            hasher.update(input);
+            let result = hasher.finalize_reset();
+            let mut output = [0u8; 64];
+            output.copy_from_slice(&result);
+            output.to_vec()
+        }
+        MorphAlgorithm::SHA3_512 => {
+            let mut hasher = Sha3_512::new();
+            hasher.update(input);
+            let result = hasher.finalize_reset();
+            result.to_vec()
+        }
+        MorphAlgorithm::BLAKE3 => {
+            let mut hasher = blake3::Hasher::new();
+            hasher.update(input);
+            let mut out = [0u8; 64];
+            hasher.finalize_xof().fill(&mut out);
+            out.to_vec()
+        }
+        MorphAlgorithm::BLAKE2b => {
+            // BLAKE2b via blake3 keyed mode (different salt per algorithm)
+            let salt = b"BLAKE2b";
+            let mut key = [0u8; 32];
+            key[..salt.len()].copy_from_slice(salt);
+            let mut hasher = blake3::Hasher::new_keyed(&key);
+            hasher.update(input);
+            let mut out = [0u8; 64];
+            hasher.finalize_xof().fill(&mut out);
+            out.to_vec()
+        }
+        MorphAlgorithm::SHA512_256 => {
+            let mut hasher = Sha512::new();
+            hasher.update(input);
+            let result = hasher.finalize();
+            let mut padded = [0u8; 64];
+            padded[..32].copy_from_slice(&result[..32]);
+            padded.to_vec()
+        }
+        MorphAlgorithm::Argon2id => {
+            // Argon2id with 64-byte output, 3 passes, 64KB memory
+            let mut output = [0u8; 64];
+            let params = argon2::Params::new(64, 3, 1, None).unwrap();
+            let argon2 = argon2::Argon2::new(
+                argon2::Algorithm::Argon2id,
+                argon2::Version::V0x13,
+                params,
+            );
+            argon2
+                .hash_password_into(input, &salt_for_algorithm("Argon2id"), &mut output)
+                .expect("Argon2id hashing failed");
+            output.to_vec()
+        }
+        MorphAlgorithm::Scrypt => {
+            // Scrypt with 64-byte output
+            let mut output = [0u8; 64];
+            let params = scrypt::Params::new(16, 8, 1).unwrap();
+            scrypt::scrypt(input, &salt_for_algorithm("Scrypt"), &params, &mut output)
+                .expect("Scrypt hashing failed");
+            output.to_vec()
+        }
+        // Custom ATOLL primitives
+        MorphAlgorithm::AtollARX => atoll_arx(input),
+        MorphAlgorithm::AtollSponge => atoll_sponge(input),
+        MorphAlgorithm::AtollFeistel => atoll_feistel(input),
+        MorphAlgorithm::AtollSPN => atoll_spn(input),
+        MorphAlgorithm::AtollLattice => atoll_lattice(input),
+        MorphAlgorithm::AtollTreeHash => atoll_tree_hash(input),
+        // Simplified implementations for remaining algorithms
+        // These will be replaced with full implementations in Phase 3
+        MorphAlgorithm::Keccak512 => simplified_hash(input, "Keccak512"),
+        MorphAlgorithm::KangarooTwelve => simplified_hash(input, "KangarooTwelve"),
+        MorphAlgorithm::Whirlpool => simplified_hash(input, "Whirlpool"),
+        MorphAlgorithm::Skein512 => simplified_hash(input, "Skein512"),
+        MorphAlgorithm::JH512 => simplified_hash(input, "JH512"),
+        MorphAlgorithm::Groestl512 => simplified_hash(input, "Groestl512"),
+        MorphAlgorithm::Fugue512 => simplified_hash(input, "Fugue512"),
+        MorphAlgorithm::Luffa512 => simplified_hash(input, "Luffa512"),
+        MorphAlgorithm::SHAvite512 => simplified_hash(input, "SHAvite512"),
+        MorphAlgorithm::SIMD512 => simplified_hash(input, "SIMD512"),
+        MorphAlgorithm::ECHO512 => simplified_hash(input, "ECHO512"),
+        MorphAlgorithm::Hamsi512 => simplified_hash(input, "Hamsi512"),
+        MorphAlgorithm::Shabal512 => simplified_hash(input, "Shabal512"),
+        MorphAlgorithm::BMW512 => simplified_hash(input, "BMW512"),
+        MorphAlgorithm::CubeHash512 => simplified_hash(input, "CubeHash512"),
+        MorphAlgorithm::Yescrypt => simplified_hash(input, "Yescrypt"),
+        MorphAlgorithm::Lyra2Rev3 => simplified_hash(input, "Lyra2Rev3"),
+        MorphAlgorithm::BalloonHash => simplified_hash(input, "BalloonHash"),
+        MorphAlgorithm::RandomX => simplified_hash(input, "RandomX"),
+    }
+}
+
+/// Returns a unique salt for password-hashing algorithms.
+fn salt_for_algorithm(name: &str) -> &[u8] {
+    match name {
+        "Argon2id" => b"atoll-argon2id-salt-01",
+        "Scrypt" => b"atoll-scrypt-salt-01",
+        _ => b"atoll-default-salt-01",
+    }
+}
+
+/// Simplified hash implementation for algorithms without mature Rust crates.
+///
+/// Phase 2: Uses BLAKE3 with algorithm-specific salt as a placeholder.
+/// Phase 3: Replace with full algorithm implementations.
+fn simplified_hash(input: &[u8], algo_name: &str) -> Vec<u8> {
+    let salt = algo_name.as_bytes();
+    let mut key = [0u8; 32];
+    key[..salt.len().min(32)].copy_from_slice(&salt[..salt.len().min(32)]);
+    let mut hasher = blake3::Hasher::new_keyed(&key);
+    hasher.update(input);
+    let mut out = [0u8; 64];
+    hasher.finalize_xof().fill(&mut out);
+    out.to_vec()
+}
+
+// ---------------------------------------------------------------------------
+// Custom ATOLL Primitives
+// ---------------------------------------------------------------------------
+
+/// Custom ATOLL ARX (Add-Rotate-XOR) cipher-based hash.
+fn atoll_arx(input: &[u8]) -> Vec<u8> {
+    let mut state = [0u64; 8];
+    for (i, &byte) in input.iter().enumerate() {
+        state[i % 8] ^= byte as u64;
+        state[i % 8] = state[i % 8].wrapping_add(0x9E3779B97F4A7C15);
+        state[i % 8] = state[i % 8].rotate_left(31);
+        state[i % 8] ^= state[(i + 1) % 8];
+    }
+    let mut output = [0u8; 64];
+    for (i, &s) in state.iter().enumerate() {
+        output[i * 8..(i + 1) * 8].copy_from_slice(&s.to_le_bytes());
+    }
+    output.to_vec()
+}
+
+/// Custom ATOLL Sponge construction.
+fn atoll_sponge(input: &[u8]) -> Vec<u8> {
+    let mut state = [0u64; 25]; // 200-bit state
+    let rate = 8; // bytes per absorption step
+
+    // Absorb input
+    for chunk in input.chunks(rate) {
+        for (i, &byte) in chunk.iter().enumerate() {
+            state[i] ^= byte as u64;
+        }
+        // Permute (simplified)
+        for i in 0..25 {
+            state[i] = state[i].wrapping_mul(0x9E3779B97F4A7C15);
+            state[i] = state[i].rotate_left(17);
+            state[i] ^= state[(i + 1) % 25];
+        }
+    }
+
+    // Squeeze output
+    let mut output = [0u8; 64];
+    for i in 0..64 {
+        output[i] = state[i % 25] as u8;
+        state[i % 25] = state[i % 25].wrapping_add(0x9E3779B97F4A7C15);
+    }
+    output.to_vec()
+}
+
+/// Custom ATOLL Feistel network hash.
+fn atoll_feistel(input: &[u8]) -> Vec<u8> {
+    let mut left: u64 = 0;
+    let mut right: u64 = 0;
+
+    for (i, &byte) in input.iter().enumerate() {
+        let key = (i as u64).wrapping_mul(0x9E3779B97F4A7C15);
+        let f = right.wrapping_add(key).rotate_left(7);
+        let new_right = left ^ f;
+        left = right;
+        right = new_right ^ byte as u64;
+    }
+
+    let mut output = [0u8; 64];
+    output[..8].copy_from_slice(&left.to_le_bytes());
+    output[8..16].copy_from_slice(&right.to_le_bytes());
+    for i in 16..64 {
+        output[i] = output[i - 16] ^ output[i - 8];
+    }
+    output.to_vec()
+}
+
+/// Custom ATOLL SPN (Substitution-Permutation Network) hash.
+fn atoll_spn(input: &[u8]) -> Vec<u8> {
+    let sbox: [u8; 16] = [
+        0xE, 0x4, 0xD, 0x1, 0x2, 0xF, 0xB, 0x8,
+        0x3, 0xA, 0x6, 0xC, 0x5, 0x9, 0x0, 0x7,
+    ];
+
+    let mut state = [0u8; 64];
+    for (i, &byte) in input.iter().enumerate() {
+        state[i % 64] ^= byte;
+        let idx = state[i % 64] as usize;
+        state[i % 64] = sbox[(idx >> 4) & 0xF] << 4 | sbox[idx & 0xF];
+        state[i % 64] = state[i % 64].rotate_left(3);
+    }
+
+    // Additional rounds
+    for _ in 0..3 {
+        for i in 0..64 {
+            state[i] = state[i].wrapping_add(state[(i + 1) % 64]);
+            let idx = state[i] as usize;
+            state[i] = sbox[(idx >> 4) & 0xF] << 4 | sbox[idx & 0xF];
+        }
+    }
+
+    state.to_vec()
+}
+
+/// Custom ATOLL Lattice-based hash (simplified SWIFFT).
+fn atoll_lattice(input: &[u8]) -> Vec<u8> {
+    let mut coeffs: Vec<u64> = input.iter().map(|&b| b as u64).collect();
+    coeffs.resize(64, 0);
+
+    // Simple NTT-like transform
+    for i in 0..64 {
+        let mut acc: u64 = 0;
+        for j in 0..64 {
+            acc = acc.wrapping_add(coeffs[j].wrapping_mul(((i * j + 1) as u64).wrapping_mul(0x9E3779B97F4A7C15)));
+        }
+        coeffs[i] = acc % 257;
+    }
+
+    let mut output = [0u8; 64];
+    for (i, &c) in coeffs.iter().enumerate() {
+        output[i] = c as u8;
+    }
+    output.to_vec()
+}
+
+/// Custom ATOLL Tree hash.
+fn atoll_tree_hash(input: &[u8]) -> Vec<u8> {
+    let mut layer: Vec<[u8; 64]> = Vec::new();
+
+    // Leaf nodes: hash each 64-byte chunk
+    for chunk in input.chunks(64) {
+        let mut leaf = [0u8; 64];
+        leaf[..chunk.len()].copy_from_slice(chunk);
+        layer.push(leaf);
+    }
+
+    if layer.is_empty() {
+        layer.push([0u8; 64]);
+    }
+
+    // Build tree upward
+    while layer.len() > 1 {
+        let mut next_layer: Vec<[u8; 64]> = Vec::new();
+        for pair in layer.chunks(2) {
+            let mut combined = [0u8; 128];
+            combined[..64].copy_from_slice(&pair[0]);
+            if pair.len() > 1 {
+                combined[64..].copy_from_slice(&pair[1]);
+            } else {
+                combined[64..].copy_from_slice(&[0u8; 64]);
+            }
+            let mut hasher = blake3::Hasher::new();
+            hasher.update(&combined);
+            let mut hash = [0u8; 64];
+            hasher.finalize_xof().fill(&mut hash);
+            next_layer.push(hash);
+        }
+        layer = next_layer;
+    }
+
+    layer[0].to_vec()
+}
+
+// ---------------------------------------------------------------------------
 // Algorithm Selection (Fisher-Yates shuffle seeded by prev hash + height)
 // ---------------------------------------------------------------------------
 
@@ -192,9 +480,6 @@ fn fisher_yates_shuffle(seed: &[u8], n: usize) -> Vec<usize> {
 }
 
 /// Selects 16 of 32 algorithms based on previous block hash and block height.
-///
-/// The selection uses Fisher-Yates shuffle seeded by `prev_hash`, then
-/// applies an additional rotation based on `block_height`.
 pub fn select_algorithm_chain(
     prev_hash: &Hash512,
     block_height: u64,
@@ -214,35 +499,10 @@ pub fn select_algorithm_chain(
 }
 
 // ---------------------------------------------------------------------------
-// Algorithm Application (simulated for Phase 1)
-// ---------------------------------------------------------------------------
-
-/// Applies a single morph algorithm to input data, producing 64 bytes.
-///
-/// Phase 1 uses BLAKE3 XOF as the underlying primitive for all algorithms.
-/// Phase 2 will replace this with real implementations of each algorithm.
-fn apply_algorithm(algo: MorphAlgorithm, input: &[u8]) -> Vec<u8> {
-    // Use algorithm name as key salt for keyed BLAKE3, so each algorithm
-    // produces different output from the same input.
-    let mut salt = [0u8; 32];
-    let name_bytes = algo.name().as_bytes();
-    salt[..name_bytes.len().min(32)].copy_from_slice(&name_bytes[..name_bytes.len().min(32)]);
-
-    let mut hasher = blake3::Hasher::new_keyed(&salt);
-    hasher.update(input);
-    let mut out = [0u8; 64];
-    hasher.finalize_xof().fill(&mut out);
-    out.to_vec()
-}
-
-// ---------------------------------------------------------------------------
 // S-Box Evolution
 // ---------------------------------------------------------------------------
 
 /// Evolved S-box transformation using generation-based key.
-///
-/// Phase 1: Simple XOR with generation-based key.
-/// Phase 2: Cryptographically strong S-boxes selected by scoring.
 fn evolved_sbox_transform(data: &[u8], generation: u64) -> Vec<u8> {
     let key = generation.wrapping_mul(0x9E3779B97F4A7C15).to_le_bytes();
     let mut result = data.to_vec();
@@ -257,9 +517,6 @@ fn evolved_sbox_transform(data: &[u8], generation: u64) -> Vec<u8> {
 // ---------------------------------------------------------------------------
 
 /// Memory-hard mixing layer.
-///
-/// Phase 1: Simulated buffer (configurable size) for testability.
-/// Phase 2: Full 4 GB buffer with BLAKE3 initialization.
 pub struct MemoryHardLayer {
     buffer_size: usize,
     access_rounds: usize,
@@ -273,8 +530,6 @@ impl MemoryHardLayer {
         }
     }
 
-    /// Creates a MemoryHardLayer with a custom buffer size (useful for tests).
-    #[allow(dead_code)]
     pub fn with_buffer_size(buffer_size: usize) -> Self {
         Self {
             buffer_size,
@@ -282,8 +537,6 @@ impl MemoryHardLayer {
         }
     }
 
-    /// Initializes memory buffer with pseudo-random data seeded by prev hash.
-    #[allow(dead_code)]
     pub fn init_buffer(&self, seed: &Hash512) -> Vec<u8> {
         let mut buffer = vec![0u8; self.buffer_size];
         let mut counter = 0u64;
@@ -300,7 +553,6 @@ impl MemoryHardLayer {
             counter += 1;
         }
 
-        // Memory-hard mixing passes (3 passes of ARX-based diffusion)
         for _ in 0..3 {
             for i in 0..self.buffer_size {
                 let j = (i.wrapping_mul(2_654_435_761).wrapping_add(1)) % self.buffer_size;
@@ -313,8 +565,6 @@ impl MemoryHardLayer {
         buffer
     }
 
-    /// Performs random memory access mixing into state.
-    #[allow(dead_code)]
     pub fn memory_hard_mix(&self, state: &mut [u8], buffer: &[u8]) {
         for _round in 0..self.access_rounds.min(state.len() * 8) {
             let addr = u64::from_le_bytes(state[..8].try_into().unwrap_or([0; 8]))
@@ -335,10 +585,6 @@ impl MemoryHardLayer {
 // Post-Quantum Finalization (SWIFFT-style lattice construction)
 // ---------------------------------------------------------------------------
 
-/// Post-quantum finalization layer.
-///
-/// Phase 1: SHA-512 stand-in for SWIFFT construction.
-/// Phase 2: Full lattice-based finalization with NTT and matrix multiplication.
 pub struct PostQuantumFinalizer;
 
 impl PostQuantumFinalizer {
@@ -346,10 +592,9 @@ impl PostQuantumFinalizer {
         Self
     }
 
-    /// Finalizes the hash state using a lattice-based construction.
     pub fn finalize(&self, state: &[u8]) -> [u8; 64] {
-        // Phase 1: SHA-512 as stand-in for SWIFFT
-        // Phase 2: Replace with actual lattice-based construction
+        // Phase 2: SHA-512 stand-in for SWIFFT lattice construction
+        // Phase 3: Full lattice-based finalization with NTT and matrix multiplication
         use sha2::{Digest, Sha512};
         let mut hasher = Sha512::new();
         hasher.update(state);
@@ -364,18 +609,6 @@ impl PostQuantumFinalizer {
 // Main Morph-Hash Engine
 // ---------------------------------------------------------------------------
 
-/// Morph-Hash engine: self-evolving hash with rotating algorithm pools.
-///
-/// # Pipeline
-///
-/// 1. **Chain Selection**: Fisher-Yates shuffle of 32 algorithms, take 16,
-///    rotate by block height.
-/// 2. **Memory-Hard Buffer**: Initialize buffer with BLAKE3 counter mode.
-///    Default buffer size is small for testing; use `for_production()` for 4 GB.
-/// 3. **Algorithmic Chain**: Chain through 16 selected algorithms, mixing
-///    with memory-hard data and evolving S-boxes at each step.
-/// 4. **Post-Quantum Finalization**: Lattice-based (SWIFFT-style) finalization.
-/// 5. **Final Squeeze**: Output 512 bits.
 pub struct MorphHashEngine {
     sbox_generation: u64,
     memory_layer: MemoryHardLayer,
@@ -389,7 +622,6 @@ impl Default for MorphHashEngine {
 }
 
 impl MorphHashEngine {
-    /// Creates a new MorphHashEngine with a small memory buffer (suitable for tests).
     pub fn new() -> Self {
         Self {
             sbox_generation: 0,
@@ -398,7 +630,6 @@ impl MorphHashEngine {
         }
     }
 
-    /// Creates a MorphHashEngine for production use with the full 4 GB memory buffer.
     pub fn for_production() -> Self {
         Self {
             sbox_generation: 0,
@@ -407,8 +638,6 @@ impl MorphHashEngine {
         }
     }
 
-    /// Creates a MorphHashEngine with a custom memory buffer size (for tests).
-    #[allow(dead_code)]
     pub fn with_memory_size(buffer_size: usize) -> Self {
         Self {
             sbox_generation: 0,
@@ -417,60 +646,37 @@ impl MorphHashEngine {
         }
     }
 
-    /// Returns the current S-box generation.
     pub fn sbox_generation(&self) -> u64 {
         self.sbox_generation
     }
 
-    /// Sets the S-box generation (called every SBOX_EVOLUTION_INTERVAL blocks).
     pub fn set_sbox_generation(&mut self, generation: u64) {
         self.sbox_generation = generation;
     }
 
-    /// Computes the Morph-Hash of input data.
-    ///
-    /// # Arguments
-    /// * `input` - Data to hash
-    /// * `prev_block_hash` - Previous block hash (provides entropy for algorithm selection)
-    /// * `block_height` - Current block height (provides rotation and context)
-    ///
-    /// # Returns
-    /// 512-bit (64 byte) hash output
     pub fn morph_hash(
         &mut self,
         input: &[u8],
         prev_block_hash: &Hash512,
         block_height: u64,
     ) -> Hash512 {
-        // Phase 1: Select algorithm chain
         let chain = select_algorithm_chain(prev_block_hash, block_height);
-
-        // Phase 2: Initialize memory buffer
         let memory_buffer = self.memory_layer.init_buffer(prev_block_hash);
 
-        // Phase 3: Chain through selected algorithms
         let mut state = input.to_vec();
         for (i, algo) in chain.iter().enumerate() {
-            // Mix with memory-hard component
             let mem_index = Self::derive_memory_index(&state, i, &memory_buffer);
             let mem_data = &memory_buffer[mem_index..mem_index + 64.min(memory_buffer.len() - mem_index)];
             state = Self::xor_mix(&state, mem_data);
 
-            // Apply algorithm
             state = apply_algorithm(*algo, &state);
-
-            // Apply evolved S-box
             state = evolved_sbox_transform(&state, self.sbox_generation);
         }
 
-        // Phase 4: Post-quantum finalization
         let finalized = self.pq_finalizer.finalize(&state);
-
-        // Phase 5: Final squeeze (already 512 bits)
         Hash512::from_array(finalized)
     }
 
-    /// Derives a memory index from state and chain position.
     fn derive_memory_index(state: &[u8], i: usize, buffer: &[u8]) -> usize {
         let mut hasher = DefaultHasher::new();
         state.hash(&mut hasher);
@@ -479,7 +685,6 @@ impl MorphHashEngine {
         (state_hash % (buffer.len() as u64 - 64).max(1)) as usize
     }
 
-    /// XOR mixes two byte slices, repeating the shorter one as needed.
     fn xor_mix(state: &[u8], mem_data: &[u8]) -> Vec<u8> {
         state
             .iter()
@@ -531,7 +736,6 @@ mod tests {
         let prev_hash = Hash512::zero();
         let chain_h0 = select_algorithm_chain(&prev_hash, 0);
         let chain_h1 = select_algorithm_chain(&prev_hash, 1);
-        // Rotation should change the order at different heights
         assert_ne!(chain_h0, chain_h1);
     }
 
@@ -550,7 +754,7 @@ mod tests {
         let prev_hash = Hash512::zero();
         let h1 = engine.morph_hash(b"ATOLL", &prev_hash, 1);
         let h2 = engine.morph_hash(b"ATOLL", &prev_hash, 2);
-        assert_ne!(h1, h2, "Same input at different heights should produce different hashes");
+        assert_ne!(h1, h2);
     }
 
     #[test]
@@ -587,7 +791,7 @@ mod tests {
         let h_gen0 = engine.morph_hash(b"test", &prev_hash, 0);
         engine.set_sbox_generation(1);
         let h_gen1 = engine.morph_hash(b"test", &prev_hash, 0);
-        assert_ne!(h_gen0, h_gen1, "Different S-box generations should produce different hashes");
+        assert_ne!(h_gen0, h_gen1);
     }
 
     #[test]
@@ -596,14 +800,11 @@ mod tests {
         let seed = Hash512::zero();
         let buffer = layer.init_buffer(&seed);
         assert_eq!(buffer.len(), 4096);
-        // Buffer should not be all zeros after initialization
         assert!(buffer.iter().any(|&b| b != 0));
     }
 
     #[test]
     fn morph_hash_matches_python_prototype_pattern() {
-        // Verify context sensitivity matches Python prototype:
-        // Same input at different heights produces different outputs
         let mut engine = MorphHashEngine::new();
         let prev_hash = Hash512::zero();
 
@@ -614,5 +815,71 @@ mod tests {
         assert_ne!(h1, h2);
         assert_ne!(h2, h3);
         assert_ne!(h1, h3);
+    }
+
+    #[test]
+    fn real_sha512_algorithm() {
+        let result = apply_algorithm(MorphAlgorithm::SHA512, b"test");
+        assert_eq!(result.len(), 64);
+    }
+
+    #[test]
+    fn real_sha3_512_algorithm() {
+        let result = apply_algorithm(MorphAlgorithm::SHA3_512, b"test");
+        assert_eq!(result.len(), 64);
+    }
+
+    #[test]
+    fn real_blake3_algorithm() {
+        let result = apply_algorithm(MorphAlgorithm::BLAKE3, b"test");
+        assert_eq!(result.len(), 64);
+    }
+
+    #[test]
+    fn real_argon2id_algorithm() {
+        let result = apply_algorithm(MorphAlgorithm::Argon2id, b"test");
+        assert_eq!(result.len(), 64);
+    }
+
+    #[test]
+    fn real_scrypt_algorithm() {
+        let result = apply_algorithm(MorphAlgorithm::Scrypt, b"test");
+        assert_eq!(result.len(), 64);
+    }
+
+    #[test]
+    fn atoll_arx_algorithm() {
+        let result = apply_algorithm(MorphAlgorithm::AtollARX, b"test");
+        assert_eq!(result.len(), 64);
+    }
+
+    #[test]
+    fn atoll_sponge_algorithm() {
+        let result = apply_algorithm(MorphAlgorithm::AtollSponge, b"test");
+        assert_eq!(result.len(), 64);
+    }
+
+    #[test]
+    fn atoll_feistel_algorithm() {
+        let result = apply_algorithm(MorphAlgorithm::AtollFeistel, b"test");
+        assert_eq!(result.len(), 64);
+    }
+
+    #[test]
+    fn atoll_spn_algorithm() {
+        let result = apply_algorithm(MorphAlgorithm::AtollSPN, b"test");
+        assert_eq!(result.len(), 64);
+    }
+
+    #[test]
+    fn atoll_lattice_algorithm() {
+        let result = apply_algorithm(MorphAlgorithm::AtollLattice, b"test");
+        assert_eq!(result.len(), 64);
+    }
+
+    #[test]
+    fn atoll_tree_hash_algorithm() {
+        let result = apply_algorithm(MorphAlgorithm::AtollTreeHash, b"test");
+        assert_eq!(result.len(), 64);
     }
 }

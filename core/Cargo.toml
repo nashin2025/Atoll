@@ -13,6 +13,15 @@ homepage = "https://atoll.protocol"
 blake3 = "1.5"
 rand = "0.8"
 sha2 = "0.10"
+sha3 = "0.10"
+digest = "0.10"
+
+# Password hashing (memory-hard)
+argon2 = "0.5"
+scrypt = "0.6"
+
+# RandomX (CPU-hard)
+# randomx = "0.2"  # TODO: Add when RandomX Rust bindings available
 
 # Encoding
 hex = "0.4"
