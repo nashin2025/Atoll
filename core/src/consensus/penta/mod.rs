@@ -3,16 +3,16 @@
 //! Production implementation with all five layers, composite scoring,
 //! slashing conditions, and HotStuff BFT finality.
 
-use crate::consensus::finality::hotstuff::{BFTVote, HotStuffState, HotStuffBFT, VoteType};
+use crate::consensus::finality::hotstuff::{BFTVote, HotStuffBFT, HotStuffState, VoteType};
 use crate::primitives::address::Address;
 use crate::primitives::hash::Hash512;
 use serde::{Deserialize, Serialize};
 
-pub mod pouw;
+pub mod poh;
+pub mod por;
 pub mod pos_vrf;
 pub mod post;
-pub mod por;
-pub mod poh;
+pub mod pouw;
 
 // ---------------------------------------------------------------------------
 // Consensus Weights
@@ -21,11 +21,11 @@ pub mod poh;
 /// Weights for each consensus layer in composite scoring
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ConsensusWeights {
-    pub useful_work: f64,   // 0.30
-    pub stake_vrf: f64,     // 0.25
-    pub spacetime: f64,     // 0.15
-    pub reputation: f64,    // 0.15
-    pub humanness: f64,     // 0.15
+    pub useful_work: f64, // 0.30
+    pub stake_vrf: f64,   // 0.25
+    pub spacetime: f64,   // 0.15
+    pub reputation: f64,  // 0.15
+    pub humanness: f64,   // 0.15
 }
 
 impl Default for ConsensusWeights {
@@ -212,9 +212,8 @@ impl PentaConsensus {
         hotstuff_state: &HotStuffState,
         block_hash: &Hash512,
     ) -> Result<PentaValidation, ConsensusError> {
-        let mut validation = self.validate_block(
-            pouw_result, pos_result, post_result, por_result, poh_result,
-        )?;
+        let mut validation =
+            self.validate_block(pouw_result, pos_result, post_result, por_result, poh_result)?;
 
         // Check HotStuff BFT finality
         let finality = self.hotstuff.check_finality(hotstuff_state, block_hash);
@@ -277,9 +276,7 @@ pub enum SlashingEvidence {
         missed_slots: u64,
     },
     /// Validator submitted invalid useful work
-    InvalidWork {
-        validator: Address,
-    },
+    InvalidWork { validator: Address },
 }
 
 impl PentaConsensus {
@@ -388,7 +385,11 @@ mod tests {
             difficulty_met: true,
         };
         let result = consensus.validate_block(
-            &bad_pouw, &valid_pos(), &valid_post(), &valid_por(), &valid_poh(),
+            &bad_pouw,
+            &valid_pos(),
+            &valid_post(),
+            &valid_por(),
+            &valid_poh(),
         );
         assert_eq!(result, Err(ConsensusError::PoUWFailed));
     }
@@ -402,7 +403,11 @@ mod tests {
             is_eligible: false,
         };
         let result = consensus.validate_block(
-            &valid_pouw(), &valid_pos(), &valid_post(), &bad_por, &valid_poh(),
+            &valid_pouw(),
+            &valid_pos(),
+            &valid_post(),
+            &bad_por,
+            &valid_poh(),
         );
         assert_eq!(result, Err(ConsensusError::ReputationTooLow));
     }
@@ -412,7 +417,11 @@ mod tests {
         let consensus = PentaConsensus::new();
         let bad_poh = poh::PoHResult { is_verified: false };
         let result = consensus.validate_block(
-            &valid_pouw(), &valid_pos(), &valid_post(), &valid_por(), &bad_poh,
+            &valid_pouw(),
+            &valid_pos(),
+            &valid_post(),
+            &valid_por(),
+            &bad_poh,
         );
         assert_eq!(result, Err(ConsensusError::HumanVerificationRequired));
     }
@@ -420,13 +429,15 @@ mod tests {
     #[test]
     fn composite_score_calculation() {
         let consensus = PentaConsensus::new();
-        let v = consensus.validate_block(
-            &valid_pouw(),
-            &valid_pos(),
-            &valid_post(),
-            &valid_por(),
-            &valid_poh(),
-        ).unwrap();
+        let v = consensus
+            .validate_block(
+                &valid_pouw(),
+                &valid_pos(),
+                &valid_post(),
+                &valid_por(),
+                &valid_poh(),
+            )
+            .unwrap();
 
         // Expected: 0.8*0.30 + 0.9*0.25 + 1.0*0.15 + 0.72*0.15 + 1.0*0.15
         let expected = 0.8 * 0.30 + 0.9 * 0.25 + 1.0 * 0.15 + 0.72 * 0.15 + 1.0 * 0.15;
@@ -528,9 +539,6 @@ mod tests {
             &hotstuff_state,
             &block_hash,
         );
-        assert_eq!(
-            result,
-            Err(ConsensusError::FinalityNotAchieved)
-        );
+        assert_eq!(result, Err(ConsensusError::FinalityNotAchieved));
     }
 }

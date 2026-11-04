@@ -84,9 +84,10 @@ impl CrossShardManager {
         &mut self,
         request_id: &Hash512,
     ) -> Result<CrossShardReceipt, String> {
-        let request = self.pending_requests.get(request_id).ok_or_else(|| {
-            format!("Request {:?} not found", request_id)
-        })?;
+        let request = self
+            .pending_requests
+            .get(request_id)
+            .ok_or_else(|| format!("Request {:?} not found", request_id))?;
 
         let receipt = CrossShardReceipt {
             id: request.id,
@@ -118,9 +119,11 @@ impl CrossShardManager {
         receipt_id: &Hash512,
         block_height: u64,
     ) -> Result<(), String> {
-        let mut receipt = self.pending_receipts.get(receipt_id).ok_or_else(|| {
-            format!("Receipt {:?} not found", receipt_id)
-        })?.clone();
+        let mut receipt = self
+            .pending_receipts
+            .get(receipt_id)
+            .ok_or_else(|| format!("Receipt {:?} not found", receipt_id))?
+            .clone();
 
         if receipt.executed {
             return Err(format!("Receipt {:?} already executed", receipt_id));
@@ -144,10 +147,7 @@ impl CrossShardManager {
     }
 
     /// Returns pending receipts for a shard
-    pub fn get_pending_receipts_for_shard(
-        &self,
-        shard_id: u16,
-    ) -> Vec<CrossShardReceipt> {
+    pub fn get_pending_receipts_for_shard(&self, shard_id: u16) -> Vec<CrossShardReceipt> {
         let mut result = Vec::new();
         if let Some(queue) = self.shard_receipt_queues.get(&shard_id) {
             for id in queue {
@@ -196,7 +196,8 @@ impl CrossShardManager {
 
     /// Cleans up expired receipts
     pub fn cleanup_expired(&mut self, current_block: u64) {
-        let expired: Vec<Hash512> = self.pending_receipts
+        let expired: Vec<Hash512> = self
+            .pending_receipts
             .iter()
             .filter(|(_, r)| current_block > r.block_height + self.timeout_blocks)
             .map(|(id, _)| *id)

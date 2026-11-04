@@ -5,36 +5,45 @@
 //! chain, network, privacy, VM, storage, mempool, and API layers.
 
 use atoll_core::chain::blockchain::Blockchain;
-use atoll_core::chain::state::ChainState;
 use atoll_core::chain::sharding::cross_shard::CrossShardManager;
 use atoll_core::chain::sharding::rebalancer::ShardRebalancer;
 use atoll_core::chain::sharding::shard_manager::ShardManager;
-use atoll_core::consensus::penta::{PentaConsensus, pouw, pos_vrf, post, por, poh, PentaValidation};
+use atoll_core::chain::state::ChainState;
+use atoll_core::config::chain_params::ChainParams;
+use atoll_core::config::genesis::GenesisConfig;
+use atoll_core::config::network_params::NetworkParams;
 use atoll_core::consensus::finality::hotstuff::{HotStuffBFT, HotStuffState, VoteType};
 use atoll_core::consensus::fork_choice::ForkChoice;
-use atoll_core::crypto::morph_hash::{MorphHashEngine, select_algorithm_chain};
-use atoll_core::privacy::encrypted_mempool::{EncryptedMempool as PrivacyEncryptedMempool, EncryptedTransaction, DecryptionShare};
-use atoll_core::privacy::homomorphic::{HomomorphicContext, HomomorphicEngine, HomomorphicScheme, Plaintext};
-use atoll_core::privacy::post_quantum::{PQSignatureEngine, PQSignatureScheme, PQKEMEngine, PQKEMScheme, HybridSignatureEngine, HybridKeyPair};
-use atoll_core::privacy::zk_starks::{StarkProver, StarkVerifier, StarkProof};
-use atoll_core::network::{NetworkMessage, PingMessage, PeerInfo};
+use atoll_core::consensus::penta::{
+    poh, por, pos_vrf, post, pouw, PentaConsensus, PentaValidation,
+};
+use atoll_core::crypto::morph_hash::{select_algorithm_chain, MorphHashEngine};
 use atoll_core::network::discovery::DiscoveryProtocol;
-use atoll_core::network::p2p::PeerConnection;
 use atoll_core::network::gossip::{GossipConfig, GossipProtocol};
+use atoll_core::network::p2p::PeerConnection;
 use atoll_core::network::sync::SyncManager;
+use atoll_core::network::{NetworkMessage, PeerInfo, PingMessage};
 use atoll_core::primitives::address::Address;
 use atoll_core::primitives::block::{Block, BlockBody, BlockHeader};
 use atoll_core::primitives::hash::Hash512;
-use atoll_core::vm::{ExecutionContext, GasMeter, VMRouter, VMType, ExecutionResult};
+use atoll_core::privacy::encrypted_mempool::{
+    DecryptionShare, EncryptedMempool as PrivacyEncryptedMempool, EncryptedTransaction,
+};
+use atoll_core::privacy::homomorphic::{
+    HomomorphicContext, HomomorphicEngine, HomomorphicScheme, Plaintext,
+};
+use atoll_core::privacy::post_quantum::{
+    HybridKeyPair, HybridSignatureEngine, PQKEMEngine, PQKEMScheme, PQSignatureEngine,
+    PQSignatureScheme,
+};
+use atoll_core::privacy::zk_starks::{StarkProof, StarkProver, StarkVerifier};
+use atoll_core::vm::ai_vm::AIVMExecutor;
 use atoll_core::vm::evm::EVMExecutor;
-use atoll_core::vm::wasm::WASMExecutor;
 use atoll_core::vm::move_vm::MoveExecutor;
 use atoll_core::vm::riscv::RISCVExecutor;
-use atoll_core::vm::ai_vm::AIVMExecutor;
+use atoll_core::vm::wasm::WASMExecutor;
 use atoll_core::vm::zk_vm::ZKVMExecutor;
-use atoll_core::config::genesis::GenesisConfig;
-use atoll_core::config::chain_params::ChainParams;
-use atoll_core::config::network_params::NetworkParams;
+use atoll_core::vm::{ExecutionContext, ExecutionResult, GasMeter, VMRouter, VMType};
 
 // ---------------------------------------------------------------------------
 // Helper functions
@@ -84,7 +93,7 @@ fn make_valid_poh() -> poh::PoHResult {
 
 fn make_block_with_prev(prev_hash: Hash512, height: u64, proposer: Address) -> Block {
     Block {
-            header: BlockHeader {
+        header: BlockHeader {
             version: 1,
             height,
             shard_id: 0,
@@ -95,7 +104,9 @@ fn make_block_with_prev(prev_hash: Hash512, height: u64, proposer: Address) -> B
             proposer,
             difficulty: 1,
         },
-        body: BlockBody { transactions: Vec::new() },
+        body: BlockBody {
+            transactions: Vec::new(),
+        },
     }
 }
 
@@ -170,13 +181,15 @@ fn penta_consensus_validates_block_for_chain_insertion() {
 fn blockchain_accepts_valid_block_with_penta_validation() {
     let mut bc = Blockchain::default();
     let consensus = PentaConsensus::new();
-    let validation = consensus.validate_block(
-        &make_valid_pouw(),
-        &make_valid_pos(),
-        &make_valid_post(),
-        &make_valid_por(),
-        &make_valid_poh(),
-    ).unwrap();
+    let validation = consensus
+        .validate_block(
+            &make_valid_pouw(),
+            &make_valid_pos(),
+            &make_valid_post(),
+            &make_valid_por(),
+            &make_valid_poh(),
+        )
+        .unwrap();
 
     let block = make_block_with_prev(bc.tip_hash(), 1, make_address([1u8; 20]));
     let block_hash = bc.insert_block(block, &validation).unwrap();
@@ -190,11 +203,16 @@ fn blockchain_rejects_invalid_validation() {
     let mut bc = Blockchain::default();
     let consensus = PentaConsensus::new();
     let invalid_validation = PentaValidation {
-        pouw_valid: false, pouw_score: 0.0,
-        pos_valid: false, pos_score: 0.0,
-        post_valid: false, post_score: 0.0,
-        por_valid: false, por_score: 0.0,
-        poh_valid: false, poh_score: 0.0,
+        pouw_valid: false,
+        pouw_score: 0.0,
+        pos_valid: false,
+        pos_score: 0.0,
+        post_valid: false,
+        post_score: 0.0,
+        por_valid: false,
+        por_score: 0.0,
+        poh_valid: false,
+        poh_score: 0.0,
         composite_score: 0.0,
         finality_achieved: false,
         all_layers_pass: false,
@@ -270,13 +288,16 @@ fn shard_manager_with_cross_shard_communication() {
     let mut shard_mgr = ShardManager::new();
     let mut xshard_mgr = CrossShardManager::new();
 
-    shard_mgr.create_shard(atoll_core::chain::sharding::ShardConfig {
-        id: 1,
-        ..Default::default()
-    }).unwrap();
+    shard_mgr
+        .create_shard(atoll_core::chain::sharding::ShardConfig {
+            id: 1,
+            ..Default::default()
+        })
+        .unwrap();
 
     let request_id = xshard_mgr.create_request(
-        0, 1,
+        0,
+        1,
         make_address([1u8; 20]),
         make_address([2u8; 20]),
         100_000_000,
@@ -296,18 +317,19 @@ fn shard_rebalancer_split_and_merge() {
     let mut rebalancer = ShardRebalancer::new();
     rebalancer.set_rebalance_interval(100);
 
-    let validators: Vec<atoll_core::primitives::address::Address> = (0..200)
-        .map(|i| make_address([i as u8; 20]))
-        .collect();
-    rebalancer.shard_manager_mut().assign_validators(0, validators).unwrap();
+    let validators: Vec<atoll_core::primitives::address::Address> =
+        (0..200).map(|i| make_address([i as u8; 20])).collect();
+    rebalancer
+        .shard_manager_mut()
+        .assign_validators(0, validators)
+        .unwrap();
 
-    rebalancer.shard_manager_mut().update_shard_state(
-        0, 100, Hash512::zero(), 2.0, 1000, 100, 100,
-    ).unwrap();
+    rebalancer
+        .shard_manager_mut()
+        .update_shard_state(0, 100, Hash512::zero(), 2.0, 1000, 100, 100)
+        .unwrap();
 
-    let result = rebalancer.update_shard_load(
-        0, 200, 2.0, 1000, 100, 100, Hash512::zero(),
-    );
+    let result = rebalancer.update_shard_load(0, 200, 2.0, 1000, 100, 100, Hash512::zero());
     assert!(result.is_ok());
     assert_eq!(rebalancer.last_rebalance_block, 200);
     assert!(rebalancer.shard_manager().shard_count() >= 1);
@@ -399,20 +421,24 @@ fn encrypted_mempool_threshold_decryption() {
     assert_eq!(mempool.pending_count(), 1);
 
     let tx_hash = make_hash([1u8; 64]);
-    mempool.add_decryption_share(DecryptionShare {
-        tx_hash,
-        share: vec![1],
-        validator: make_address([1u8; 20]),
-        share_index: 0,
-    }).unwrap();
+    mempool
+        .add_decryption_share(DecryptionShare {
+            tx_hash,
+            share: vec![1],
+            validator: make_address([1u8; 20]),
+            share_index: 0,
+        })
+        .unwrap();
     assert!(!mempool.can_decrypt(&tx_hash));
 
-    mempool.add_decryption_share(DecryptionShare {
-        tx_hash,
-        share: vec![2],
-        validator: make_address([2u8; 20]),
-        share_index: 1,
-    }).unwrap();
+    mempool
+        .add_decryption_share(DecryptionShare {
+            tx_hash,
+            share: vec![2],
+            validator: make_address([2u8; 20]),
+            share_index: 1,
+        })
+        .unwrap();
     assert!(mempool.can_decrypt(&tx_hash));
     assert_eq!(mempool.get_decryptable_transactions().len(), 1);
 }
@@ -431,7 +457,9 @@ fn homomorphic_encrypt_decrypt_roundtrip() {
     ));
     engine.generate_key_pair().unwrap();
 
-    let plaintext = Plaintext { data: vec![10, 20, 30] };
+    let plaintext = Plaintext {
+        data: vec![10, 20, 30],
+    };
     let ciphertext = engine.encrypt(&plaintext).unwrap();
     let decrypted = engine.decrypt(&ciphertext).unwrap();
     assert_eq!(decrypted.data, plaintext.data);
@@ -447,8 +475,12 @@ fn homomorphic_addition_preserves_values() {
     ));
     engine.generate_key_pair().unwrap();
 
-    let pt1 = Plaintext { data: vec![1, 2, 3] };
-    let pt2 = Plaintext { data: vec![4, 5, 6] };
+    let pt1 = Plaintext {
+        data: vec![1, 2, 3],
+    };
+    let pt2 = Plaintext {
+        data: vec![4, 5, 6],
+    };
     let ct1 = engine.encrypt(&pt1).unwrap();
     let ct2 = engine.encrypt(&pt2).unwrap();
     let ct_sum = engine.add(&ct1, &ct2).unwrap();
@@ -475,18 +507,26 @@ fn stark_prove_and_verify_integration() {
 #[test]
 fn pq_signature_kem_integration() {
     let sig_engine = PQSignatureEngine::new();
-    let keypair = sig_engine.generate_keypair(PQSignatureScheme::Dilithium5).unwrap();
+    let keypair = sig_engine
+        .generate_keypair(PQSignatureScheme::Dilithium5)
+        .unwrap();
     let message = b"integration test message";
 
     let signature = sig_engine.sign(message, &keypair).unwrap();
     assert_eq!(signature.scheme, PQSignatureScheme::Dilithium5);
-    let valid = sig_engine.verify(message, &signature, &keypair.public_key).unwrap();
+    let valid = sig_engine
+        .verify(message, &signature, &keypair.public_key)
+        .unwrap();
     assert!(valid);
 
     let kem_engine = PQKEMEngine::new();
     let kem_keypair = kem_engine.generate_keypair(PQKEMScheme::Kyber768).unwrap();
-    let encapsulated = kem_engine.encapsulate(&kem_keypair.public_key, PQKEMScheme::Kyber768).unwrap();
-    let decapsulated = kem_engine.decapsulate(&encapsulated.ciphertext, &kem_keypair.secret_key).unwrap();
+    let encapsulated = kem_engine
+        .encapsulate(&kem_keypair.public_key, PQKEMScheme::Kyber768)
+        .unwrap();
+    let decapsulated = kem_engine
+        .decapsulate(&encapsulated.ciphertext, &kem_keypair.secret_key)
+        .unwrap();
     assert_eq!(decapsulated, encapsulated.shared_secret);
 }
 
@@ -500,12 +540,14 @@ fn hybrid_signature_roundtrip() {
     assert_eq!(signature.classical.len(), 64);
     assert!(!signature.pq_dilithium.is_empty());
 
-    let valid = engine.verify(
-        message,
-        &signature,
-        &keypair.classical,
-        &keypair.pq_dilithium,
-    ).unwrap();
+    let valid = engine
+        .verify(
+            message,
+            &signature,
+            &keypair.classical,
+            &keypair.pq_dilithium,
+        )
+        .unwrap();
     assert!(valid);
 }
 
@@ -569,7 +611,9 @@ fn riscv_execution_with_gas_metering() {
 fn ai_vm_deploy_and_infer() {
     let context = ExecutionContext::default();
     let mut ai_vm = AIVMExecutor::new(context, 50_000_000);
-    let model_bytes = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B];
+    let model_bytes = vec![
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
+    ];
     let deploy_result = ai_vm.deploy_model(&model_bytes).unwrap();
     match deploy_result {
         ExecutionResult::Success { return_data, .. } => {

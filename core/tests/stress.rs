@@ -4,27 +4,33 @@
 //! remains correct under load.
 
 use atoll_core::chain::blockchain::Blockchain;
-use atoll_core::chain::state::ChainState;
 use atoll_core::chain::sharding::cross_shard::CrossShardManager;
 use atoll_core::chain::sharding::rebalancer::ShardRebalancer;
 use atoll_core::chain::sharding::shard_manager::ShardManager;
-use atoll_core::consensus::penta::{PentaConsensus, pouw, pos_vrf, post, por, poh};
+use atoll_core::chain::state::ChainState;
 use atoll_core::consensus::finality::hotstuff::{HotStuffBFT, HotStuffState, VoteType};
-use atoll_core::crypto::morph_hash::{MorphHashEngine, select_algorithm_chain};
+use atoll_core::consensus::penta::{poh, por, pos_vrf, post, pouw, PentaConsensus};
+use atoll_core::crypto::morph_hash::{select_algorithm_chain, MorphHashEngine};
+use atoll_core::network::encrypted_mempool::EncryptedMempool as NetworkEncryptedMempool;
 use atoll_core::network::gossip::{GossipConfig, GossipProtocol};
 use atoll_core::network::PeerInfo;
-use atoll_core::network::encrypted_mempool::EncryptedMempool as NetworkEncryptedMempool;
 use atoll_core::network::{NetworkMessage, PingMessage};
-use atoll_core::privacy::encrypted_mempool::{EncryptedMempool as PrivacyEncryptedMempool, EncryptedTransaction, DecryptionShare};
-use atoll_core::privacy::homomorphic::{HomomorphicContext, HomomorphicEngine, HomomorphicScheme, Plaintext};
-use atoll_core::privacy::post_quantum::{PQSignatureEngine, PQSignatureScheme, PQKEMEngine, PQKEMScheme};
 use atoll_core::primitives::address::Address;
 use atoll_core::primitives::block::{Block, BlockBody, BlockHeader};
 use atoll_core::primitives::hash::Hash512;
 use atoll_core::primitives::signature::Signature;
 use atoll_core::primitives::transaction::Transaction;
-use atoll_core::vm::{ExecutionContext, VMRouter, VMType};
+use atoll_core::privacy::encrypted_mempool::{
+    DecryptionShare, EncryptedMempool as PrivacyEncryptedMempool, EncryptedTransaction,
+};
+use atoll_core::privacy::homomorphic::{
+    HomomorphicContext, HomomorphicEngine, HomomorphicScheme, Plaintext,
+};
+use atoll_core::privacy::post_quantum::{
+    PQKEMEngine, PQKEMScheme, PQSignatureEngine, PQSignatureScheme,
+};
 use atoll_core::vm::evm::EVMExecutor;
+use atoll_core::vm::{ExecutionContext, VMRouter, VMType};
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -50,15 +56,25 @@ fn make_valid_pouw() -> pouw::PoUWResult {
 }
 
 fn make_valid_pos() -> pos_vrf::PoSResult {
-    pos_vrf::PoSResult { valid: true, combined_score: 0.9 }
+    pos_vrf::PoSResult {
+        valid: true,
+        combined_score: 0.9,
+    }
 }
 
 fn make_valid_post() -> post::PoSTResult {
-    post::PoSTResult { valid: true, size_score: 1.0 }
+    post::PoSTResult {
+        valid: true,
+        size_score: 1.0,
+    }
 }
 
 fn make_valid_por() -> por::PoRResult {
-    por::PoRResult { raw_score: 0.8, decayed_score: 0.72, is_eligible: true }
+    por::PoRResult {
+        raw_score: 0.8,
+        decayed_score: 0.72,
+        is_eligible: true,
+    }
 }
 
 fn make_valid_poh() -> poh::PoHResult {
@@ -78,17 +94,24 @@ fn make_block(prev_hash: Hash512, height: u64, proposer: Address) -> Block {
             proposer,
             difficulty: 1,
         },
-        body: BlockBody { transactions: Vec::new() },
+        body: BlockBody {
+            transactions: Vec::new(),
+        },
     }
 }
 
 fn make_valid_validation() -> atoll_core::consensus::penta::PentaValidation {
     atoll_core::consensus::penta::PentaValidation {
-        pouw_valid: true, pouw_score: 0.8,
-        pos_valid: true, pos_score: 0.9,
-        post_valid: true, post_score: 1.0,
-        por_valid: true, por_score: 0.72,
-        poh_valid: true, poh_score: 1.0,
+        pouw_valid: true,
+        pouw_score: 0.8,
+        pos_valid: true,
+        pos_score: 0.9,
+        post_valid: true,
+        post_score: 1.0,
+        por_valid: true,
+        por_score: 0.72,
+        poh_valid: true,
+        poh_score: 1.0,
         composite_score: 0.665,
         finality_achieved: true,
         all_layers_pass: true,
@@ -119,14 +142,20 @@ fn morph_hash_high_throughput() {
 fn morph_hash_concurrent_engines() {
     // Each thread has its own engine (MorphHashEngine is not Sync)
     let num_engines = 8;
-        let hashes_per_engine: usize = 1_000;
+    let hashes_per_engine: usize = 1_000;
 
     let all_hashes: Vec<Vec<Hash512>> = (0..num_engines)
         .map(|engine_id| {
             let mut engine = MorphHashEngine::new();
             let prev_hash = Hash512::from_bytes(&[engine_id as u8; 64]);
             (0..hashes_per_engine)
-                .map(|i| engine.morph_hash(format!("engine_{}_hash_{}", engine_id, i).as_bytes(), &prev_hash, i as u64))
+                .map(|i| {
+                    engine.morph_hash(
+                        format!("engine_{}_hash_{}", engine_id, i).as_bytes(),
+                        &prev_hash,
+                        i as u64,
+                    )
+                })
                 .collect()
         })
         .collect();
@@ -135,7 +164,11 @@ fn morph_hash_concurrent_engines() {
     for (engine_id, hashes) in all_hashes.iter().enumerate() {
         let mut seen = HashSet::new();
         for h in hashes {
-            assert!(seen.insert(*h), "Engine {} produced duplicate hash", engine_id);
+            assert!(
+                seen.insert(*h),
+                "Engine {} produced duplicate hash",
+                engine_id
+            );
         }
         assert_eq!(seen.len(), hashes_per_engine);
     }
@@ -247,9 +280,19 @@ fn penta_consensus_many_validations() {
             usefulness_score: 0.8,
             difficulty_met: true,
         };
-        let pos = pos_vrf::PoSResult { valid: true, combined_score: 0.9 };
-        let post = post::PoSTResult { valid: true, size_score: 1.0 };
-        let por = por::PoRResult { raw_score: 0.8, decayed_score: 0.72, is_eligible: true };
+        let pos = pos_vrf::PoSResult {
+            valid: true,
+            combined_score: 0.9,
+        };
+        let post = post::PoSTResult {
+            valid: true,
+            size_score: 1.0,
+        };
+        let por = por::PoRResult {
+            raw_score: 0.8,
+            decayed_score: 0.72,
+            is_eligible: true,
+        };
         let poh = poh::PoHResult { is_verified: true };
 
         let result = consensus.validate_block(&pouw, &pos, &post, &por, &poh);
@@ -361,9 +404,7 @@ fn shard_manager_many_validators_per_shard() {
     let mut manager = ShardManager::new();
 
     // Assign 256 validators to shard 0 (all unique u8 values)
-    let validators: Vec<Address> = (0..256)
-        .map(|i| make_address([i as u8; 20]))
-        .collect();
+    let validators: Vec<Address> = (0..256).map(|i| make_address([i as u8; 20])).collect();
     let validators_for_removal = validators.clone();
     manager.assign_validators(0, validators).unwrap();
 
@@ -391,7 +432,8 @@ fn cross_shard_many_transactions() {
     let mut request_ids = Vec::new();
     for i in 0..5_000 {
         let id = xshard_mgr.create_request(
-            0, 1,
+            0,
+            1,
             make_address([(i % 255) as u8; 20]),
             make_address([((i + 1) % 255) as u8; 20]),
             i as u128 * 100,

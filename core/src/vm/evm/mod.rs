@@ -21,11 +21,7 @@ impl EVMExecutor {
     }
 
     /// Executes EVM bytecode
-    pub fn execute(
-        &mut self,
-        bytecode: &[u8],
-        input: &[u8],
-    ) -> Result<ExecutionResult, String> {
+    pub fn execute(&mut self, bytecode: &[u8], input: &[u8]) -> Result<ExecutionResult, String> {
         // Charge base gas for execution
         self.gas_meter.charge(bytecode.len() as u64 * 2)?;
 

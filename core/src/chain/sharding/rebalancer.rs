@@ -82,18 +82,16 @@ impl ShardRebalancer {
     }
 
     /// Splits an overloaded shard into two
-    pub fn split_shard(
-        &mut self,
-        shard_id: u16,
-        current_block: u64,
-    ) -> Result<(), String> {
-        let state = self.shard_manager.get_shard_state(shard_id).ok_or_else(|| {
-            format!("Shard {} does not exist", shard_id)
-        })?;
+    pub fn split_shard(&mut self, shard_id: u16, current_block: u64) -> Result<(), String> {
+        let state = self
+            .shard_manager
+            .get_shard_state(shard_id)
+            .ok_or_else(|| format!("Shard {} does not exist", shard_id))?;
 
-        let config = self.shard_manager.get_shard_config(shard_id).ok_or_else(|| {
-            format!("Shard {} config not found", shard_id)
-        })?;
+        let config = self
+            .shard_manager
+            .get_shard_config(shard_id)
+            .ok_or_else(|| format!("Shard {} config not found", shard_id))?;
 
         // Only split if validator count supports it
         if state.validator_count < config.min_validators * 2 {
@@ -107,7 +105,9 @@ impl ShardRebalancer {
         }
 
         // Split validators roughly in half
-        let validators = self.shard_manager.get_shard_validators(shard_id)
+        let validators = self
+            .shard_manager
+            .get_shard_validators(shard_id)
             .ok_or_else(|| format!("Shard {} validators not found", shard_id))?;
         let validator_list: Vec<Address> = validators.iter().cloned().collect();
         let half = validator_list.len() / 2;
@@ -125,13 +125,19 @@ impl ShardRebalancer {
         };
 
         self.shard_manager.create_shard(new_config)?;
-        self.shard_manager.assign_validators(new_shard_id, move_validators.clone())?;
+        self.shard_manager
+            .assign_validators(new_shard_id, move_validators.clone())?;
 
         // Keep remaining validators on original shard
-        self.shard_manager.remove_validators(shard_id, &move_validators)?;
+        self.shard_manager
+            .remove_validators(shard_id, &move_validators)?;
 
         // Split state
-        let original_state = self.shard_manager.get_shard_state(shard_id).unwrap().clone();
+        let original_state = self
+            .shard_manager
+            .get_shard_state(shard_id)
+            .unwrap()
+            .clone();
         self.shard_manager.update_shard_state(
             shard_id,
             current_block,
@@ -159,11 +165,7 @@ impl ShardRebalancer {
     }
 
     /// Merges an underloaded shard with another shard
-    pub fn merge_shard(
-        &mut self,
-        shard_id: u16,
-        current_block: u64,
-    ) -> Result<(), String> {
+    pub fn merge_shard(&mut self, shard_id: u16, current_block: u64) -> Result<(), String> {
         // Find another shard to merge with (preferably nearby ID)
         let target_shard_id = if shard_id > 0 {
             shard_id - 1
@@ -177,18 +179,30 @@ impl ShardRebalancer {
         }
 
         // Move all validators from source to target
-        let validators = self.shard_manager.get_shard_validators(shard_id)
+        let validators = self
+            .shard_manager
+            .get_shard_validators(shard_id)
             .ok_or_else(|| format!("Shard {} validators not found", shard_id))?;
         let validator_list: Vec<Address> = validators.iter().cloned().collect();
 
         if !validator_list.is_empty() {
-            self.shard_manager.assign_validators(target_shard_id, validator_list.clone())?;
-            self.shard_manager.remove_validators(shard_id, &validator_list)?;
+            self.shard_manager
+                .assign_validators(target_shard_id, validator_list.clone())?;
+            self.shard_manager
+                .remove_validators(shard_id, &validator_list)?;
         }
 
         // Merge state
-        let source_state = self.shard_manager.get_shard_state(shard_id).unwrap().clone();
-        let target_state = self.shard_manager.get_shard_state(target_shard_id).unwrap().clone();
+        let source_state = self
+            .shard_manager
+            .get_shard_state(shard_id)
+            .unwrap()
+            .clone();
+        let target_state = self
+            .shard_manager
+            .get_shard_state(target_shard_id)
+            .unwrap()
+            .clone();
 
         self.shard_manager.update_shard_state(
             target_shard_id,
@@ -294,18 +308,16 @@ mod tests {
         let validators: Vec<Address> = (0..200)
             .map(|i| Address::from_bytes([i as u8; 20]))
             .collect();
-        rebalancer.shard_manager_mut().assign_validators(0, validators).unwrap();
+        rebalancer
+            .shard_manager_mut()
+            .assign_validators(0, validators)
+            .unwrap();
 
         // Set high load
-        rebalancer.shard_manager_mut().update_shard_state(
-            0,
-            100,
-            Hash512::zero(),
-            2.0,
-            1000,
-            100,
-            100,
-        ).unwrap();
+        rebalancer
+            .shard_manager_mut()
+            .update_shard_state(0, 100, Hash512::zero(), 2.0, 1000, 100, 100)
+            .unwrap();
 
         // Split should succeed
         let result = rebalancer.split_shard(0, 100);
@@ -319,26 +331,28 @@ mod tests {
         let mut rebalancer = ShardRebalancer::new();
 
         // Create a second shard
-        rebalancer.shard_manager_mut().create_shard(
-            crate::chain::sharding::ShardConfig { id: 1, ..Default::default() }
-        ).unwrap();
+        rebalancer
+            .shard_manager_mut()
+            .create_shard(crate::chain::sharding::ShardConfig {
+                id: 1,
+                ..Default::default()
+            })
+            .unwrap();
 
         // Assign validators to shard 1
         let validators: Vec<Address> = (0..50)
             .map(|i| Address::from_bytes([10u8 + i as u8; 20]))
             .collect();
-        rebalancer.shard_manager_mut().assign_validators(1, validators).unwrap();
+        rebalancer
+            .shard_manager_mut()
+            .assign_validators(1, validators)
+            .unwrap();
 
         // Set low load on shard 1
-        rebalancer.shard_manager_mut().update_shard_state(
-            1,
-            100,
-            Hash512::zero(),
-            0.1,
-            10,
-            10,
-            100,
-        ).unwrap();
+        rebalancer
+            .shard_manager_mut()
+            .update_shard_state(1, 100, Hash512::zero(), 0.1, 10, 10, 100)
+            .unwrap();
 
         // Merge shard 1 into shard 0
         let result = rebalancer.merge_shard(1, 100);
@@ -353,41 +367,17 @@ mod tests {
         rebalancer.set_rebalance_interval(100);
 
         // First update at block 100 should trigger rebalance
-        let result = rebalancer.update_shard_load(
-            0,
-            100,
-            1.0,
-            100,
-            100,
-            100,
-            Hash512::zero(),
-        );
+        let result = rebalancer.update_shard_load(0, 100, 1.0, 100, 100, 100, Hash512::zero());
         assert!(result.is_ok());
         assert_eq!(rebalancer.last_rebalance_block, 100);
 
         // Update at block 150 should NOT trigger rebalance (interval not reached)
-        let result = rebalancer.update_shard_load(
-            0,
-            150,
-            1.0,
-            100,
-            100,
-            100,
-            Hash512::zero(),
-        );
+        let result = rebalancer.update_shard_load(0, 150, 1.0, 100, 100, 100, Hash512::zero());
         assert!(result.is_ok());
         assert_eq!(rebalancer.last_rebalance_block, 100);
 
         // Update at block 200 should trigger rebalance
-        let result = rebalancer.update_shard_load(
-            0,
-            200,
-            1.0,
-            100,
-            100,
-            100,
-            Hash512::zero(),
-        );
+        let result = rebalancer.update_shard_load(0, 200, 1.0, 100, 100, 100, Hash512::zero());
         assert!(result.is_ok());
         assert_eq!(rebalancer.last_rebalance_block, 200);
     }
@@ -410,15 +400,19 @@ mod tests {
         assert_eq!(rebalancer.cross_shard_manager().total_cross_shard_tx(), 1);
 
         // Convert to receipt and execute
-        let receipt_id = rebalancer.cross_shard_manager_mut()
+        let receipt_id = rebalancer
+            .cross_shard_manager_mut()
             .request_to_receipt(&request_id)
             .unwrap()
             .id;
 
-        rebalancer.cross_shard_manager_mut()
+        rebalancer
+            .cross_shard_manager_mut()
             .execute_receipt(&receipt_id, 150)
             .unwrap();
 
-        assert!(rebalancer.cross_shard_manager().is_receipt_executed(&receipt_id));
+        assert!(rebalancer
+            .cross_shard_manager()
+            .is_receipt_executed(&receipt_id));
     }
 }

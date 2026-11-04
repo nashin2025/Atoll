@@ -3,14 +3,14 @@
 //! Property-based tests using iterative fuzzing to verify invariants
 //! hold across a wide range of inputs.
 
-use atoll_core::primitives::hash::Hash512;
+use atoll_core::chain::state::ChainState;
+use atoll_core::consensus::penta::{poh, por, pos_vrf, post, pouw, PentaConsensus};
+use atoll_core::crypto::morph_hash::{select_algorithm_chain, MorphHashEngine};
 use atoll_core::primitives::address::Address;
 use atoll_core::primitives::block::{Block, BlockBody, BlockHeader};
+use atoll_core::primitives::hash::Hash512;
 use atoll_core::primitives::signature::Signature;
 use atoll_core::primitives::transaction::Transaction;
-use atoll_core::crypto::morph_hash::{MorphHashEngine, select_algorithm_chain};
-use atoll_core::chain::state::ChainState;
-use atoll_core::consensus::penta::{PentaConsensus, pouw, pos_vrf, post, por, poh};
 
 // ---------------------------------------------------------------------------
 // Hash512 fuzzing
@@ -43,7 +43,9 @@ fn fuzz_hash512_blake3_deterministic() {
 #[test]
 fn fuzz_hash512_output_is_64_bytes() {
     for i in 0..10_000u32 {
-        let input: Vec<u8> = (0..(i % 1000)).map(|j| (i * 5 + (j as u32)) as u8).collect();
+        let input: Vec<u8> = (0..(i % 1000))
+            .map(|j| (i * 5 + (j as u32)) as u8)
+            .collect();
         let hash = Hash512::blake3(&input);
         assert_eq!(hash.to_array().len(), 64);
     }
@@ -176,7 +178,9 @@ fn fuzz_block_serialize_deterministic() {
                 proposer: Address::from_bytes([i as u8; 20]),
                 difficulty: i as u128 * 1000,
             },
-            body: BlockBody { transactions: Vec::new() },
+            body: BlockBody {
+                transactions: Vec::new(),
+            },
         };
         let bytes1 = block.serialize_bytes();
         let bytes2 = block.serialize_bytes();

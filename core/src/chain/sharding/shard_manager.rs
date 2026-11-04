@@ -3,8 +3,8 @@
 //! Manages shard lifecycle, validator assignments, shard state tracking,
 //! and shard creation/deletion for horizontal scaling.
 
-use crate::chain::sharding::{CrossShardReceipt, ShardConfig, ShardState, ShardStats};
 use crate::chain::sharding::ShardId;
+use crate::chain::sharding::{CrossShardReceipt, ShardConfig, ShardState, ShardStats};
 use crate::primitives::address::Address;
 use crate::primitives::hash::Hash512;
 use std::collections::{HashMap, HashSet};
@@ -104,10 +104,7 @@ impl ShardManager {
             return Err("Exceeds maximum validator count for shard".to_string());
         }
 
-        let shard_validators = self
-            .validator_assignments
-            .get_mut(&shard_id)
-            .unwrap();
+        let shard_validators = self.validator_assignments.get_mut(&shard_id).unwrap();
         for v in validators {
             shard_validators.insert(v);
         }
@@ -130,10 +127,7 @@ impl ShardManager {
             return Err(format!("Shard {} does not exist", shard_id));
         }
 
-        let shard_validators = self
-            .validator_assignments
-            .get_mut(&shard_id)
-            .unwrap();
+        let shard_validators = self.validator_assignments.get_mut(&shard_id).unwrap();
         for v in validators {
             shard_validators.remove(v);
         }
@@ -256,7 +250,10 @@ impl ShardManager {
         let avg_load = self.average_load();
         self.shards
             .iter()
-            .filter(|(_, s)| s.load_metric > avg_load * self.configs.get(&s.id).map(|c| c.max_load).unwrap_or(1.5))
+            .filter(|(_, s)| {
+                s.load_metric
+                    > avg_load * self.configs.get(&s.id).map(|c| c.max_load).unwrap_or(1.5)
+            })
             .map(|(id, _)| *id)
             .collect()
     }
@@ -266,7 +263,10 @@ impl ShardManager {
         let avg_load = self.average_load();
         self.shards
             .iter()
-            .filter(|(_, s)| s.load_metric < avg_load * self.configs.get(&s.id).map(|c| c.min_load).unwrap_or(0.3))
+            .filter(|(_, s)| {
+                s.load_metric
+                    < avg_load * self.configs.get(&s.id).map(|c| c.min_load).unwrap_or(0.3)
+            })
             .map(|(id, _)| *id)
             .collect()
     }
@@ -309,7 +309,10 @@ mod tests {
     #[test]
     fn create_duplicate_shard_fails() {
         let mut manager = ShardManager::new();
-        let config = ShardConfig { id: 0, ..Default::default() };
+        let config = ShardConfig {
+            id: 0,
+            ..Default::default()
+        };
         let result = manager.create_shard(config);
         assert!(result.is_err());
     }
@@ -320,7 +323,9 @@ mod tests {
         let addr1 = Address::from_bytes([1u8; 20]);
         let addr2 = Address::from_bytes([2u8; 20]);
 
-        manager.assign_validators(0, vec![addr1.clone(), addr2.clone()]).unwrap();
+        manager
+            .assign_validators(0, vec![addr1.clone(), addr2.clone()])
+            .unwrap();
         let validators = manager.get_shard_validators(0).unwrap();
         assert!(validators.contains(&addr1));
         assert!(validators.contains(&addr2));
@@ -356,13 +361,29 @@ mod tests {
         let mut manager = ShardManager::new();
 
         // Create additional shards with different loads
-        manager.create_shard(ShardConfig { id: 1, ..Default::default() }).unwrap();
-        manager.create_shard(ShardConfig { id: 2, ..Default::default() }).unwrap();
+        manager
+            .create_shard(ShardConfig {
+                id: 1,
+                ..Default::default()
+            })
+            .unwrap();
+        manager
+            .create_shard(ShardConfig {
+                id: 2,
+                ..Default::default()
+            })
+            .unwrap();
 
         // Set different loads
-        manager.update_shard_state(0, 100, Hash512::zero(), 2.0, 1000, 100, 100).unwrap();
-        manager.update_shard_state(1, 100, Hash512::zero(), 0.1, 10, 10, 100).unwrap();
-        manager.update_shard_state(2, 100, Hash512::zero(), 1.0, 100, 100, 100).unwrap();
+        manager
+            .update_shard_state(0, 100, Hash512::zero(), 2.0, 1000, 100, 100)
+            .unwrap();
+        manager
+            .update_shard_state(1, 100, Hash512::zero(), 0.1, 10, 10, 100)
+            .unwrap();
+        manager
+            .update_shard_state(2, 100, Hash512::zero(), 1.0, 100, 100, 100)
+            .unwrap();
 
         let overloaded = manager.overloaded_shards();
         assert!(!overloaded.is_empty());
@@ -376,7 +397,12 @@ mod tests {
     #[test]
     fn remove_shard() {
         let mut manager = ShardManager::new();
-        manager.create_shard(ShardConfig { id: 1, ..Default::default() }).unwrap();
+        manager
+            .create_shard(ShardConfig {
+                id: 1,
+                ..Default::default()
+            })
+            .unwrap();
 
         assert_eq!(manager.shard_count(), 2);
         assert!(manager.remove_shard(1).is_ok());
@@ -389,10 +415,16 @@ mod tests {
         let mut manager = ShardManager::new();
         manager.max_shards = 2;
         // Already have shard 0, so creating shard 1 should succeed
-        let result = manager.create_shard(ShardConfig { id: 1, ..Default::default() });
+        let result = manager.create_shard(ShardConfig {
+            id: 1,
+            ..Default::default()
+        });
         assert!(result.is_ok());
         // Creating shard 2 should fail since max_shards = 2
-        let result = manager.create_shard(ShardConfig { id: 2, ..Default::default() });
+        let result = manager.create_shard(ShardConfig {
+            id: 2,
+            ..Default::default()
+        });
         assert!(result.is_err());
     }
 }

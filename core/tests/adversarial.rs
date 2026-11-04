@@ -4,36 +4,44 @@
 //! conditions across all modules.
 
 use atoll_core::chain::blockchain::Blockchain;
-use atoll_core::chain::state::ChainState;
 use atoll_core::chain::sharding::cross_shard::CrossShardManager;
 use atoll_core::chain::sharding::rebalancer::ShardRebalancer;
 use atoll_core::chain::sharding::shard_manager::ShardManager;
-use atoll_core::consensus::penta::{PentaConsensus, pouw, pos_vrf, post, por, poh, PentaValidation};
-use atoll_core::consensus::finality::hotstuff::{HotStuffBFT, HotStuffState, VoteType, BFTVote};
-use atoll_core::crypto::morph_hash::{MorphHashEngine, select_algorithm_chain, MorphAlgorithm};
-use atoll_core::privacy::homomorphic::{HomomorphicContext, HomomorphicEngine, HomomorphicScheme, Plaintext};
-use atoll_core::privacy::zk_starks::{StarkProver, StarkVerifier};
-use atoll_core::network::gossip::{GossipConfig, GossipProtocol};
-use atoll_core::network::encrypted_mempool::EncryptedMempool as NetworkEncryptedMempool;
-use atoll_core::network::{NetworkMessage, PingMessage, BlockHeader as NetBlockHeader};
-use atoll_core::network::sync::SyncManager;
+use atoll_core::chain::state::ChainState;
+use atoll_core::consensus::finality::hotstuff::{BFTVote, HotStuffBFT, HotStuffState, VoteType};
+use atoll_core::consensus::penta::{
+    poh, por, pos_vrf, post, pouw, PentaConsensus, PentaValidation,
+};
+use atoll_core::crypto::morph_hash::{select_algorithm_chain, MorphAlgorithm, MorphHashEngine};
 use atoll_core::network::discovery::DiscoveryProtocol;
+use atoll_core::network::encrypted_mempool::EncryptedMempool as NetworkEncryptedMempool;
+use atoll_core::network::gossip::{GossipConfig, GossipProtocol};
 use atoll_core::network::peer_manager::{PeerManager, PeerStatus};
+use atoll_core::network::sync::SyncManager;
 use atoll_core::network::PeerInfo;
-use atoll_core::privacy::encrypted_mempool::{EncryptedMempool as PrivacyEncryptedMempool, EncryptedTransaction, DecryptionShare};
-use atoll_core::privacy::post_quantum::{PQSignatureEngine, PQSignatureScheme, PQKEMEngine, PQKEMScheme, HybridSignatureEngine};
+use atoll_core::network::{BlockHeader as NetBlockHeader, NetworkMessage, PingMessage};
 use atoll_core::primitives::address::Address;
 use atoll_core::primitives::block::{Block, BlockBody, BlockHeader};
 use atoll_core::primitives::hash::Hash512;
 use atoll_core::primitives::signature::Signature;
 use atoll_core::primitives::transaction::Transaction;
-use atoll_core::vm::{ExecutionContext, GasMeter, VMRouter, VMType};
+use atoll_core::privacy::encrypted_mempool::{
+    DecryptionShare, EncryptedMempool as PrivacyEncryptedMempool, EncryptedTransaction,
+};
+use atoll_core::privacy::homomorphic::{
+    HomomorphicContext, HomomorphicEngine, HomomorphicScheme, Plaintext,
+};
+use atoll_core::privacy::post_quantum::{
+    HybridSignatureEngine, PQKEMEngine, PQKEMScheme, PQSignatureEngine, PQSignatureScheme,
+};
+use atoll_core::privacy::zk_starks::{StarkProver, StarkVerifier};
+use atoll_core::vm::ai_vm::AIVMExecutor;
 use atoll_core::vm::evm::EVMExecutor;
-use atoll_core::vm::wasm::WASMExecutor;
 use atoll_core::vm::move_vm::MoveExecutor;
 use atoll_core::vm::riscv::RISCVExecutor;
-use atoll_core::vm::ai_vm::AIVMExecutor;
+use atoll_core::vm::wasm::WASMExecutor;
 use atoll_core::vm::zk_vm::ZKVMExecutor;
+use atoll_core::vm::{ExecutionContext, GasMeter, VMRouter, VMType};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -304,11 +312,17 @@ fn homomorphic_encrypt_without_key_fails() {
 #[test]
 fn homomorphic_add_mismatched_schemes_fails() {
     let mut engine1 = HomomorphicEngine::new(HomomorphicContext::new(
-        HomomorphicScheme::BFV, 4096, 1 << 30, 1 << 20,
+        HomomorphicScheme::BFV,
+        4096,
+        1 << 30,
+        1 << 20,
     ));
     engine1.generate_key_pair().unwrap();
     let mut engine2 = HomomorphicEngine::new(HomomorphicContext::new(
-        HomomorphicScheme::CKKS, 8192, 1 << 40, 1 << 20,
+        HomomorphicScheme::CKKS,
+        8192,
+        1 << 40,
+        1 << 20,
     ));
     engine2.generate_key_pair().unwrap();
 
@@ -324,11 +338,16 @@ fn homomorphic_add_mismatched_schemes_fails() {
 #[test]
 fn homomorphic_add_mismatched_sizes_fails() {
     let mut engine = HomomorphicEngine::new(HomomorphicContext::new(
-        HomomorphicScheme::BFV, 4096, 1 << 30, 1 << 20,
+        HomomorphicScheme::BFV,
+        4096,
+        1 << 30,
+        1 << 20,
     ));
     engine.generate_key_pair().unwrap();
 
-    let pt1 = Plaintext { data: vec![1, 2, 3] };
+    let pt1 = Plaintext {
+        data: vec![1, 2, 3],
+    };
     let pt2 = Plaintext { data: vec![4, 5] };
     let ct1 = engine.encrypt(&pt1).unwrap();
     let ct2 = engine.encrypt(&pt2).unwrap();
@@ -340,7 +359,10 @@ fn homomorphic_add_mismatched_sizes_fails() {
 #[test]
 fn homomorphic_multiply_noise_too_high_fails() {
     let mut engine = HomomorphicEngine::new(HomomorphicContext::new(
-        HomomorphicScheme::BFV, 4096, 1 << 30, 1 << 20,
+        HomomorphicScheme::BFV,
+        4096,
+        1 << 30,
+        1 << 20,
     ));
     engine.generate_key_pair().unwrap();
 
@@ -364,7 +386,9 @@ fn homomorphic_multiply_noise_too_high_fails() {
 #[test]
 fn pq_sign_empty_secret_key_fails() {
     let engine = PQSignatureEngine::new();
-    let keypair = PQSignatureEngine::new().generate_keypair(PQSignatureScheme::Dilithium2).unwrap();
+    let keypair = PQSignatureEngine::new()
+        .generate_keypair(PQSignatureScheme::Dilithium2)
+        .unwrap();
     // Create a keypair with empty secret key
     let empty_keypair = atoll_core::privacy::post_quantum::PQKeyPair {
         scheme: PQSignatureScheme::Dilithium2,
@@ -378,7 +402,9 @@ fn pq_sign_empty_secret_key_fails() {
 #[test]
 fn pq_sign_empty_message() {
     let engine = PQSignatureEngine::new();
-    let keypair = engine.generate_keypair(PQSignatureScheme::Dilithium2).unwrap();
+    let keypair = engine
+        .generate_keypair(PQSignatureScheme::Dilithium2)
+        .unwrap();
     let result = engine.sign(&[], &keypair);
     assert!(result.is_ok()); // Empty message should still work
 }
@@ -386,7 +412,9 @@ fn pq_sign_empty_message() {
 #[test]
 fn pq_verify_empty_signature_fails() {
     let engine = PQSignatureEngine::new();
-    let keypair = engine.generate_keypair(PQSignatureScheme::Dilithium2).unwrap();
+    let keypair = engine
+        .generate_keypair(PQSignatureScheme::Dilithium2)
+        .unwrap();
     let sig = atoll_core::privacy::post_quantum::PQSignature {
         scheme: PQSignatureScheme::Dilithium2,
         signature: vec![],
@@ -435,10 +463,20 @@ fn stark_prove_empty_outputs_fails() {
 fn penta_consensus_invalid_pouw() {
     let consensus = PentaConsensus::new();
     let result = consensus.validate_block(
-        &pouw::PoUWResult { valid: false, usefulness_score: 0.8, difficulty_met: true },
-        &make_valid_pos(), &make_valid_post(), &make_valid_por(), &make_valid_poh(),
+        &pouw::PoUWResult {
+            valid: false,
+            usefulness_score: 0.8,
+            difficulty_met: true,
+        },
+        &make_valid_pos(),
+        &make_valid_post(),
+        &make_valid_por(),
+        &make_valid_poh(),
     );
-    assert_eq!(result, Err(atoll_core::consensus::penta::ConsensusError::PoUWFailed));
+    assert_eq!(
+        result,
+        Err(atoll_core::consensus::penta::ConsensusError::PoUWFailed)
+    );
 }
 
 #[test]
@@ -446,24 +484,49 @@ fn penta_consensus_invalid_pos() {
     let consensus = PentaConsensus::new();
     let result = consensus.validate_block(
         &make_valid_pouw(),
-        &pos_vrf::PoSResult { valid: false, combined_score: 0.9 },
-        &make_valid_post(), &make_valid_por(), &make_valid_poh(),
+        &pos_vrf::PoSResult {
+            valid: false,
+            combined_score: 0.9,
+        },
+        &make_valid_post(),
+        &make_valid_por(),
+        &make_valid_poh(),
     );
-    assert_eq!(result, Err(atoll_core::consensus::penta::ConsensusError::PoSFailed));
+    assert_eq!(
+        result,
+        Err(atoll_core::consensus::penta::ConsensusError::PoSFailed)
+    );
 }
 
 #[test]
 fn penta_consensus_composite_score_too_low() {
     let consensus = PentaConsensus::new();
     // All scores zero -> composite = 0 < 0.5 threshold
-    let pouw = pouw::PoUWResult { valid: true, usefulness_score: 0.0, difficulty_met: true };
-    let pos = pos_vrf::PoSResult { valid: true, combined_score: 0.0 };
-    let post = post::PoSTResult { valid: true, size_score: 0.0 };
-    let por = por::PoRResult { raw_score: 0.0, decayed_score: 0.0, is_eligible: true };
+    let pouw = pouw::PoUWResult {
+        valid: true,
+        usefulness_score: 0.0,
+        difficulty_met: true,
+    };
+    let pos = pos_vrf::PoSResult {
+        valid: true,
+        combined_score: 0.0,
+    };
+    let post = post::PoSTResult {
+        valid: true,
+        size_score: 0.0,
+    };
+    let por = por::PoRResult {
+        raw_score: 0.0,
+        decayed_score: 0.0,
+        is_eligible: true,
+    };
     let poh = poh::PoHResult { is_verified: true }; // poh passes, but composite score too low
 
     let result = consensus.validate_block(&pouw, &pos, &post, &por, &poh);
-    assert_eq!(result, Err(atoll_core::consensus::penta::ConsensusError::CompositeScoreTooLow));
+    assert_eq!(
+        result,
+        Err(atoll_core::consensus::penta::ConsensusError::CompositeScoreTooLow)
+    );
 }
 
 #[test]
@@ -553,7 +616,9 @@ fn blockchain_insert_block_wrong_prev_hash() {
             proposer: zero_address(),
             difficulty: 1,
         },
-        body: BlockBody { transactions: Vec::new() },
+        body: BlockBody {
+            transactions: Vec::new(),
+        },
     };
     let result = bc.insert_block(block, &validation);
     assert!(result.is_err());
@@ -637,9 +702,7 @@ fn shard_manager_assign_validators_to_nonexistent_shard() {
 fn shard_manager_exceeds_max_validators() {
     let mut manager = ShardManager::new();
     // Shard 0 has max_validators = 1000 by default
-    let validators: Vec<Address> = (0..1001)
-        .map(|i| make_address([i as u8; 20]))
-        .collect();
+    let validators: Vec<Address> = (0..1001).map(|i| make_address([i as u8; 20])).collect();
     let result = manager.assign_validators(0, validators);
     assert!(result.is_err());
 }
@@ -661,16 +724,18 @@ fn cross_shard_execute_nonexistent_receipt() {
 #[test]
 fn cross_shard_execute_receipt_twice() {
     let mut xshard_mgr = CrossShardManager::new();
-    let request_id = xshard_mgr.create_request(
-        0, 1, zero_address(), zero_address(), 10, vec![], 100,
-    );
+    let request_id =
+        xshard_mgr.create_request(0, 1, zero_address(), zero_address(), 10, vec![], 100);
     let receipt_id = xshard_mgr.request_to_receipt(&request_id).unwrap().id;
 
     xshard_mgr.execute_receipt(&receipt_id, 150).unwrap();
     let result = xshard_mgr.execute_receipt(&receipt_id, 160);
     assert!(result.is_err());
     // Receipt was removed from pending after first execution, so it's "not found"
-    assert_eq!(result.unwrap_err().as_str(), format!("Receipt {:?} not found", receipt_id).as_str());
+    assert_eq!(
+        result.unwrap_err().as_str(),
+        format!("Receipt {:?} not found", receipt_id).as_str()
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -746,11 +811,7 @@ fn peer_manager_record_message_for_nonexistent_peer() {
 
 #[test]
 fn privacy_encrypted_mempool_add_duplicate() {
-    let mut mempool = PrivacyEncryptedMempool::new(
-        zero_hash(),
-        vec![],
-        1,
-    );
+    let mut mempool = PrivacyEncryptedMempool::new(zero_hash(), vec![], 1);
     let tx = EncryptedTransaction {
         ciphertext: vec![1],
         order_commitment: zero_hash(),
@@ -766,11 +827,7 @@ fn privacy_encrypted_mempool_add_duplicate() {
 
 #[test]
 fn privacy_encrypted_mempool_add_decryption_share_for_unknown_tx() {
-    let mut mempool = PrivacyEncryptedMempool::new(
-        zero_hash(),
-        vec![],
-        1,
-    );
+    let mut mempool = PrivacyEncryptedMempool::new(zero_hash(), vec![], 1);
     let result = mempool.add_decryption_share(DecryptionShare {
         tx_hash: zero_hash(),
         share: vec![1],
@@ -782,22 +839,14 @@ fn privacy_encrypted_mempool_add_decryption_share_for_unknown_tx() {
 
 #[test]
 fn privacy_encrypted_mempool_remove_nonexistent() {
-    let mut mempool = PrivacyEncryptedMempool::new(
-        zero_hash(),
-        vec![],
-        1,
-    );
+    let mut mempool = PrivacyEncryptedMempool::new(zero_hash(), vec![], 1);
     let result = mempool.remove_transaction(&zero_hash());
     assert!(result.is_none());
 }
 
 #[test]
 fn privacy_encrypted_mempool_max_size_reached() {
-    let mut mempool = PrivacyEncryptedMempool::new(
-        zero_hash(),
-        vec![],
-        1,
-    );
+    let mut mempool = PrivacyEncryptedMempool::new(zero_hash(), vec![], 1);
     mempool.set_max_size(2);
 
     let tx1 = EncryptedTransaction {
@@ -840,7 +889,7 @@ fn privacy_encrypted_mempool_max_size_reached() {
 fn evm_out_of_gas_on_expensive_opcode() {
     let context = ExecutionContext::default();
     let mut evm = EVMExecutor::new(context, 10); // Very low gas limit
-    // SELFDESTRUCT costs 5000 gas
+                                                 // SELFDESTRUCT costs 5000 gas
     let result = evm.execute(&[0xFF], &[]);
     assert!(result.is_err());
 }
@@ -878,7 +927,11 @@ fn evm_push_operand_out_of_bounds() {
 fn wasm_invalid_magic_number() {
     let context = ExecutionContext::default();
     let mut wasm = WASMExecutor::new(context, 10_000);
-    let result = wasm.execute(&[0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00], "main", &[]);
+    let result = wasm.execute(
+        &[0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00],
+        "main",
+        &[],
+    );
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), "Invalid WASM magic number");
 }
@@ -887,7 +940,11 @@ fn wasm_invalid_magic_number() {
 fn wasm_unsupported_version() {
     let context = ExecutionContext::default();
     let mut wasm = WASMExecutor::new(context, 10_000);
-    let result = wasm.execute(&[0x00, 0x61, 0x73, 0x6d, 0x02, 0x00, 0x00, 0x00], "main", &[]);
+    let result = wasm.execute(
+        &[0x00, 0x61, 0x73, 0x6d, 0x02, 0x00, 0x00, 0x00],
+        "main",
+        &[],
+    );
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), "Unsupported WASM version: 2");
 }
@@ -914,7 +971,11 @@ fn move_empty_bytecode() {
 fn riscv_invalid_elf_magic() {
     let context = ExecutionContext::default();
     let mut riscv = RISCVExecutor::new(context, 10_000);
-    let result = riscv.execute(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00], 0x1000, &[]);
+    let result = riscv.execute(
+        &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+        0x1000,
+        &[],
+    );
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), "Invalid RISC-V ELF magic number");
 }

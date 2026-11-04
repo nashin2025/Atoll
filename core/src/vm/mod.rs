@@ -5,15 +5,15 @@
 //!
 //! The VM router selects the appropriate VM based on contract bytecode prefix.
 
+pub mod ai_vm;
 pub mod evm;
-pub mod wasm;
 pub mod move_vm;
 pub mod riscv;
-pub mod ai_vm;
+pub mod wasm;
 pub mod zk_vm;
 
-use crate::primitives::hash::Hash512;
 use crate::primitives::address::Address;
+use crate::primitives::hash::Hash512;
 
 /// VM type enum for the VM router
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,13 +92,13 @@ impl VMRouter {
         // Phase 2: More sophisticated detection (magic bytes, headers, etc.)
 
         match data[0] {
-            0x00 => Ok(VMType::EVM),    // EVM bytecode starts with 0x00
-            0x01 => Ok(VMType::WASM),   // WASM magic number starts with 0x00 0x61 0x73 0x6d
-            0x02 => Ok(VMType::Move),   // Move bytecode
-            0x03 => Ok(VMType::RISCV),  // RISC-V binary
-            0x04 => Ok(VMType::AI),     // AI model (ONNX)
-            0x05 => Ok(VMType::ZK),     // ZK VM circuit
-            _ => Ok(VMType::EVM),       // Default to EVM for compatibility
+            0x00 => Ok(VMType::EVM),   // EVM bytecode starts with 0x00
+            0x01 => Ok(VMType::WASM),  // WASM magic number starts with 0x00 0x61 0x73 0x6d
+            0x02 => Ok(VMType::Move),  // Move bytecode
+            0x03 => Ok(VMType::RISCV), // RISC-V binary
+            0x04 => Ok(VMType::AI),    // AI model (ONNX)
+            0x05 => Ok(VMType::ZK),    // ZK VM circuit
+            _ => Ok(VMType::EVM),      // Default to EVM for compatibility
         }
     }
 }

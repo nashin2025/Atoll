@@ -8,20 +8,20 @@
 #![warn(clippy::all)]
 #![warn(clippy::pedantic)]
 
-pub mod config;
-pub mod primitives;
-pub mod crypto;
-pub mod consensus;
-pub mod chain;
-pub mod network;
-pub mod privacy;
-pub mod vm;
-pub mod storage;
-pub mod mempool;
 pub mod api;
+pub mod chain;
+pub mod config;
+pub mod consensus;
+pub mod crypto;
 pub mod governance;
-pub mod tokens;
+pub mod mempool;
+pub mod network;
+pub mod primitives;
+pub mod privacy;
+pub mod storage;
 pub mod telemetry;
+pub mod tokens;
+pub mod vm;
 
 // Protocol version
 pub const CHIMERA_VERSION: u32 = 1;

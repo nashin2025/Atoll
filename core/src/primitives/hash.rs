@@ -163,12 +163,11 @@ mod tests {
     fn blake3_avalanche_effect() {
         let h1 = Hash512::blake3(b"hello");
         let h2 = Hash512::blake3(b"hellp");
-        let diff_bits: u32 = h1
-            .0
-            .iter()
-            .zip(h2.0.iter())
-            .map(|(a, b)| (a ^ b).count_ones())
-            .sum();
+        let diff_bits: u32 =
+            h1.0.iter()
+                .zip(h2.0.iter())
+                .map(|(a, b)| (a ^ b).count_ones())
+                .sum();
         assert!(
             diff_bits > 16,
             "Avalanche effect: expected >16 bit flips, got {}",

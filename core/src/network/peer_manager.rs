@@ -100,10 +100,10 @@ impl PeerManager {
     /// Checks if a peer is banned
     pub fn is_banned(&self, node_id: &NodeId) -> bool {
         if let Some(ban_until) = self.banned_peers.get(node_id) {
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+            let now = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
             now < *ban_until
         } else {
             false
@@ -112,7 +112,10 @@ impl PeerManager {
 
     /// Returns the number of connected peers
     pub fn connected_count(&self) -> usize {
-        self.peers.values().filter(|m| m.status == PeerStatus::Connected).count()
+        self.peers
+            .values()
+            .filter(|m| m.status == PeerStatus::Connected)
+            .count()
     }
 
     /// Returns the number of banned peers

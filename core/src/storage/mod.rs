@@ -2,9 +2,9 @@
 //!
 //! Database, state trie, pruning, and archival storage.
 
-pub mod database;
-pub mod state_trie;
-pub mod pruning;
 pub mod archival;
+pub mod database;
+pub mod pruning;
+pub mod state_trie;
 
 // Placeholder - full implementations after Phase 0 research

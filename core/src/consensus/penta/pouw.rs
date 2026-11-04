@@ -76,17 +76,14 @@ impl ProblemRegistry {
     }
 
     /// Register a new useful work problem
-    pub fn register(
-        &mut self,
-        problem: UsefulWorkProblem,
-        submitter: &str,
-    ) -> usize {
+    pub fn register(&mut self, problem: UsefulWorkProblem, submitter: &str) -> usize {
         let id = self.next_id;
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        self.problems.insert(id, (problem, submitter.to_string(), now));
+        self.problems
+            .insert(id, (problem, submitter.to_string(), now));
         self.next_id += 1;
         id
     }
@@ -116,22 +113,14 @@ impl VerificationEngine {
     }
 
     /// Verifies that a useful work proof is valid
-    pub fn verify(
-        &self,
-        problem: &UsefulWorkProblem,
-        proof_data: &[u8],
-    ) -> bool {
+    pub fn verify(&self, problem: &UsefulWorkProblem, proof_data: &[u8]) -> bool {
         // Phase 2: Basic validation - check proof data is non-empty
         // Phase 3: Full verification with zk-SNARKs and problem-specific checks
         !proof_data.is_empty() && proof_data.len() <= 10_000
     }
 
     /// Scores the usefulness of a work proof (0.0 - 1.0)
-    pub fn score_usefulness(
-        &self,
-        problem: &UsefulWorkProblem,
-        quality: f64,
-    ) -> f64 {
+    pub fn score_usefulness(&self, problem: &UsefulWorkProblem, quality: f64) -> f64 {
         quality.clamp(0.0, 1.0)
     }
 }

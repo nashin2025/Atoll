@@ -219,11 +219,8 @@ fn apply_algorithm(algo: MorphAlgorithm, input: &[u8]) -> Vec<u8> {
             // Argon2id with 64-byte output, 3 passes, 64KB memory
             let mut output = [0u8; 64];
             let params = argon2::Params::new(64, 3, 1, None).unwrap();
-            let argon2 = argon2::Argon2::new(
-                argon2::Algorithm::Argon2id,
-                argon2::Version::V0x13,
-                params,
-            );
+            let argon2 =
+                argon2::Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
             argon2
                 .hash_password_into(input, &salt_for_algorithm("Argon2id"), &mut output)
                 .expect("Argon2id hashing failed");
@@ -364,8 +361,7 @@ fn atoll_feistel(input: &[u8]) -> Vec<u8> {
 /// Custom ATOLL SPN (Substitution-Permutation Network) hash.
 fn atoll_spn(input: &[u8]) -> Vec<u8> {
     let sbox: [u8; 16] = [
-        0xE, 0x4, 0xD, 0x1, 0x2, 0xF, 0xB, 0x8,
-        0x3, 0xA, 0x6, 0xC, 0x5, 0x9, 0x0, 0x7,
+        0xE, 0x4, 0xD, 0x1, 0x2, 0xF, 0xB, 0x8, 0x3, 0xA, 0x6, 0xC, 0x5, 0x9, 0x0, 0x7,
     ];
 
     let mut state = [0u8; 64];
@@ -397,7 +393,9 @@ fn atoll_lattice(input: &[u8]) -> Vec<u8> {
     for i in 0..64 {
         let mut acc: u64 = 0;
         for j in 0..64 {
-            acc = acc.wrapping_add(coeffs[j].wrapping_mul(((i * j + 1) as u64).wrapping_mul(0x9E3779B97F4A7C15)));
+            acc = acc.wrapping_add(
+                coeffs[j].wrapping_mul(((i * j + 1) as u64).wrapping_mul(0x9E3779B97F4A7C15)),
+            );
         }
         coeffs[i] = acc % 257;
     }
@@ -462,7 +460,9 @@ fn derive_index(seed: &[u8], i: usize) -> usize {
 
 /// Mixes the seed for the next Fisher-Yates iteration.
 fn mix_seed(seed: &[u8], i: u64) -> Vec<u8> {
-    blake3::hash(&[seed, &i.to_le_bytes()].concat()).as_bytes().to_vec()
+    blake3::hash(&[seed, &i.to_le_bytes()].concat())
+        .as_bytes()
+        .to_vec()
 }
 
 /// Fisher-Yates shuffle seeded with block hash entropy.
@@ -480,10 +480,7 @@ fn fisher_yates_shuffle(seed: &[u8], n: usize) -> Vec<usize> {
 }
 
 /// Selects 16 of 32 algorithms based on previous block hash and block height.
-pub fn select_algorithm_chain(
-    prev_hash: &Hash512,
-    block_height: u64,
-) -> Vec<MorphAlgorithm> {
+pub fn select_algorithm_chain(prev_hash: &Hash512, block_height: u64) -> Vec<MorphAlgorithm> {
     let shuffled = fisher_yates_shuffle(prev_hash.as_ref(), ALGORITHM_POOL_SIZE);
     let mut selected: Vec<MorphAlgorithm> = shuffled
         .into_iter()
@@ -567,14 +564,11 @@ impl MemoryHardLayer {
 
     pub fn memory_hard_mix(&self, state: &mut [u8], buffer: &[u8]) {
         for _round in 0..self.access_rounds.min(state.len() * 8) {
-            let addr = u64::from_le_bytes(state[..8].try_into().unwrap_or([0; 8]))
-                as usize
+            let addr = u64::from_le_bytes(state[..8].try_into().unwrap_or([0; 8])) as usize
                 % (buffer.len().saturating_sub(64));
             let mem_data = &buffer[addr..addr + 64];
             for i in 0..64.min(state.len()) {
-                state[i] = state[i]
-                    .wrapping_add(mem_data[i])
-                    .rotate_left(3);
+                state[i] = state[i].wrapping_add(mem_data[i]).rotate_left(3);
                 state[i] ^= mem_data[(i + 17) % 64];
             }
         }
@@ -666,7 +660,8 @@ impl MorphHashEngine {
         let mut state = input.to_vec();
         for (i, algo) in chain.iter().enumerate() {
             let mem_index = Self::derive_memory_index(&state, i, &memory_buffer);
-            let mem_data = &memory_buffer[mem_index..mem_index + 64.min(memory_buffer.len() - mem_index)];
+            let mem_data =
+                &memory_buffer[mem_index..mem_index + 64.min(memory_buffer.len() - mem_index)];
             state = Self::xor_mix(&state, mem_data);
 
             state = apply_algorithm(*algo, &state);
@@ -763,12 +758,11 @@ mod tests {
         let prev_hash = Hash512::zero();
         let h1 = engine.morph_hash(b"hello", &prev_hash, 0);
         let h2 = engine.morph_hash(b"hellp", &prev_hash, 0);
-        let diff_bits: u32 = h1
-            .0
-            .iter()
-            .zip(h2.0.iter())
-            .map(|(a, b)| (a ^ b).count_ones())
-            .sum();
+        let diff_bits: u32 =
+            h1.0.iter()
+                .zip(h2.0.iter())
+                .map(|(a, b)| (a ^ b).count_ones())
+                .sum();
         assert!(
             diff_bits > 16,
             "Avalanche effect: expected >16 bit flips, got {}",

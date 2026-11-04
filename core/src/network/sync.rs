@@ -33,17 +33,16 @@ impl SyncManager {
     }
 
     /// Updates a peer's sync state
-    pub fn update_peer_height(
-        &mut self,
-        node_id: crate::network::p2p::NodeId,
-        height: u64,
-    ) {
-        self.peer_states.entry(node_id).or_insert(PeerSyncState {
-            node_id,
-            current_height: height,
-            common_height: 0,
-            syncing: false,
-        }).current_height = height;
+    pub fn update_peer_height(&mut self, node_id: crate::network::p2p::NodeId, height: u64) {
+        self.peer_states
+            .entry(node_id)
+            .or_insert(PeerSyncState {
+                node_id,
+                current_height: height,
+                common_height: 0,
+                syncing: false,
+            })
+            .current_height = height;
     }
 
     /// Returns peers that are behind our height (need blocks from us)
@@ -92,11 +91,7 @@ impl SyncManager {
     }
 
     /// Marks a peer as syncing
-    pub fn set_syncing(
-        &mut self,
-        node_id: crate::network::p2p::NodeId,
-        syncing: bool,
-    ) {
+    pub fn set_syncing(&mut self, node_id: crate::network::p2p::NodeId, syncing: bool) {
         if let Some(state) = self.peer_states.get_mut(&node_id) {
             state.syncing = syncing;
         }

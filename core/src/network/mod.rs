@@ -5,15 +5,15 @@
 //! Uses tokio for async I/O, curve25519-dalek for Diffie-Hellman key exchange,
 //! and chacha20poly1305 for symmetric encryption.
 
-pub mod p2p;
-pub mod peer_manager;
-pub mod gossip;
-pub mod sync;
 pub mod discovery;
 pub mod encrypted_mempool;
+pub mod gossip;
+pub mod p2p;
+pub mod peer_manager;
+pub mod sync;
 
-use crate::primitives::hash::Hash512;
 use crate::primitives::address::Address;
+use crate::primitives::hash::Hash512;
 
 // ---------------------------------------------------------------------------
 // Network Message Types
@@ -29,13 +29,13 @@ pub enum NetworkMessage {
     Neighbors(NeighborsMessage),
 
     // Block propagation
-    NewBlock(Vec<u8>),           // Serialized block
+    NewBlock(Vec<u8>), // Serialized block
     NewBlockHash(Hash512),
     GetBlock(Hash512),
-    BlockResponse(Vec<u8>),      // Serialized block
+    BlockResponse(Vec<u8>), // Serialized block
 
     // Transaction propagation
-    NewTransaction(Vec<u8>),     // Serialized transaction
+    NewTransaction(Vec<u8>), // Serialized transaction
     NewTransactionBatch(Vec<Vec<u8>>),
 
     // Consensus votes
@@ -47,13 +47,13 @@ pub enum NetworkMessage {
     GetHeaders(GetHeadersMessage),
     Headers(Vec<BlockHeader>),
     GetBodies(Vec<Hash512>),
-    Bodies(Vec<Vec<u8>>),        // Serialized block bodies
+    Bodies(Vec<Vec<u8>>), // Serialized block bodies
     GetState(StateRequest),
     StateResponse(StateData),
 
     // Cross-shard
-    CrossShardReceipt(Vec<u8>),  // Serialized receipt
-    CrossShardRequest(Vec<u8>),  // Serialized request
+    CrossShardReceipt(Vec<u8>), // Serialized receipt
+    CrossShardRequest(Vec<u8>), // Serialized request
 
     // Encrypted mempool
     EncryptedTransaction(EncryptedTx),
@@ -382,9 +382,7 @@ mod tests {
 
     #[test]
     fn neighbors_message_construction() {
-        let neighbors = NeighborsMessage {
-            peers: vec![],
-        };
+        let neighbors = NeighborsMessage { peers: vec![] };
         assert!(neighbors.peers.is_empty());
     }
 

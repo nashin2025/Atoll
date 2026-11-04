@@ -9,13 +9,13 @@ use serde::{Deserialize, Serialize};
 /// Weights for reputation scoring components
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ReputationWeights {
-    pub uptime: f64,                    // 0.20
-    pub block_validity_rate: f64,       // 0.25
-    pub transaction_honesty: f64,       // 0.15
-    pub useful_work_contribution: f64,  // 0.15
-    pub governance_participation: f64,  // 0.10
-    pub community_endorsements: f64,    // 0.10
-    pub age_bonus: f64,                 // 0.05
+    pub uptime: f64,                   // 0.20
+    pub block_validity_rate: f64,      // 0.25
+    pub transaction_honesty: f64,      // 0.15
+    pub useful_work_contribution: f64, // 0.15
+    pub governance_participation: f64, // 0.10
+    pub community_endorsements: f64,   // 0.10
+    pub age_bonus: f64,                // 0.05
 }
 
 impl Default for ReputationWeights {
@@ -77,8 +77,8 @@ impl Default for ParticipantHistory {
 /// Reputation calculator
 pub struct ReputationCalculator {
     weights: ReputationWeights,
-    decay_rate: f64,        // 0.10 per year
-    minimum_score: f64,     // 0.3
+    decay_rate: f64,    // 0.10 per year
+    minimum_score: f64, // 0.3
     history_depth: u64,
 }
 
@@ -244,9 +244,13 @@ mod tests {
     #[test]
     fn weights_sum_to_one() {
         let w = ReputationWeights::default();
-        let total = w.uptime + w.block_validity_rate + w.transaction_honesty
-            + w.useful_work_contribution + w.governance_participation
-            + w.community_endorsements + w.age_bonus;
+        let total = w.uptime
+            + w.block_validity_rate
+            + w.transaction_honesty
+            + w.useful_work_contribution
+            + w.governance_participation
+            + w.community_endorsements
+            + w.age_bonus;
         assert!((total - 1.0).abs() < 0.001);
     }
 }

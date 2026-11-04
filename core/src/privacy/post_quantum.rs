@@ -69,16 +69,16 @@ pub struct PQEncapsulatedKey {
 /// Hybrid key pair: classical + post-quantum
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HybridKeyPair {
-    pub classical: Vec<u8>,   // Ed25519 public key
-    pub pq_dilithium: Vec<u8>, // Dilithium public key
+    pub classical: Vec<u8>,          // Ed25519 public key
+    pub pq_dilithium: Vec<u8>,       // Dilithium public key
     pub pq_sphincs: Option<Vec<u8>>, // SPHINCS+ public key (optional)
 }
 
 /// Hybrid signature: classical + post-quantum
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HybridSignature {
-    pub classical: Vec<u8>,   // Ed25519 signature
-    pub pq_dilithium: Vec<u8>, // Dilithium signature
+    pub classical: Vec<u8>,          // Ed25519 signature
+    pub pq_dilithium: Vec<u8>,       // Dilithium signature
     pub pq_sphincs: Option<Vec<u8>>, // SPHINCS+ signature (optional)
 }
 
@@ -92,10 +92,7 @@ impl PQSignatureEngine {
     }
 
     /// Generates a PQ key pair
-    pub fn generate_keypair(
-        &self,
-        scheme: PQSignatureScheme,
-    ) -> Result<PQKeyPair, String> {
+    pub fn generate_keypair(&self, scheme: PQSignatureScheme) -> Result<PQKeyPair, String> {
         let (public_key_size, secret_key_size) = self.key_sizes(scheme);
 
         Ok(PQKeyPair {
@@ -106,11 +103,7 @@ impl PQSignatureEngine {
     }
 
     /// Signs a message with a PQ key pair
-    pub fn sign(
-        &self,
-        message: &[u8],
-        keypair: &PQKeyPair,
-    ) -> Result<PQSignature, String> {
+    pub fn sign(&self, message: &[u8], keypair: &PQKeyPair) -> Result<PQSignature, String> {
         if keypair.secret_key.is_empty() {
             return Err("Empty secret key".to_string());
         }
@@ -123,10 +116,9 @@ impl PQSignatureEngine {
         // placeholder and must be replaced with real Dilithium/SPHINCS+
         // signatures before production use.
 
-        let mut signature = Hash512::blake3(&[
-            message,
-            &keypair.public_key,
-        ].concat()).0.to_vec();
+        let mut signature = Hash512::blake3(&[message, &keypair.public_key].concat())
+            .0
+            .to_vec();
 
         // Pad to scheme-specific size
         let sig_size = self.signature_size(keypair.scheme);
@@ -213,10 +205,7 @@ impl PQKEMEngine {
     }
 
     /// Generates a KEM key pair
-    pub fn generate_keypair(
-        &self,
-        scheme: PQKEMScheme,
-    ) -> Result<PQKEMKeyPair, String> {
+    pub fn generate_keypair(&self, scheme: PQKEMScheme) -> Result<PQKEMKeyPair, String> {
         let (public_key_size, secret_key_size) = self.key_sizes(scheme);
 
         Ok(PQKEMKeyPair {
@@ -250,11 +239,7 @@ impl PQKEMEngine {
     }
 
     /// Decapsulates a shared secret
-    pub fn decapsulate(
-        &self,
-        ciphertext: &[u8],
-        _secret_key: &[u8],
-    ) -> Result<Vec<u8>, String> {
+    pub fn decapsulate(&self, ciphertext: &[u8], _secret_key: &[u8]) -> Result<Vec<u8>, String> {
         if ciphertext.is_empty() {
             return Err("Empty ciphertext".to_string());
         }
@@ -289,9 +274,9 @@ impl HybridSignatureEngine {
 
     /// Generates a hybrid key pair
     pub fn generate_keypair(&self) -> Result<HybridKeyPair, String> {
-        let pq_keypair = self.pq_engine.generate_keypair(
-            PQSignatureScheme::Dilithium5,
-        )?;
+        let pq_keypair = self
+            .pq_engine
+            .generate_keypair(PQSignatureScheme::Dilithium5)?;
 
         let mut classical = [0u8; 64];
         OsRng.fill_bytes(&mut classical);
@@ -304,15 +289,8 @@ impl HybridSignatureEngine {
     }
 
     /// Signs with hybrid signature
-    pub fn sign(
-        &self,
-        message: &[u8],
-        keypair: &HybridKeyPair,
-    ) -> Result<HybridSignature, String> {
-        let classical_sig = Hash512::blake3(&[
-            message,
-            &keypair.classical,
-        ].concat()).0;
+    pub fn sign(&self, message: &[u8], keypair: &HybridKeyPair) -> Result<HybridSignature, String> {
+        let classical_sig = Hash512::blake3(&[message, &keypair.classical].concat()).0;
 
         let pq_sig = self.pq_engine.sign(
             message,
@@ -339,10 +317,9 @@ impl HybridSignatureEngine {
         pq_pk: &[u8],
     ) -> Result<bool, String> {
         // Both classical and PQ must verify
-        let classical_sig = Hash512::blake3(&[
-            message,
-            classical_pk,
-        ].concat()).0.to_vec();
+        let classical_sig = Hash512::blake3(&[message, classical_pk].concat())
+            .0
+            .to_vec();
 
         if signature.classical != classical_sig {
             return Ok(false);
@@ -379,7 +356,9 @@ mod tests {
     #[test]
     fn pq_keypair_generation() {
         let engine = PQSignatureEngine::new();
-        let keypair = engine.generate_keypair(PQSignatureScheme::Dilithium5).unwrap();
+        let keypair = engine
+            .generate_keypair(PQSignatureScheme::Dilithium5)
+            .unwrap();
         assert_eq!(keypair.scheme, PQSignatureScheme::Dilithium5);
         assert!(!keypair.public_key.is_empty());
         assert!(!keypair.secret_key.is_empty());
@@ -388,30 +367,42 @@ mod tests {
     #[test]
     fn pq_sign_and_verify() {
         let engine = PQSignatureEngine::new();
-        let keypair = engine.generate_keypair(PQSignatureScheme::Dilithium3).unwrap();
+        let keypair = engine
+            .generate_keypair(PQSignatureScheme::Dilithium3)
+            .unwrap();
         let message = b"test message";
 
         let signature = engine.sign(message, &keypair).unwrap();
         assert_eq!(signature.scheme, PQSignatureScheme::Dilithium3);
         assert!(!signature.signature.is_empty());
 
-        let valid = engine.verify(message, &signature, &keypair.public_key).unwrap();
+        let valid = engine
+            .verify(message, &signature, &keypair.public_key)
+            .unwrap();
         assert!(valid);
     }
 
     #[test]
     fn pq_wrong_key_verify_fails() {
         let engine = PQSignatureEngine::new();
-        let keypair1 = engine.generate_keypair(PQSignatureScheme::Dilithium2).unwrap();
-        let keypair2 = engine.generate_keypair(PQSignatureScheme::Dilithium2).unwrap();
+        let keypair1 = engine
+            .generate_keypair(PQSignatureScheme::Dilithium2)
+            .unwrap();
+        let keypair2 = engine
+            .generate_keypair(PQSignatureScheme::Dilithium2)
+            .unwrap();
         let message = b"test message";
 
         let signature = engine.sign(message, &keypair1).unwrap();
         // Correct key verifies
-        let valid = engine.verify(message, &signature, &keypair1.public_key).unwrap();
+        let valid = engine
+            .verify(message, &signature, &keypair1.public_key)
+            .unwrap();
         assert!(valid);
         // Phase 1: Prototype accepts any non-empty signature regardless of key
-        let valid = engine.verify(message, &signature, &keypair2.public_key).unwrap();
+        let valid = engine
+            .verify(message, &signature, &keypair2.public_key)
+            .unwrap();
         assert!(valid);
     }
 
@@ -420,11 +411,15 @@ mod tests {
         let engine = PQKEMEngine::new();
         let keypair = engine.generate_keypair(PQKEMScheme::Kyber768).unwrap();
 
-        let encapsulated = engine.encapsulate(&keypair.public_key, PQKEMScheme::Kyber768).unwrap();
+        let encapsulated = engine
+            .encapsulate(&keypair.public_key, PQKEMScheme::Kyber768)
+            .unwrap();
         assert!(!encapsulated.ciphertext.is_empty());
         assert!(!encapsulated.shared_secret.is_empty());
 
-        let decapsulated = engine.decapsulate(&encapsulated.ciphertext, &keypair.secret_key).unwrap();
+        let decapsulated = engine
+            .decapsulate(&encapsulated.ciphertext, &keypair.secret_key)
+            .unwrap();
         assert_eq!(decapsulated, encapsulated.shared_secret);
     }
 
@@ -447,12 +442,14 @@ mod tests {
         assert_eq!(signature.classical.len(), 64);
         assert!(!signature.pq_dilithium.is_empty());
 
-        let valid = engine.verify(
-            message,
-            &signature,
-            &keypair.classical,
-            &keypair.pq_dilithium,
-        ).unwrap();
+        let valid = engine
+            .verify(
+                message,
+                &signature,
+                &keypair.classical,
+                &keypair.pq_dilithium,
+            )
+            .unwrap();
         assert!(valid);
     }
 
@@ -465,20 +462,24 @@ mod tests {
 
         let signature = engine.sign(message, &keypair1).unwrap();
         // Correct keys verify
-        let valid = engine.verify(
-            message,
-            &signature,
-            &keypair1.classical,
-            &keypair1.pq_dilithium,
-        ).unwrap();
+        let valid = engine
+            .verify(
+                message,
+                &signature,
+                &keypair1.classical,
+                &keypair1.pq_dilithium,
+            )
+            .unwrap();
         assert!(valid);
         // Wrong keys fail because classical signature is key-dependent
-        let valid = engine.verify(
-            message,
-            &signature,
-            &keypair2.classical,
-            &keypair2.pq_dilithium,
-        ).unwrap();
+        let valid = engine
+            .verify(
+                message,
+                &signature,
+                &keypair2.classical,
+                &keypair2.pq_dilithium,
+            )
+            .unwrap();
         assert!(!valid);
     }
 

@@ -10,7 +10,7 @@
 //! - Privacy levels (public, shielded, private, fully private, selective disclosure)
 //! - Post-quantum signatures (Dilithium, SPHINCS+, Kyber key encapsulation)
 
-pub mod zk_starks;
-pub mod homomorphic;
 pub mod encrypted_mempool;
+pub mod homomorphic;
 pub mod post_quantum;
+pub mod zk_starks;

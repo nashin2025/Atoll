@@ -3,21 +3,21 @@
 //! Criterion benchmarks for hash functions, consensus, chain operations,
 //! and VM execution.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use std::time::Duration;
 use atoll_core::chain::blockchain::Blockchain;
 use atoll_core::chain::sharding::cross_shard::CrossShardManager;
 use atoll_core::chain::state::ChainState;
-use atoll_core::consensus::penta::{PentaConsensus, pouw, pos_vrf, post, por, poh};
+use atoll_core::consensus::penta::{poh, por, pos_vrf, post, pouw, PentaConsensus};
 use atoll_core::crypto::morph_hash::MorphHashEngine;
-use atoll_core::privacy::zk_starks::{StarkProver, StarkVerifier};
 use atoll_core::primitives::address::Address;
 use atoll_core::primitives::block::{Block, BlockBody, BlockHeader};
 use atoll_core::primitives::hash::Hash512;
 use atoll_core::primitives::signature::Signature;
 use atoll_core::primitives::transaction::Transaction;
-use atoll_core::vm::{ExecutionContext, GasMeter};
+use atoll_core::privacy::zk_starks::{StarkProver, StarkVerifier};
 use atoll_core::vm::evm::EVMExecutor;
+use atoll_core::vm::{ExecutionContext, GasMeter};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use std::time::Duration;
 
 // ---------------------------------------------------------------------------
 // Hash benchmarks
@@ -46,9 +46,7 @@ fn bench_hash512_from_hex(c: &mut Criterion) {
 
 fn bench_hash512_to_hex(c: &mut Criterion) {
     let hash = Hash512::blake3(b"test");
-    c.bench_function("hash512_to_hex", |b| {
-        b.iter(|| black_box(hash.to_hex()))
-    });
+    c.bench_function("hash512_to_hex", |b| b.iter(|| black_box(hash.to_hex())));
 }
 
 // ---------------------------------------------------------------------------
@@ -76,7 +74,12 @@ fn bench_morph_hash_production(c: &mut Criterion) {
 fn bench_select_algorithm_chain(c: &mut Criterion) {
     let prev_hash = Hash512::zero();
     c.bench_function("select_algorithm_chain", |b| {
-        b.iter(|| atoll_core::crypto::morph_hash::select_algorithm_chain(black_box(&prev_hash), black_box(100)))
+        b.iter(|| {
+            atoll_core::crypto::morph_hash::select_algorithm_chain(
+                black_box(&prev_hash),
+                black_box(100),
+            )
+        })
     });
 }
 
@@ -86,9 +89,7 @@ fn bench_select_algorithm_chain(c: &mut Criterion) {
 
 fn bench_address_to_hex(c: &mut Criterion) {
     let addr = Address::from_bytes([42u8; 20]);
-    c.bench_function("address_to_hex", |b| {
-        b.iter(|| black_box(addr.to_hex()))
-    });
+    c.bench_function("address_to_hex", |b| b.iter(|| black_box(addr.to_hex())));
 }
 
 fn bench_address_from_hex(c: &mut Criterion) {
@@ -134,14 +135,16 @@ fn bench_block_serialize(c: &mut Criterion) {
             difficulty: 1 << 20,
         },
         body: BlockBody {
-            transactions: (0..10).map(|_| Transaction {
-                version: 1,
-                from: Address::from_bytes([1u8; 20]),
-                to: Some(Address::from_bytes([2u8; 20])),
-                value: 100,
-                data: vec![1, 2, 3],
-                signature: Signature::default(),
-            }).collect(),
+            transactions: (0..10)
+                .map(|_| Transaction {
+                    version: 1,
+                    from: Address::from_bytes([1u8; 20]),
+                    to: Some(Address::from_bytes([2u8; 20])),
+                    value: 100,
+                    data: vec![1, 2, 3],
+                    signature: Signature::default(),
+                })
+                .collect(),
         },
     };
     c.bench_function("block_serialize", |b| {
@@ -178,13 +181,35 @@ fn bench_chain_state_balance(c: &mut Criterion) {
 
 fn bench_penta_validate_block(c: &mut Criterion) {
     let consensus = PentaConsensus::new();
-    let pouw = pouw::PoUWResult { valid: true, usefulness_score: 0.8, difficulty_met: true };
-    let pos = pos_vrf::PoSResult { valid: true, combined_score: 0.9 };
-    let post = post::PoSTResult { valid: true, size_score: 1.0 };
-    let por = por::PoRResult { raw_score: 0.8, decayed_score: 0.72, is_eligible: true };
+    let pouw = pouw::PoUWResult {
+        valid: true,
+        usefulness_score: 0.8,
+        difficulty_met: true,
+    };
+    let pos = pos_vrf::PoSResult {
+        valid: true,
+        combined_score: 0.9,
+    };
+    let post = post::PoSTResult {
+        valid: true,
+        size_score: 1.0,
+    };
+    let por = por::PoRResult {
+        raw_score: 0.8,
+        decayed_score: 0.72,
+        is_eligible: true,
+    };
     let poh = poh::PoHResult { is_verified: true };
     c.bench_function("penta_validate_block", |b| {
-        b.iter(|| consensus.validate_block(black_box(&pouw), black_box(&pos), black_box(&post), black_box(&por), black_box(&poh)))
+        b.iter(|| {
+            consensus.validate_block(
+                black_box(&pouw),
+                black_box(&pos),
+                black_box(&post),
+                black_box(&por),
+                black_box(&poh),
+            )
+        })
     });
 }
 
@@ -214,12 +239,28 @@ fn bench_gas_meter_charge(c: &mut Criterion) {
 
 fn bench_block_validation_insert(c: &mut Criterion) {
     let consensus = PentaConsensus::new();
-    let pouw = pouw::PoUWResult { valid: true, usefulness_score: 0.8, difficulty_met: true };
-    let pos = pos_vrf::PoSResult { valid: true, combined_score: 0.9 };
-    let post = post::PoSTResult { valid: true, size_score: 1.0 };
-    let por = por::PoRResult { raw_score: 0.8, decayed_score: 0.72, is_eligible: true };
+    let pouw = pouw::PoUWResult {
+        valid: true,
+        usefulness_score: 0.8,
+        difficulty_met: true,
+    };
+    let pos = pos_vrf::PoSResult {
+        valid: true,
+        combined_score: 0.9,
+    };
+    let post = post::PoSTResult {
+        valid: true,
+        size_score: 1.0,
+    };
+    let por = por::PoRResult {
+        raw_score: 0.8,
+        decayed_score: 0.72,
+        is_eligible: true,
+    };
     let poh = poh::PoHResult { is_verified: true };
-    let validation = consensus.validate_block(&pouw, &pos, &post, &por, &poh).unwrap();
+    let validation = consensus
+        .validate_block(&pouw, &pos, &post, &por, &poh)
+        .unwrap();
     c.bench_function("block_validation_insert", |b| {
         b.iter(|| {
             let mut bc = Blockchain::default();
@@ -235,7 +276,9 @@ fn bench_block_validation_insert(c: &mut Criterion) {
                     proposer: Address::zero(),
                     difficulty: 1,
                 },
-                body: BlockBody { transactions: Vec::new() },
+                body: BlockBody {
+                    transactions: Vec::new(),
+                },
             };
             let _ = bc.insert_block(block, &validation);
         })
@@ -244,12 +287,28 @@ fn bench_block_validation_insert(c: &mut Criterion) {
 
 fn bench_block_validation_with_tx(c: &mut Criterion) {
     let consensus = PentaConsensus::new();
-    let pouw = pouw::PoUWResult { valid: true, usefulness_score: 0.8, difficulty_met: true };
-    let pos = pos_vrf::PoSResult { valid: true, combined_score: 0.9 };
-    let post = post::PoSTResult { valid: true, size_score: 1.0 };
-    let por = por::PoRResult { raw_score: 0.8, decayed_score: 0.72, is_eligible: true };
+    let pouw = pouw::PoUWResult {
+        valid: true,
+        usefulness_score: 0.8,
+        difficulty_met: true,
+    };
+    let pos = pos_vrf::PoSResult {
+        valid: true,
+        combined_score: 0.9,
+    };
+    let post = post::PoSTResult {
+        valid: true,
+        size_score: 1.0,
+    };
+    let por = por::PoRResult {
+        raw_score: 0.8,
+        decayed_score: 0.72,
+        is_eligible: true,
+    };
     let poh = poh::PoHResult { is_verified: true };
-    let validation = consensus.validate_block(&pouw, &pos, &post, &por, &poh).unwrap();
+    let validation = consensus
+        .validate_block(&pouw, &pos, &post, &por, &poh)
+        .unwrap();
     c.bench_function("block_validation_with_10_tx", |b| {
         b.iter(|| {
             let mut bc = Blockchain::default();
@@ -329,7 +388,8 @@ fn bench_cross_shard_full_lifecycle(c: &mut Criterion) {
         b.iter(|| {
             let mut manager = CrossShardManager::new();
             let request_id = manager.create_request(
-                0, 1,
+                0,
+                1,
                 Address::from_bytes([1u8; 20]),
                 Address::from_bytes([2u8; 20]),
                 50_000_000,
@@ -348,7 +408,8 @@ fn bench_cross_shard_batch_100(c: &mut Criterion) {
             let mut manager = CrossShardManager::new();
             for i in 0..100u64 {
                 let id = manager.create_request(
-                    0, 1,
+                    0,
+                    1,
                     Address::from_bytes([1u8; 20]),
                     Address::from_bytes([2u8; 20]),
                     i as u128,
@@ -374,7 +435,11 @@ fn bench_zk_starks_prove(c: &mut Criterion) {
     c.bench_function("zk_starks_prove_40_queries", |b| {
         b.iter(|| {
             let _ = prover
-                .prove(black_box(computation_hash), black_box(&inputs), black_box(&outputs))
+                .prove(
+                    black_box(computation_hash),
+                    black_box(&inputs),
+                    black_box(&outputs),
+                )
                 .unwrap();
         })
     });
@@ -386,13 +451,15 @@ fn bench_zk_starks_verify(c: &mut Criterion) {
     let computation_hash = Hash512::blake3(b"benchmark_computation");
     let inputs = vec![vec![1u8; 32], vec![2u8; 32], vec![3u8; 32]];
     let outputs = vec![vec![4u8; 32]];
-    let proof = prover
-        .prove(computation_hash, &inputs, &outputs)
-        .unwrap();
+    let proof = prover.prove(computation_hash, &inputs, &outputs).unwrap();
     c.bench_function("zk_starks_verify_40_queries", |b| {
         b.iter(|| {
             let _ = verifier
-                .verify(black_box(&proof), black_box(computation_hash), black_box(&inputs))
+                .verify(
+                    black_box(&proof),
+                    black_box(computation_hash),
+                    black_box(&inputs),
+                )
                 .unwrap();
         })
     });
@@ -407,10 +474,18 @@ fn bench_zk_starks_roundtrip(c: &mut Criterion) {
             let inputs = vec![vec![1u8; 32], vec![2u8; 32]];
             let outputs = vec![vec![3u8; 32]];
             let proof = prover
-                .prove(black_box(computation_hash), black_box(&inputs), black_box(&outputs))
+                .prove(
+                    black_box(computation_hash),
+                    black_box(&inputs),
+                    black_box(&outputs),
+                )
                 .unwrap();
             let _ = verifier
-                .verify(black_box(&proof), black_box(computation_hash), black_box(&inputs))
+                .verify(
+                    black_box(&proof),
+                    black_box(computation_hash),
+                    black_box(&inputs),
+                )
                 .unwrap();
         })
     });
@@ -423,9 +498,7 @@ fn bench_zk_starks_roundtrip(c: &mut Criterion) {
 fn bench_homomorphic_placeholder(c: &mut Criterion) {
     // BFV and CKKS modules are placeholder files (Phase 0 research).
     // No public API exists yet; benchmark a no-op to establish baseline.
-    c.bench_function("homomorphic_bfv_placeholder", |b| {
-        b.iter(|| black_box(()))
-    });
+    c.bench_function("homomorphic_bfv_placeholder", |b| b.iter(|| black_box(())));
 }
 
 criterion_group! {

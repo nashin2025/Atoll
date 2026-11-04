@@ -139,13 +139,11 @@ impl HomomorphicEngine {
     }
 
     /// Encrypts plaintext to ciphertext
-    pub fn encrypt(
-        &self,
-        plaintext: &Plaintext,
-    ) -> Result<Ciphertext, String> {
-        let _key_pair = self.key_pair.as_ref().ok_or_else(|| {
-            "Key pair not generated".to_string()
-        })?;
+    pub fn encrypt(&self, plaintext: &Plaintext) -> Result<Ciphertext, String> {
+        let _key_pair = self
+            .key_pair
+            .as_ref()
+            .ok_or_else(|| "Key pair not generated".to_string())?;
 
         Ok(Ciphertext {
             scheme: self.context.scheme,
@@ -156,13 +154,11 @@ impl HomomorphicEngine {
     }
 
     /// Decrypts ciphertext to plaintext
-    pub fn decrypt(
-        &self,
-        ciphertext: &Ciphertext,
-    ) -> Result<Plaintext, String> {
-        let _key_pair = self.key_pair.as_ref().ok_or_else(|| {
-            "Key pair not generated".to_string()
-        })?;
+    pub fn decrypt(&self, ciphertext: &Ciphertext) -> Result<Plaintext, String> {
+        let _key_pair = self
+            .key_pair
+            .as_ref()
+            .ok_or_else(|| "Key pair not generated".to_string())?;
 
         // Phase 1: Simulated decryption - just return the data
         // Phase 2: Full homomorphic decryption
@@ -172,11 +168,7 @@ impl HomomorphicEngine {
     }
 
     /// Homomorphic addition of two ciphertexts
-    pub fn add(
-        &self,
-        ct1: &Ciphertext,
-        ct2: &Ciphertext,
-    ) -> Result<Ciphertext, String> {
+    pub fn add(&self, ct1: &Ciphertext, ct2: &Ciphertext) -> Result<Ciphertext, String> {
         if ct1.scheme != ct2.scheme {
             return Err("Ciphertext schemes must match".to_string());
         }
@@ -202,11 +194,7 @@ impl HomomorphicEngine {
     }
 
     /// Homomorphic multiplication of two ciphertexts
-    pub fn multiply(
-        &self,
-        ct1: &Ciphertext,
-        ct2: &Ciphertext,
-    ) -> Result<Ciphertext, String> {
+    pub fn multiply(&self, ct1: &Ciphertext, ct2: &Ciphertext) -> Result<Ciphertext, String> {
         if ct1.scheme != ct2.scheme {
             return Err("Ciphertext schemes must match".to_string());
         }
@@ -218,8 +206,7 @@ impl HomomorphicEngine {
         }
 
         let noise_level = ct1.noise_level + ct2.noise_level + 10;
-        let multiplicative_depth =
-            ct1.multiplicative_depth + ct2.multiplicative_depth + 1;
+        let multiplicative_depth = ct1.multiplicative_depth + ct2.multiplicative_depth + 1;
 
         // Check if noise level is too high
         if noise_level > 1000 {
@@ -235,17 +222,15 @@ impl HomomorphicEngine {
     }
 
     /// Relinearization: reduces ciphertext size after multiplication
-    pub fn relinearize(
-        &self,
-        ciphertext: &Ciphertext,
-    ) -> Result<Ciphertext, String> {
+    pub fn relinearize(&self, ciphertext: &Ciphertext) -> Result<Ciphertext, String> {
         if self.context.scheme != HomomorphicScheme::BFV {
             return Err("Relinearization only supported for BFV".to_string());
         }
 
-        let key_pair = self.key_pair.as_ref().ok_or_else(|| {
-            "Key pair not generated".to_string()
-        })?;
+        let key_pair = self
+            .key_pair
+            .as_ref()
+            .ok_or_else(|| "Key pair not generated".to_string())?;
 
         if key_pair.relinearization_key.is_none() {
             return Err("Relinearization key not available".to_string());
@@ -261,10 +246,7 @@ impl HomomorphicEngine {
     }
 
     /// Bootstrapping: refreshes ciphertext noise
-    pub fn bootstrap(
-        &self,
-        ciphertext: &Ciphertext,
-    ) -> Result<Ciphertext, String> {
+    pub fn bootstrap(&self, ciphertext: &Ciphertext) -> Result<Ciphertext, String> {
         if ciphertext.noise_level < 100 {
             return Ok(ciphertext.clone()); // No need to bootstrap
         }
@@ -294,24 +276,14 @@ mod tests {
 
     #[test]
     fn homomorphic_context_new() {
-        let context = HomomorphicContext::new(
-            HomomorphicScheme::BFV,
-            4096,
-            1 << 30,
-            1 << 20,
-        );
+        let context = HomomorphicContext::new(HomomorphicScheme::BFV, 4096, 1 << 30, 1 << 20);
         assert_eq!(context.security_level(), 256);
         assert_eq!(context.scale, 0.0);
     }
 
     #[test]
     fn homomorphic_context_ckks() {
-        let context = HomomorphicContext::new(
-            HomomorphicScheme::CKKS,
-            8192,
-            1 << 40,
-            1 << 20,
-        );
+        let context = HomomorphicContext::new(HomomorphicScheme::CKKS, 8192, 1 << 40, 1 << 20);
         assert_eq!(context.scale, 1.0);
         assert_eq!(context.security_level(), 256);
     }
@@ -369,8 +341,12 @@ mod tests {
         ));
         engine.generate_key_pair().unwrap();
 
-        let pt1 = Plaintext { data: vec![1, 2, 3] };
-        let pt2 = Plaintext { data: vec![4, 5, 6] };
+        let pt1 = Plaintext {
+            data: vec![1, 2, 3],
+        };
+        let pt2 = Plaintext {
+            data: vec![4, 5, 6],
+        };
 
         let ct1 = engine.encrypt(&pt1).unwrap();
         let ct2 = engine.encrypt(&pt2).unwrap();
@@ -392,8 +368,12 @@ mod tests {
         ));
         engine.generate_key_pair().unwrap();
 
-        let pt1 = Plaintext { data: vec![2, 3, 4] };
-        let pt2 = Plaintext { data: vec![3, 4, 5] };
+        let pt1 = Plaintext {
+            data: vec![2, 3, 4],
+        };
+        let pt2 = Plaintext {
+            data: vec![3, 4, 5],
+        };
 
         let ct1 = engine.encrypt(&pt1).unwrap();
         let ct2 = engine.encrypt(&pt2).unwrap();
@@ -498,7 +478,9 @@ mod tests {
         ));
         engine.generate_key_pair().unwrap();
 
-        let plaintext = Plaintext { data: vec![1, 2, 3] };
+        let plaintext = Plaintext {
+            data: vec![1, 2, 3],
+        };
         let ciphertext = engine.encrypt(&plaintext).unwrap();
         let decrypted = engine.decrypt(&ciphertext).unwrap();
         assert_eq!(decrypted.data, plaintext.data);
@@ -506,20 +488,10 @@ mod tests {
 
     #[test]
     fn security_level_by_degree() {
-        let contexts = vec![
-            (1024, 128),
-            (2048, 192),
-            (4096, 256),
-            (8192, 256),
-        ];
+        let contexts = vec![(1024, 128), (2048, 192), (4096, 256), (8192, 256)];
 
         for (degree, expected) in contexts {
-            let context = HomomorphicContext::new(
-                HomomorphicScheme::BFV,
-                degree,
-                1 << 30,
-                1 << 20,
-            );
+            let context = HomomorphicContext::new(HomomorphicScheme::BFV, degree, 1 << 30, 1 << 20);
             assert_eq!(context.security_level(), expected);
         }
     }

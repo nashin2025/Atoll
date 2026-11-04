@@ -28,10 +28,7 @@ impl AIVMExecutor {
     }
 
     /// Deploys an AI model on-chain
-    pub fn deploy_model(
-        &mut self,
-        model_bytes: &[u8],
-    ) -> Result<ExecutionResult, String> {
+    pub fn deploy_model(&mut self, model_bytes: &[u8]) -> Result<ExecutionResult, String> {
         if model_bytes.len() > self.max_model_size {
             return Err("Model too large".to_string());
         }
@@ -68,7 +65,8 @@ impl AIVMExecutor {
 
         // Charge gas for inference based on input size
         let inference_gas = (input_data.len() as u64 / 1024 + 1) * 100;
-        self.gas_meter.charge(inference_gas.min(self.max_inference_gas))?;
+        self.gas_meter
+            .charge(inference_gas.min(self.max_inference_gas))?;
 
         // Phase 1: Simulated deterministic inference
         let mut output = Vec::new();
@@ -126,7 +124,9 @@ mod tests {
     #[test]
     fn ai_deploy_model() {
         let mut ai_vm = AIVMExecutor::default();
-        let model_bytes = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B];
+        let model_bytes = vec![
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
+        ];
         let result = ai_vm.deploy_model(&model_bytes);
         assert!(result.is_ok());
     }
@@ -190,7 +190,9 @@ mod tests {
     #[test]
     fn ai_out_of_gas() {
         let mut ai_vm = AIVMExecutor::new(ExecutionContext::default(), 5);
-        let model_bytes = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B];
+        let model_bytes = vec![
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
+        ];
         let result = ai_vm.deploy_model(&model_bytes);
         assert!(result.is_err());
     }

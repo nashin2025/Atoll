@@ -2,10 +2,10 @@
 //!
 //! Defines Block, BlockHeader, and BlockBody with serialization support.
 
-use crate::primitives::hash::Hash512;
 use crate::primitives::address::Address;
-use crate::primitives::transaction::Transaction;
+use crate::primitives::hash::Hash512;
 use crate::primitives::signature::Signature;
+use crate::primitives::transaction::Transaction;
 
 /// Block header containing metadata about a block
 #[derive(Debug, Clone)]
