@@ -4,8 +4,8 @@
 //! Phase 2: Encrypted transport using Noise Protocol Framework
 //! (`Noise_XX_25519_ChaChaPoly_BLAKE2s`).
 
-use crate::network::NetworkMessage;
 use crate::network::node_identity::NodeIdentity;
+use crate::network::NetworkMessage;
 
 use blake3::Hasher;
 use snow::{Builder, TransportState};
@@ -293,8 +293,9 @@ fn perform_initiator_handshake(
     tcp: &mut StdTcpStream,
     identity: &NodeIdentity,
 ) -> Result<TransportState, String> {
-    let params: snow::params::NoiseParams =
-        "Noise_XX_25519_ChaChaPoly_BLAKE2s".parse().map_err(|e| format!("Invalid noise params: {e}"))?;
+    let params: snow::params::NoiseParams = "Noise_XX_25519_ChaChaPoly_BLAKE2s"
+        .parse()
+        .map_err(|e| format!("Invalid noise params: {e}"))?;
 
     let secret_key = identity.secret_key();
     let mut hs = Builder::new(params)
@@ -377,10 +378,12 @@ impl NoiseStream {
         let mut enc = vec![0u8; enc_len];
         self.tcp.read_exact(&mut enc)?;
         let mut plain = vec![0u8; enc_len];
-        let n = self
-            .state
-            .read_message(&enc, &mut plain)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("Noise decrypt failed: {e}")))?;
+        let n = self.state.read_message(&enc, &mut plain).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Noise decrypt failed: {e}"),
+            )
+        })?;
         plain.truncate(n);
         Ok(plain)
     }
@@ -429,10 +432,9 @@ impl Write for NoiseStream {
         // so each ciphertext stays within the Noise maximum message size.
         let chunk = &buf[..buf.len().min(MAX_NOISE_PLAINTEXT)];
         let mut enc = vec![0u8; chunk.len() + 16];
-        let n = self
-            .state
-            .write_message(chunk, &mut enc)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Noise encrypt failed: {e}")))?;
+        let n = self.state.write_message(chunk, &mut enc).map_err(|e| {
+            io::Error::new(io::ErrorKind::Other, format!("Noise encrypt failed: {e}"))
+        })?;
         enc.truncate(n);
 
         // Frame: [u32 LE ciphertext length][ciphertext bytes]
@@ -541,8 +543,7 @@ impl PeerListener {
 
         // The Noise handshake is synchronous CPU + blocking socket IO, so run
         // it off the tokio reactor.
-        let state =
-            block_in_place(|| perform_responder_handshake(&mut std_tcp, &self.identity))?;
+        let state = block_in_place(|| perform_responder_handshake(&mut std_tcp, &self.identity))?;
 
         // Derive the peer's NodeId from their static public key fingerprint.
         let peer_static = state
@@ -585,8 +586,9 @@ fn perform_responder_handshake(
     tcp: &mut StdTcpStream,
     identity: &NodeIdentity,
 ) -> Result<TransportState, String> {
-    let params: snow::params::NoiseParams =
-        "Noise_XX_25519_ChaChaPoly_BLAKE2s".parse().map_err(|e| format!("Invalid noise params: {e}"))?;
+    let params: snow::params::NoiseParams = "Noise_XX_25519_ChaChaPoly_BLAKE2s"
+        .parse()
+        .map_err(|e| format!("Invalid noise params: {e}"))?;
 
     let secret_key = identity.secret_key();
     let mut hs = Builder::new(params)
@@ -599,8 +601,8 @@ fn perform_responder_handshake(
     let mut resp_buf = [0u8; 65535];
 
     // 1. <- e (initiator's first message: ephemeral key only)
-    let init_msg = recv_frame(tcp, &mut msg_buf)
-        .map_err(|e| format!("Handshake recv (msg 1) failed: {e}"))?;
+    let init_msg =
+        recv_frame(tcp, &mut msg_buf).map_err(|e| format!("Handshake recv (msg 1) failed: {e}"))?;
     hs.read_message(init_msg, &mut resp_buf)
         .map_err(|e| format!("Handshake read (msg 1) failed: {e}"))?;
 
@@ -778,9 +780,15 @@ mod tests {
             nonce: 7,
             timestamp: 12345,
         });
-        initiator.send_message(&ping).await.expect("failed to send ping");
+        initiator
+            .send_message(&ping)
+            .await
+            .expect("failed to send ping");
 
-        let received = responder.receive_message().await.expect("failed to receive ping");
+        let received = responder
+            .receive_message()
+            .await
+            .expect("failed to receive ping");
         match received {
             NetworkMessage::Ping(p) => {
                 assert_eq!(p.nonce, 7);
@@ -794,9 +802,15 @@ mod tests {
             nonce: 8,
             timestamp: 999,
         });
-        responder.send_message(&pong).await.expect("failed to send pong");
+        responder
+            .send_message(&pong)
+            .await
+            .expect("failed to send pong");
 
-        let received_pong = initiator.receive_message().await.expect("failed to receive pong");
+        let received_pong = initiator
+            .receive_message()
+            .await
+            .expect("failed to receive pong");
         match received_pong {
             NetworkMessage::Pong(p) => {
                 assert_eq!(p.nonce, 8);
@@ -812,8 +826,7 @@ mod tests {
             NodeIdentity::generate().expect("failed to generate initiator identity");
         let responder_identity =
             NodeIdentity::generate().expect("failed to generate responder identity");
-        let wrong_identity =
-            NodeIdentity::generate().expect("failed to generate wrong identity");
+        let wrong_identity = NodeIdentity::generate().expect("failed to generate wrong identity");
         let wrong_node_id = wrong_identity.node_id();
 
         let mut listener = PeerListener::bind("127.0.0.1:0", responder_identity)
@@ -823,12 +836,9 @@ mod tests {
 
         let accept_handle = tokio::spawn(async move { listener.accept().await });
 
-        let result = PeerConnection::connect(
-            &initiator_identity,
-            &addr.to_string(),
-            Some(wrong_node_id),
-        )
-        .await;
+        let result =
+            PeerConnection::connect(&initiator_identity, &addr.to_string(), Some(wrong_node_id))
+                .await;
 
         assert!(
             result.is_err(),

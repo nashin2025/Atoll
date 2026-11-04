@@ -43,11 +43,11 @@ impl NodeIdentity {
     ///
     /// Uses snow's default crypto resolver (Curve25519 DH, getrandom RNG).
     pub fn generate() -> Result<Self, snow::Error> {
-        let params: snow::params::NoiseParams =
-            "Noise_XX_25519_ChaChaPoly_BLAKE2s".parse()?;
+        let params: snow::params::NoiseParams = "Noise_XX_25519_ChaChaPoly_BLAKE2s".parse()?;
         let keypair = Builder::new(params).generate_keypair()?;
 
-        let secret_key: [u8; SECRET_KEY_LEN] = keypair.private[..SECRET_KEY_LEN].try_into().unwrap();
+        let secret_key: [u8; SECRET_KEY_LEN] =
+            keypair.private[..SECRET_KEY_LEN].try_into().unwrap();
         let public_key: [u8; SECRET_KEY_LEN] = keypair.public[..SECRET_KEY_LEN].try_into().unwrap();
         let node_id = Self::compute_node_id(&public_key);
 
