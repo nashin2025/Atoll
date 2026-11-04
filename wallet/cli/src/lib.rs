@@ -235,7 +235,9 @@ fn cmd_send(
 
     // L4: Reject zero amounts before any signing work.
     if value == 0 {
-        return Err(WalletError::Amount("amount must be greater than zero".to_string()));
+        return Err(WalletError::Amount(
+            "amount must be greater than zero".to_string(),
+        ));
     }
 
     // M1: Check sender balance before signing.
@@ -396,10 +398,10 @@ mod tests {
         keystore.save().unwrap();
 
         let result = cmd_send(&keystore_path, &from.to_hex(), &to.to_hex(), "0", ATOLL);
-        assert!(matches!(
-            result,
-            Err(WalletError::Amount(_))
-        ), "zero amount must be rejected");
+        assert!(
+            matches!(result, Err(WalletError::Amount(_))),
+            "zero amount must be rejected"
+        );
 
         let _ = fs::remove_file(&keystore_path);
     }
@@ -417,10 +419,16 @@ mod tests {
 
         // ChainState::new() has no accounts, so every address has balance 0.
         let result = cmd_send(&keystore_path, &from.to_hex(), &to.to_hex(), "100", ATOLL);
-        assert!(matches!(
-            result,
-            Err(WalletError::InsufficientBalance { available: 0, requested: 100 })
-        ), "insufficient balance must be rejected");
+        assert!(
+            matches!(
+                result,
+                Err(WalletError::InsufficientBalance {
+                    available: 0,
+                    requested: 100
+                })
+            ),
+            "insufficient balance must be rejected"
+        );
 
         let _ = fs::remove_file(&keystore_path);
     }
