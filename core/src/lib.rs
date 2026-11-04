@@ -14,6 +14,7 @@ pub mod crypto;
 pub mod consensus;
 pub mod chain;
 pub mod network;
+pub mod privacy;
 pub mod vm;
 pub mod storage;
 pub mod mempool;
