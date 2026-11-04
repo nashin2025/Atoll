@@ -3,10 +3,10 @@
 //! Maintains the chain of blocks, handles block validation and insertion,
 //! and tracks the current tip and finalized height.
 
-use crate::consensus::penta::{PentaConsensus, PentaValidation, pouw, pos_vrf, post, por, poh};
+use crate::consensus::penta::{poh, por, pos_vrf, post, pouw, PentaConsensus, PentaValidation};
 use crate::primitives::address::Address;
-use crate::primitives::hash::Hash512;
 use crate::primitives::block::{Block, BlockBody, BlockHeader};
+use crate::primitives::hash::Hash512;
 use std::collections::HashMap;
 
 /// Blockchain state: tracks blocks, state root, and tip
@@ -28,8 +28,11 @@ pub struct Blockchain {
 impl Blockchain {
     /// Creates a new blockchain with genesis block
     pub fn new(genesis: Block) -> Self {
-        let genesis_hash = crate::crypto::morph_hash::MorphHashEngine::new()
-            .morph_hash(&genesis.serialize_bytes(), &Hash512::zero(), 0);
+        let genesis_hash = crate::crypto::morph_hash::MorphHashEngine::new().morph_hash(
+            &genesis.serialize_bytes(),
+            &Hash512::zero(),
+            0,
+        );
 
         let mut blocks = HashMap::new();
         let mut blocks_by_height = HashMap::new();
@@ -93,19 +96,24 @@ impl Blockchain {
         }
 
         // Compute block hash
-        let block_hash = crate::crypto::morph_hash::MorphHashEngine::new()
-            .morph_hash(&block.serialize_bytes(), &block.header.prev_hash, block.header.height);
+        let block_hash = crate::crypto::morph_hash::MorphHashEngine::new().morph_hash(
+            &block.serialize_bytes(),
+            &block.header.prev_hash,
+            block.header.height,
+        );
 
         // Store the block
         self.blocks.insert(block_hash, block.clone());
-        self.blocks_by_height.insert(block.header.height, block_hash);
+        self.blocks_by_height
+            .insert(block.header.height, block_hash);
 
         // Update tip
         self.tip_hash = block_hash;
         self.tip_height = block.header.height;
 
         // Store state root
-        self.state_roots.insert(block.header.height, block.header.state_root);
+        self.state_roots
+            .insert(block.header.height, block.header.state_root);
 
         Ok(block_hash)
     }
@@ -129,8 +137,7 @@ impl Blockchain {
 
     /// Returns the proposer of the block at a given height
     pub fn proposer_at(&self, height: u64) -> Option<&Address> {
-        self.get_block_by_height(height)
-            .map(|b| &b.header.proposer)
+        self.get_block_by_height(height).map(|b| &b.header.proposer)
     }
 }
 
@@ -160,7 +167,7 @@ impl Default for Blockchain {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::penta::{pouw, pos_vrf, post, por, poh, PentaValidation};
+    use crate::consensus::penta::{poh, por, pos_vrf, post, pouw, PentaValidation};
 
     fn valid_validation() -> PentaValidation {
         PentaValidation {
@@ -233,7 +240,9 @@ mod tests {
         );
 
         assert!(validation.is_ok());
-        let block_hash = bc.insert_block(block, validation.as_ref().unwrap()).unwrap();
+        let block_hash = bc
+            .insert_block(block, validation.as_ref().unwrap())
+            .unwrap();
         assert_eq!(bc.tip_height(), 1);
         assert_eq!(bc.tip_hash(), block_hash);
         assert_eq!(bc.block_count(), 2);

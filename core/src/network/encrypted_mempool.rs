@@ -27,11 +27,7 @@ pub struct EncryptedMempool {
 
 impl EncryptedMempool {
     /// Creates a new encrypted mempool
-    pub fn new(
-        threshold_public_key: [u8; 32],
-        committee: Vec<NodeId>,
-        threshold: usize,
-    ) -> Self {
+    pub fn new(threshold_public_key: [u8; 32], committee: Vec<NodeId>, threshold: usize) -> Self {
         Self {
             threshold_public_key,
             committee,
@@ -42,11 +38,7 @@ impl EncryptedMempool {
     }
 
     /// Adds an encrypted transaction to the mempool
-    pub fn add_transaction(
-        &mut self,
-        tx: crate::network::EncryptedTx,
-        peer_id: NodeId,
-    ) {
+    pub fn add_transaction(&mut self, tx: crate::network::EncryptedTx, peer_id: NodeId) {
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
@@ -77,7 +69,8 @@ impl EncryptedMempool {
 
     /// Returns transactions ready for decryption (in order)
     pub fn get_ordered_transactions(&self) -> Vec<&Hash512> {
-        self.order_queue.iter()
+        self.order_queue
+            .iter()
             .filter(|h| self.pending.contains_key(h))
             .collect()
     }
@@ -105,11 +98,7 @@ impl EncryptedMempool {
 
 impl Default for EncryptedMempool {
     fn default() -> Self {
-        Self::new(
-            [0u8; 32],
-            vec![],
-            1,
-        )
+        Self::new([0u8; 32], vec![], 1)
     }
 }
 
@@ -119,11 +108,8 @@ mod tests {
 
     #[test]
     fn add_and_remove_transaction() {
-        let mut mempool = EncryptedMempool::new(
-            [1u8; 32],
-            vec![[2u8; 32], [3u8; 32], [4u8; 32]],
-            2,
-        );
+        let mut mempool =
+            EncryptedMempool::new([1u8; 32], vec![[2u8; 32], [3u8; 32], [4u8; 32]], 2);
 
         let tx = crate::network::EncryptedTx {
             ciphertext: vec![1, 2, 3],
@@ -141,11 +127,7 @@ mod tests {
 
     #[test]
     fn threshold_check() {
-        let mempool = EncryptedMempool::new(
-            [1u8; 32],
-            vec![[1u8; 32], [2u8; 32], [3u8; 32]],
-            2,
-        );
+        let mempool = EncryptedMempool::new([1u8; 32], vec![[1u8; 32], [2u8; 32], [3u8; 32]], 2);
 
         assert!(mempool.can_decrypt(&vec![[1u8; 32], [2u8; 32]]));
         assert!(!mempool.can_decrypt(&vec![[1u8; 32]]));
@@ -153,11 +135,7 @@ mod tests {
 
     #[test]
     fn ordered_transactions() {
-        let mut mempool = EncryptedMempool::new(
-            [1u8; 32],
-            vec![],
-            1,
-        );
+        let mut mempool = EncryptedMempool::new([1u8; 32], vec![], 1);
 
         let tx1 = crate::network::EncryptedTx {
             ciphertext: vec![1],

@@ -2,8 +2,10 @@
 //!
 //! Defines Block, BlockHeader, and BlockBody with serialization support.
 
-use crate::primitives::hash::Hash512;
 use crate::primitives::address::Address;
+use crate::primitives::hash::Hash512;
+use crate::primitives::signature::Signature;
+use crate::primitives::transaction::Transaction;
 
 /// Block header containing metadata about a block
 #[derive(Debug, Clone)]
@@ -78,5 +80,153 @@ impl Default for Block {
                 transactions: Vec::new(),
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::primitives::signature::Signature;
+    use crate::primitives::transaction::Transaction;
+
+    #[test]
+    fn block_header_construction() {
+        let header = BlockHeader {
+            version: 1,
+            height: 42,
+            shard_id: 1,
+            timestamp: 1798761600,
+            prev_hash: Hash512::from_bytes(&[1u8; 64]),
+            state_root: Hash512::from_bytes(&[2u8; 64]),
+            transaction_root: Hash512::from_bytes(&[3u8; 64]),
+            proposer: Address::from_bytes([4u8; 20]),
+            difficulty: 1 << 20,
+        };
+        assert_eq!(header.height, 42);
+        assert_eq!(header.shard_id, 1);
+        assert_eq!(header.version, 1);
+        assert_eq!(header.difficulty, 1 << 20);
+    }
+
+    #[test]
+    fn block_body_holds_transactions() {
+        let tx = Transaction {
+            version: 1,
+            from: Address::from_bytes([1u8; 20]),
+            to: Some(Address::from_bytes([2u8; 20])),
+            value: 100,
+            data: vec![1, 2, 3],
+            signature: Signature::default(),
+        };
+        let body = BlockBody {
+            transactions: vec![tx.clone()],
+        };
+        assert_eq!(body.transactions.len(), 1);
+        assert_eq!(body.transactions[0].value, 100);
+    }
+
+    #[test]
+    fn block_serialize_bytes_is_deterministic() {
+        let block = Block::default();
+        let bytes1 = block.serialize_bytes();
+        let bytes2 = block.serialize_bytes();
+        assert_eq!(bytes1, bytes2);
+        assert!(!bytes1.is_empty());
+    }
+
+    #[test]
+    fn block_serialize_bytes_includes_transaction_count() {
+        let tx1 = Transaction {
+            version: 1,
+            from: Address::from_bytes([1u8; 20]),
+            to: None,
+            value: 50,
+            data: vec![],
+            signature: Signature::default(),
+        };
+        let tx2 = Transaction {
+            version: 1,
+            from: Address::from_bytes([2u8; 20]),
+            to: Some(Address::from_bytes([3u8; 20])),
+            value: 75,
+            data: vec![9],
+            signature: Signature::default(),
+        };
+        let block = Block {
+            header: BlockHeader {
+                version: 1,
+                height: 0,
+                shard_id: 0,
+                timestamp: 0,
+                prev_hash: Hash512::zero(),
+                state_root: Hash512::zero(),
+                transaction_root: Hash512::zero(),
+                proposer: Address::zero(),
+                difficulty: 1,
+            },
+            body: BlockBody {
+                transactions: vec![tx1, tx2],
+            },
+        };
+        let bytes = block.serialize_bytes();
+        // Header: version(4) + height(8) + shard_id(2) + timestamp(8) + prev_hash(64)
+        // + state_root(64) + transaction_root(64) + proposer(20) + difficulty(16) = 250
+        // Transaction count at offset 250
+        let count = u32::from_le_bytes(bytes[250..254].try_into().unwrap());
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn default_block_has_genesis_values() {
+        let block = Block::default();
+        assert_eq!(block.header.height, 0);
+        assert_eq!(block.header.prev_hash, Hash512::zero());
+        assert_eq!(block.header.state_root, Hash512::zero());
+        assert_eq!(block.header.transaction_root, Hash512::zero());
+        assert_eq!(block.header.proposer, Address::zero());
+        assert!(block.body.transactions.is_empty());
+    }
+
+    #[test]
+    fn block_with_transactions_serializes_with_count() {
+        let tx1 = Transaction {
+            version: 1,
+            from: Address::from_bytes([1u8; 20]),
+            to: None,
+            value: 50,
+            data: vec![],
+            signature: Signature::default(),
+        };
+        let tx2 = Transaction {
+            version: 1,
+            from: Address::from_bytes([2u8; 20]),
+            to: Some(Address::from_bytes([3u8; 20])),
+            value: 75,
+            data: vec![9],
+            signature: Signature::default(),
+        };
+        let block = Block {
+            header: BlockHeader {
+                version: 1,
+                height: 0,
+                shard_id: 0,
+                timestamp: 0,
+                prev_hash: Hash512::zero(),
+                state_root: Hash512::zero(),
+                transaction_root: Hash512::zero(),
+                proposer: Address::zero(),
+                difficulty: 1,
+            },
+            body: BlockBody {
+                transactions: vec![tx1, tx2],
+            },
+        };
+        let bytes = block.serialize_bytes();
+        // Header is 250 bytes, then 4-byte transaction count at offset 250
+        let count = u32::from_le_bytes(bytes[250..254].try_into().unwrap());
+        assert_eq!(count, 2);
+        // Block with transactions should be larger than empty block
+        let empty_block = Block::default();
+        assert!(bytes.len() > empty_block.serialize_bytes().len());
     }
 }

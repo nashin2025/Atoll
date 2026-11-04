@@ -157,12 +157,8 @@ mod tests {
     fn vrf_evaluate_is_deterministic() {
         let engine = VRFEngine::new();
         let secret = [1u8; 32];
-        let output1 = engine.evaluate(
-            &secret, 0, 0, &[0u8; 32], "validator1"
-        );
-        let output2 = engine.evaluate(
-            &secret, 0, 0, &[0u8; 32], "validator1"
-        );
+        let output1 = engine.evaluate(&secret, 0, 0, &[0u8; 32], "validator1");
+        let output2 = engine.evaluate(&secret, 0, 0, &[0u8; 32], "validator1");
         assert_eq!(output1.output, output2.output);
     }
 
@@ -170,12 +166,8 @@ mod tests {
     fn vrf_different_inputs_different_outputs() {
         let engine = VRFEngine::new();
         let secret = [1u8; 32];
-        let output1 = engine.evaluate(
-            &secret, 0, 0, &[0u8; 32], "validator1"
-        );
-        let output2 = engine.evaluate(
-            &secret, 0, 0, &[0u8; 32], "validator2"
-        );
+        let output1 = engine.evaluate(&secret, 0, 0, &[0u8; 32], "validator1");
+        let output2 = engine.evaluate(&secret, 0, 0, &[0u8; 32], "validator2");
         assert_ne!(output1.output, output2.output);
     }
 
@@ -197,31 +189,19 @@ mod tests {
                 reputation_score: 0.9,
             },
         ];
-        let result = selector.select(
-            &vrf_engine,
-            &validators,
-            0,
-            0,
-            &[0u8; 32],
-            150_000,
-        );
+        let result = selector.select(&vrf_engine, &validators, 0, 0, &[0u8; 32], 150_000);
         assert!(result.is_some());
         let sel = result.unwrap();
-        assert!(validators.iter().any(|v| v.address == sel.selected_validator));
+        assert!(validators
+            .iter()
+            .any(|v| v.address == sel.selected_validator));
     }
 
     #[test]
     fn select_no_validators() {
         let vrf_engine = VRFEngine::new();
         let selector = ProposerSelector::new();
-        let result = selector.select(
-            &vrf_engine,
-            &[],
-            0,
-            0,
-            &[0u8; 32],
-            0,
-        );
+        let result = selector.select(&vrf_engine, &[], 0, 0, &[0u8; 32], 0);
         assert!(result.is_none());
     }
 }

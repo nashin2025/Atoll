@@ -58,32 +58,19 @@ impl PoSTVerifier {
     }
 
     /// Verifies a spacetime proof against a challenge
-    pub fn verify(
-        &self,
-        proof: &SpacetimeProof,
-        challenge: &[u8],
-    ) -> bool {
+    pub fn verify(&self, proof: &SpacetimeProof, challenge: &[u8]) -> bool {
         // 1. Verify space commitment (data is actually stored)
-        let space_valid = self.verify_space_proof(
-            &proof.space_proof,
-            &proof.plot_commitment,
-            challenge,
-        );
+        let space_valid =
+            self.verify_space_proof(&proof.space_proof, &proof.plot_commitment, challenge);
 
         // 2. Verify time proof (data was stored continuously)
-        let time_valid = self.verify_time_proof(
-            &proof.time_proof,
-            &proof.plot_commitment,
-        );
+        let time_valid = self.verify_time_proof(&proof.time_proof, &proof.plot_commitment);
 
         // 3. Verify minimum plot size
         let size_valid = proof.plot_size_gb >= self.minimum_plot_size_gb;
 
         // 4. Verify proof of replication (data is unique)
-        let unique_valid = self.verify_uniqueness(
-            &proof.plot_commitment,
-            &proof.farmer,
-        );
+        let unique_valid = self.verify_uniqueness(&proof.plot_commitment, &proof.farmer);
 
         space_valid && time_valid && size_valid && unique_valid
     }
@@ -99,21 +86,13 @@ impl PoSTVerifier {
         true
     }
 
-    fn verify_time_proof(
-        &self,
-        _proof: &TimeProof,
-        _commitment: &Hash512,
-    ) -> bool {
+    fn verify_time_proof(&self, _proof: &TimeProof, _commitment: &Hash512) -> bool {
         // Phase 2: Simulated VDF verification
         // Phase 3: Full VDF verification with sequential computation
         true
     }
 
-    fn verify_uniqueness(
-        &self,
-        _commitment: &Hash512,
-        _farmer: &Address,
-    ) -> bool {
+    fn verify_uniqueness(&self, _commitment: &Hash512, _farmer: &Address) -> bool {
         // Phase 2: Simulated uniqueness check
         // Phase 3: Check against registered plot commitments
         true

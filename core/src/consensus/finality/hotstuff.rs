@@ -51,12 +51,22 @@ impl HotStuffState {
     }
 
     /// Returns true if we have a quorum of votes for this block at this height/round
-    pub fn has_quorum(&self, block_hash: &Hash512, height: u64, round: u64, vote_type: VoteType) -> bool {
-        let count = self.votes.iter()
-            .filter(|v| v.block_hash == *block_hash
-                && v.height == height
-                && v.round == round
-                && v.vote_type == vote_type)
+    pub fn has_quorum(
+        &self,
+        block_hash: &Hash512,
+        height: u64,
+        round: u64,
+        vote_type: VoteType,
+    ) -> bool {
+        let count = self
+            .votes
+            .iter()
+            .filter(|v| {
+                v.block_hash == *block_hash
+                    && v.height == height
+                    && v.round == round
+                    && v.vote_type == vote_type
+            })
             .count();
         count >= self.quorum_size as usize
     }
@@ -68,7 +78,8 @@ impl HotStuffState {
 
     /// Clears votes for a different height/round
     pub fn clear_stale_votes(&mut self, height: u64, round: u64) {
-        self.votes.retain(|v| v.height == height && v.round == round);
+        self.votes
+            .retain(|v| v.height == height && v.round == round);
     }
 }
 
@@ -84,12 +95,13 @@ impl HotStuffBFT {
     ///
     /// Finality is achieved when a quorum of validators has committed to
     /// the block at the current height and round (3 HotStuff rounds).
-    pub fn check_finality(
-        &self,
-        state: &HotStuffState,
-        block_hash: &Hash512,
-    ) -> bool {
-        state.has_quorum(block_hash, state.current_height, state.current_round, VoteType::Commit)
+    pub fn check_finality(&self, state: &HotStuffState, block_hash: &Hash512) -> bool {
+        state.has_quorum(
+            block_hash,
+            state.current_height,
+            state.current_round,
+            VoteType::Commit,
+        )
     }
 
     /// Creates a vote for a block

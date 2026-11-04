@@ -10,8 +10,8 @@ pub mod cross_shard;
 pub mod rebalancer;
 pub mod shard_manager;
 
-use crate::primitives::hash::Hash512;
 use crate::primitives::address::Address;
+use crate::primitives::hash::Hash512;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 

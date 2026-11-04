@@ -74,10 +74,7 @@ impl StarkProver {
             });
         }
 
-        let commitment = Hash512::blake3(&[
-            computation_hash.as_ref(),
-            &inputs.concat(),
-        ].concat());
+        let commitment = Hash512::blake3(&[computation_hash.as_ref(), &inputs.concat()].concat());
 
         Ok(StarkProof {
             commitment,
@@ -116,10 +113,8 @@ impl StarkVerifier {
         // Phase 2: Full STARK verifier with FRI low-degree testing
 
         // Verify commitment matches computation hash
-        let expected_commitment = Hash512::blake3(&[
-            computation_hash.as_ref(),
-            &public_inputs.concat(),
-        ].concat());
+        let expected_commitment =
+            Hash512::blake3(&[computation_hash.as_ref(), &public_inputs.concat()].concat());
 
         if proof.commitment != expected_commitment {
             return Ok(false);
@@ -211,8 +206,12 @@ mod tests {
         let computation_hash = Hash512::zero();
         let inputs = vec![vec![1]];
 
-        let proof_low = prover_low.prove(computation_hash, &inputs, &vec![vec![2]]).unwrap();
-        let proof_high = prover_high.prove(computation_hash, &inputs, &vec![vec![2]]).unwrap();
+        let proof_low = prover_low
+            .prove(computation_hash, &inputs, &vec![vec![2]])
+            .unwrap();
+        let proof_high = prover_high
+            .prove(computation_hash, &inputs, &vec![vec![2]])
+            .unwrap();
 
         assert_eq!(proof_low.queries.len(), 10);
         assert_eq!(proof_high.queries.len(), 100);
@@ -220,11 +219,7 @@ mod tests {
 
     #[test]
     fn stark_verification_result() {
-        let result = StarkVerificationResult::new(
-            true,
-            Hash512::zero(),
-            40,
-        );
+        let result = StarkVerificationResult::new(true, Hash512::zero(), 40);
         assert!(result.valid);
         assert_eq!(result.queries_checked, 40);
         assert_eq!(result.gas_used, 40000);

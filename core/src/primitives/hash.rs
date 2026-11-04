@@ -4,6 +4,7 @@
 //! hash function. This is a placeholder for Morph-Hash which will
 //! be implemented in Phase 2.
 
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
 /// 512-bit hash value used throughout the Atoll Protocol.
@@ -14,6 +15,25 @@ use std::fmt;
 /// in Phase 2.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Hash512(pub [u8; 64]);
+
+impl Serialize for Hash512 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_hex())
+    }
+}
+
+impl<'de> Deserialize<'de> for Hash512 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Hash512::from_hex(&s).map_err(serde::de::Error::custom)
+    }
+}
 
 impl Hash512 {
     /// Returns a zero hash (all bytes are 0).
@@ -143,12 +163,11 @@ mod tests {
     fn blake3_avalanche_effect() {
         let h1 = Hash512::blake3(b"hello");
         let h2 = Hash512::blake3(b"hellp");
-        let diff_bits: u32 = h1
-            .0
-            .iter()
-            .zip(h2.0.iter())
-            .map(|(a, b)| (a ^ b).count_ones())
-            .sum();
+        let diff_bits: u32 =
+            h1.0.iter()
+                .zip(h2.0.iter())
+                .map(|(a, b)| (a ^ b).count_ones())
+                .sum();
         assert!(
             diff_bits > 16,
             "Avalanche effect: expected >16 bit flips, got {}",

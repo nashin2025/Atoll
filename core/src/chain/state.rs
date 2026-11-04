@@ -50,35 +50,33 @@ impl ChainState {
 
     /// Sets the balance of an address
     pub fn set_balance(&mut self, address: Address, balance: u128) {
-        self.accounts
-            .entry(address)
-            .or_default()
-            .balance = balance;
+        self.accounts.entry(address).or_default().balance = balance;
     }
 
     /// Increments the nonce of an address
     pub fn increment_nonce(&mut self, address: &Address) {
-        self.accounts
-            .entry(*address)
-            .or_default()
-            .nonce += 1;
+        self.accounts.entry(*address).or_default().nonce += 1;
     }
 
     /// Transfers balance from one address to another
-    pub fn transfer(
-        &mut self,
-        from: &Address,
-        to: &Address,
-        amount: u128,
-    ) -> Result<(), String> {
+    pub fn transfer(&mut self, from: &Address, to: &Address, amount: u128) -> Result<(), String> {
         let from_balance = self.balance(from);
         if from_balance < amount {
             return Err("Insufficient balance".to_string());
         }
 
-        self.set_balance(*from, from_balance - amount);
+        let new_from = from_balance
+            .checked_sub(amount)
+            .ok_or_else(|| "Balance subtraction overflow".to_string())?;
         let to_balance = self.balance(to);
-        self.set_balance(*to, to_balance + amount);
+        let new_to = to_balance
+            .checked_add(amount)
+            .ok_or_else(|| "Balance addition overflow".to_string())?;
+
+        if from != to {
+            self.set_balance(*from, new_from);
+            self.set_balance(*to, new_to);
+        }
 
         self.increment_nonce(from);
 
@@ -87,23 +85,19 @@ impl ChainState {
 
     /// Sets the code hash for a contract address
     pub fn set_code_hash(&mut self, address: Address, code_hash: Hash512) {
-        self.accounts
-            .entry(address)
-            .or_default()
-            .code_hash = Some(code_hash);
+        self.accounts.entry(address).or_default().code_hash = Some(code_hash);
     }
 
     /// Gets the code hash for an address
     pub fn get_code_hash(&self, address: &Address) -> Option<&Hash512> {
-        self.accounts.get(address).and_then(|a| a.code_hash.as_ref())
+        self.accounts
+            .get(address)
+            .and_then(|a| a.code_hash.as_ref())
     }
 
     /// Sets the storage root for an address
     pub fn set_storage_root(&mut self, address: Address, storage_root: Hash512) {
-        self.accounts
-            .entry(address)
-            .or_default()
-            .storage_root = storage_root;
+        self.accounts.entry(address).or_default().storage_root = storage_root;
     }
 
     /// Returns the storage root for an address
@@ -152,10 +146,18 @@ impl ChainState {
     }
 
     /// Mints new ATOLL tokens
-    pub fn mint_atoll(&mut self, address: Address, amount: u128) {
+    pub fn mint_atoll(&mut self, address: Address, amount: u128) -> Result<(), String> {
         let current = self.balance(&address);
-        self.set_balance(address, current + amount);
-        self.total_supply += amount;
+        let new_balance = current
+            .checked_add(amount)
+            .ok_or_else(|| "Balance addition overflow".to_string())?;
+        self.set_balance(address, new_balance);
+        let new_total = self
+            .total_supply
+            .checked_add(amount)
+            .ok_or_else(|| "Total supply addition overflow".to_string())?;
+        self.total_supply = new_total;
+        Ok(())
     }
 
     /// Burns ATOLL tokens
@@ -164,8 +166,15 @@ impl ChainState {
         if current < amount {
             return Err("Insufficient balance for burn".to_string());
         }
-        self.set_balance(*address, current - amount);
-        self.total_supply -= amount;
+        let new_balance = current
+            .checked_sub(amount)
+            .ok_or_else(|| "Balance subtraction underflow".to_string())?;
+        self.set_balance(*address, new_balance);
+        let new_total = self
+            .total_supply
+            .checked_sub(amount)
+            .ok_or_else(|| "Total supply subtraction underflow".to_string())?;
+        self.total_supply = new_total;
         Ok(())
     }
 }
@@ -234,7 +243,7 @@ mod tests {
         let mut state = ChainState::new();
         let addr = Address::from_bytes([1u8; 20]);
 
-        state.mint_atoll(addr, 1000);
+        state.mint_atoll(addr, 1000).unwrap();
         assert_eq!(state.total_supply(), 1000);
         assert_eq!(state.balance(&addr), 1000);
 
@@ -248,7 +257,7 @@ mod tests {
         let mut state = ChainState::new();
         let addr = Address::from_bytes([1u8; 20]);
 
-        state.mint_atoll(addr, 100);
+        state.mint_atoll(addr, 100).unwrap();
         assert!(state.burn_atoll(&addr, 500).is_err());
         assert_eq!(state.total_supply(), 100);
     }

@@ -39,7 +39,8 @@ impl WASMExecutor {
             return Err("Invalid WASM magic number".to_string());
         }
 
-        let version = u32::from_le_bytes([wasm_bytes[4], wasm_bytes[5], wasm_bytes[6], wasm_bytes[7]]);
+        let version =
+            u32::from_le_bytes([wasm_bytes[4], wasm_bytes[5], wasm_bytes[6], wasm_bytes[7]]);
         if version != 1 {
             return Err(format!("Unsupported WASM version: {}", version));
         }

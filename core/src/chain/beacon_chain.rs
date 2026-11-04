@@ -3,8 +3,8 @@
 //! Coordinates shards, manages validator assignments, and provides
 //! cross-links between shards and the beacon chain.
 
-use crate::primitives::hash::Hash512;
 use crate::primitives::address::Address;
+use crate::primitives::hash::Hash512;
 use std::collections::{HashMap, HashSet};
 
 /// Beacon block: coordinates shards and finalizes checkpoints
@@ -89,12 +89,7 @@ impl BeaconChain {
     }
 
     /// Registers a validator
-    pub fn register_validator(
-        &mut self,
-        address: Address,
-        stake: u128,
-        activation_epoch: u64,
-    ) {
+    pub fn register_validator(&mut self, address: Address, stake: u128, activation_epoch: u64) {
         self.validator_registry.validators.insert(
             address.clone(),
             ValidatorInfo {
@@ -126,19 +121,13 @@ impl BeaconChain {
             // Reduce stake by penalty
             let penalty = (info.stake as f64 * penalty_percent as f64 / 100.0) as u128;
             info.stake = info.stake.saturating_sub(penalty);
-            self.validator_registry.total_stake = self
-                .validator_registry
-                .total_stake
-                .saturating_sub(penalty);
+            self.validator_registry.total_stake =
+                self.validator_registry.total_stake.saturating_sub(penalty);
         }
     }
 
     /// Assigns validators to shards
-    pub fn assign_validators_to_shard(
-        &mut self,
-        shard_id: u16,
-        validators: Vec<Address>,
-    ) {
+    pub fn assign_validators_to_shard(&mut self, shard_id: u16, validators: Vec<Address>) {
         let shard_validators = self
             .shard_assignments
             .entry(shard_id)
@@ -154,12 +143,7 @@ impl BeaconChain {
     }
 
     /// Creates a crosslink for a shard block
-    pub fn create_crosslink(
-        &mut self,
-        shard_id: u16,
-        shard_block_root: Hash512,
-        slot: u64,
-    ) {
+    pub fn create_crosslink(&mut self, shard_id: u16, shard_block_root: Hash512, slot: u64) {
         self.crosslinks.push(Crosslink {
             shard_id,
             shard_block_root,

@@ -73,10 +73,7 @@ impl DiscoveryProtocol {
     }
 
     /// Handles a FindNode request and returns closest peers
-    pub fn handle_find_node(
-        &self,
-        request: &FindNodeMessage,
-    ) -> NeighborsMessage {
+    pub fn handle_find_node(&self, request: &FindNodeMessage) -> NeighborsMessage {
         let mut peers: Vec<_> = self.known_peers.values().cloned().collect();
 
         // Sort by XOR distance to target

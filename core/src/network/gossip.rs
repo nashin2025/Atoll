@@ -45,11 +45,7 @@ impl GossipProtocol {
     }
 
     /// Broadcasts a message to the network using gossip
-    pub fn broadcast(
-        &mut self,
-        message: &NetworkMessage,
-        sender: NodeId,
-    ) {
+    pub fn broadcast(&mut self, message: &NetworkMessage, sender: NodeId) {
         let message_hash = Self::hash_message(message);
 
         // Skip if we've already seen this message
@@ -64,7 +60,12 @@ impl GossipProtocol {
         if self.message_history.len() > self.config.max_history {
             // Remove oldest 10%
             let to_remove = self.config.max_history / 10;
-            let keys: Vec<Hash512> = self.message_history.iter().take(to_remove).cloned().collect();
+            let keys: Vec<Hash512> = self
+                .message_history
+                .iter()
+                .take(to_remove)
+                .cloned()
+                .collect();
             for key in keys {
                 self.message_history.remove(&key);
             }

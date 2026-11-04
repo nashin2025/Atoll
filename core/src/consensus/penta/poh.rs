@@ -16,10 +16,7 @@ pub struct PoHResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum HumanVerificationMethod {
     /// Biometric ZKP with nullifier to prevent double-registration
-    BiometricZKP {
-        proof: Vec<u8>,
-        nullifier: [u8; 32],
-    },
+    BiometricZKP { proof: Vec<u8>, nullifier: [u8; 32] },
     /// Social graph verification (vouched by N existing humans)
     SocialVouching {
         vouchers: Vec<Address>,
@@ -31,9 +28,7 @@ pub enum HumanVerificationMethod {
         verifier_attestation: Vec<u8>,
     },
     /// Hardware attestation (TEE-based unique device binding)
-    HardwareAttestation {
-        tee_quote: Vec<u8>,
-    },
+    HardwareAttestation { tee_quote: Vec<u8> },
     /// Periodic reverification
     Reverification {
         previous_proof: [u8; 32],
@@ -64,7 +59,9 @@ impl Default for NullifierRegistry {
 
 impl NullifierRegistry {
     pub fn new() -> Self {
-        Self { nullifiers: HashSet::new() }
+        Self {
+            nullifiers: HashSet::new(),
+        }
     }
 
     /// Checks if a nullifier has already been used
@@ -146,7 +143,10 @@ impl PoHChecker {
                     expiry_height: current_height + self.reverification_interval_blocks,
                 })
             }
-            HumanVerificationMethod::SocialVouching { vouchers, minimum_vouchers } => {
+            HumanVerificationMethod::SocialVouching {
+                vouchers,
+                minimum_vouchers,
+            } => {
                 if (vouchers.len() as u32) < *minimum_vouchers {
                     return Err("Insufficient vouchers".to_string());
                 }
@@ -160,27 +160,24 @@ impl PoHChecker {
             HumanVerificationMethod::VideoVerification {
                 verification_hash: _,
                 verifier_attestation: _,
-            } => {
-                Ok(HumannessStatus {
-                    is_verified: true,
-                    method: Some("VideoVerification".to_string()),
-                    expiry_height: current_height + self.reverification_interval_blocks,
-                })
-            }
-            HumanVerificationMethod::HardwareAttestation { tee_quote: _ } => {
-                Ok(HumannessStatus {
-                    is_verified: true,
-                    method: Some("HardwareAttestation".to_string()),
-                    expiry_height: current_height + self.reverification_interval_blocks,
-                })
-            }
-            HumanVerificationMethod::Reverification { previous_proof: _, new_proof: _ } => {
-                Ok(HumannessStatus {
-                    is_verified: true,
-                    method: Some("Reverification".to_string()),
-                    expiry_height: current_height + self.reverification_interval_blocks,
-                })
-            }
+            } => Ok(HumannessStatus {
+                is_verified: true,
+                method: Some("VideoVerification".to_string()),
+                expiry_height: current_height + self.reverification_interval_blocks,
+            }),
+            HumanVerificationMethod::HardwareAttestation { tee_quote: _ } => Ok(HumannessStatus {
+                is_verified: true,
+                method: Some("HardwareAttestation".to_string()),
+                expiry_height: current_height + self.reverification_interval_blocks,
+            }),
+            HumanVerificationMethod::Reverification {
+                previous_proof: _,
+                new_proof: _,
+            } => Ok(HumannessStatus {
+                is_verified: true,
+                method: Some("Reverification".to_string()),
+                expiry_height: current_height + self.reverification_interval_blocks,
+            }),
         }
     }
 

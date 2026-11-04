@@ -6,8 +6,8 @@
 //! Phase 1: Interface and simulation.
 //! Phase 2: Full threshold encryption implementation.
 
-use crate::primitives::hash::Hash512;
 use crate::primitives::address::Address;
+use crate::primitives::hash::Hash512;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 
@@ -52,11 +52,7 @@ pub struct EncryptedMempool {
 
 impl EncryptedMempool {
     /// Creates a new encrypted mempool
-    pub fn new(
-        threshold_public_key: Hash512,
-        committee: Vec<Address>,
-        threshold: usize,
-    ) -> Self {
+    pub fn new(threshold_public_key: Hash512, committee: Vec<Address>, threshold: usize) -> Self {
         Self {
             threshold_public_key,
             committee,
@@ -104,10 +100,7 @@ impl EncryptedMempool {
     }
 
     /// Adds a decryption share for a transaction
-    pub fn add_decryption_share(
-        &mut self,
-        share: DecryptionShare,
-    ) -> Result<(), String> {
+    pub fn add_decryption_share(&mut self, share: DecryptionShare) -> Result<(), String> {
         if !self.pending.contains_key(&share.tx_hash) {
             return Err("Transaction not in mempool".to_string());
         }
@@ -170,10 +163,7 @@ impl EncryptedMempool {
     }
 
     /// Returns decryption shares for a transaction
-    pub fn get_decryption_shares(
-        &self,
-        tx_hash: &Hash512,
-    ) -> Option<&Vec<DecryptionShare>> {
+    pub fn get_decryption_shares(&self, tx_hash: &Hash512) -> Option<&Vec<DecryptionShare>> {
         self.decryption_shares.get(tx_hash)
     }
 
@@ -199,9 +189,7 @@ impl EncryptedMempool {
         let to_remove: Vec<Hash512> = self
             .pending
             .iter()
-            .filter(|(_, entry)| {
-                current_block.saturating_sub(entry.received_at) > max_age
-            })
+            .filter(|(_, entry)| current_block.saturating_sub(entry.received_at) > max_age)
             .map(|(hash, _)| *hash)
             .collect();
 
@@ -224,11 +212,7 @@ pub struct MempoolStats {
 
 impl Default for EncryptedMempool {
     fn default() -> Self {
-        Self::new(
-            Hash512::zero(),
-            vec![],
-            1,
-        )
+        Self::new(Hash512::zero(), vec![], 1)
     }
 }
 
@@ -238,11 +222,8 @@ mod tests {
 
     #[test]
     fn add_and_remove_transaction() {
-        let mut mempool = EncryptedMempool::new(
-            Hash512::zero(),
-            vec![Address::from_bytes([1u8; 20])],
-            1,
-        );
+        let mut mempool =
+            EncryptedMempool::new(Hash512::zero(), vec![Address::from_bytes([1u8; 20])], 1);
 
         let tx = EncryptedTransaction {
             ciphertext: vec![1, 2, 3],
@@ -262,11 +243,7 @@ mod tests {
 
     #[test]
     fn duplicate_transaction_rejected() {
-        let mut mempool = EncryptedMempool::new(
-            Hash512::zero(),
-            vec![],
-            1,
-        );
+        let mut mempool = EncryptedMempool::new(Hash512::zero(), vec![], 1);
 
         let tx = EncryptedTransaction {
             ciphertext: vec![1],
@@ -277,7 +254,9 @@ mod tests {
             received_at: 1000,
         };
 
-        mempool.add_transaction(tx.clone(), Hash512::zero()).unwrap();
+        mempool
+            .add_transaction(tx.clone(), Hash512::zero())
+            .unwrap();
         let result = mempool.add_transaction(tx, Hash512::zero());
         assert!(result.is_err());
     }
@@ -306,21 +285,25 @@ mod tests {
         let tx_hash = Hash512::zero();
 
         // Add shares one by one
-        mempool.add_decryption_share(DecryptionShare {
-            tx_hash,
-            share: vec![1],
-            validator: Address::from_bytes([1u8; 20]),
-            share_index: 0,
-        }).unwrap();
+        mempool
+            .add_decryption_share(DecryptionShare {
+                tx_hash,
+                share: vec![1],
+                validator: Address::from_bytes([1u8; 20]),
+                share_index: 0,
+            })
+            .unwrap();
 
         assert!(!mempool.can_decrypt(&tx_hash));
 
-        mempool.add_decryption_share(DecryptionShare {
-            tx_hash,
-            share: vec![2],
-            validator: Address::from_bytes([2u8; 20]),
-            share_index: 1,
-        }).unwrap();
+        mempool
+            .add_decryption_share(DecryptionShare {
+                tx_hash,
+                share: vec![2],
+                validator: Address::from_bytes([2u8; 20]),
+                share_index: 1,
+            })
+            .unwrap();
 
         assert!(mempool.can_decrypt(&tx_hash));
         assert_eq!(mempool.get_decryption_shares(&tx_hash).unwrap().len(), 2);
@@ -328,11 +311,7 @@ mod tests {
 
     #[test]
     fn ordered_transactions() {
-        let mut mempool = EncryptedMempool::new(
-            Hash512::zero(),
-            vec![],
-            1,
-        );
+        let mut mempool = EncryptedMempool::new(Hash512::zero(), vec![], 1);
 
         let tx1 = EncryptedTransaction {
             ciphertext: vec![1],
@@ -403,11 +382,7 @@ mod tests {
 
     #[test]
     fn cleanup_old() {
-        let mut mempool = EncryptedMempool::new(
-            Hash512::zero(),
-            vec![],
-            1,
-        );
+        let mut mempool = EncryptedMempool::new(Hash512::zero(), vec![], 1);
 
         let tx = EncryptedTransaction {
             ciphertext: vec![1],
@@ -427,11 +402,7 @@ mod tests {
 
     #[test]
     fn set_max_size() {
-        let mut mempool = EncryptedMempool::new(
-            Hash512::zero(),
-            vec![],
-            1,
-        );
+        let mut mempool = EncryptedMempool::new(Hash512::zero(), vec![], 1);
         mempool.set_max_size(50);
         assert_eq!(mempool.stats().max_size, 50);
     }
