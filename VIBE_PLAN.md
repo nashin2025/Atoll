@@ -41,7 +41,8 @@ Cryptocurrency researchers, developers, and users who value formal verification,
 | 11 | Phase 1: Morph-Hash Rust implementation (algorithm pool, selection chain, memory-hard, S-box, post-quantum) | Forge | ✅ Done |
 | 12 | Phase 1: Penta-Consensus Rust implementation (5 layers, composite scoring, HotStuff BFT) | Forge | ✅ Done |
 | 13 | Phase 1: P2P networking (encrypted transport, gossip, sync, discovery) | Forge | ✅ Done |
-| 14 | Phase 1: Blockchain/DAG layer (blockchain state, DAG, GHOSTDAG fork choice, beacon chain) | Forge | in_progress |
+| 14 | Phase 1: Blockchain/DAG layer (blockchain state, DAG, GHOSTDAG fork choice, beacon chain) | Forge | ✅ Done |
+| 15 | Phase 1: Smart Contract VMs (EVM, WASM, Move, RISC-V, AI VM, ZK VM) | Forge | next |
 
 ## Decisions
 - Coin name: **ATOLL** (renamed from Chimera)
@@ -58,4 +59,4 @@ Cryptocurrency researchers, developers, and users who value formal verification,
 
 ## Status
 Phase 0: Foundation & Research - COMPLETE
-Phase 1: Core Protocol Development - IN PROGRESS (Tasks 10-13 complete, Task 14 in progress)
+Phase 1: Core Protocol Development - IN PROGRESS (Tasks 10-14 complete, Task 15 next)
