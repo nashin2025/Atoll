@@ -1,0 +1,15 @@
+[package]
+name = "wallet-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Atoll Protocol CLI wallet MVP"
+
+[dependencies]
+atoll-core = { path = "../../core" }
+ed25519 = "2"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+serde = "1"
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+hex = "0.4"
+rand = "0.8"
