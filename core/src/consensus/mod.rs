@@ -5,5 +5,3 @@
 pub mod penta;
 pub mod finality;
 pub mod fork_choice;
-
-// Placeholder - full implementations after Phase 0 research

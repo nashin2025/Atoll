@@ -39,7 +39,7 @@ Cryptocurrency researchers, developers, and users who value formal verification,
 | 9 | Security baseline - secret scanning, dependency audit | Sentinel | ✅ Done |
 | 10 | Phase 1 kickoff: Core protocol development begins | Forge | ✅ Done |
 | 11 | Phase 1: Morph-Hash Rust implementation (algorithm pool, selection chain, memory-hard, S-box, post-quantum) | Forge | ✅ Done |
-| 12 | Phase 1: Penta-Consensus Rust implementation (5 layers, composite scoring) | Forge | next |
+| 12 | Phase 1: Penta-Consensus Rust implementation (5 layers, composite scoring) | Forge | in_progress |
 
 ## Decisions
 - Coin name: **ATOLL** (renamed from Chimera)
