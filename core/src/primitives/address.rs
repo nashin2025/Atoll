@@ -3,6 +3,7 @@
 //! Addresses are 20-byte identifiers derived from public keys.
 //! They use Base58Check encoding for human-readable representation.
 
+use crate::primitives::hash::Hash512;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -33,6 +34,17 @@ impl Address {
         let mut result = [0u8; 20];
         result.copy_from_slice(bytes);
         Self(result)
+    }
+
+    /// Creates an Address from a public key by computing `blake3(public_key)[..20]`.
+    ///
+    /// This is the canonical address derivation used throughout the Atoll Protocol.
+    /// All address derivation should go through this method to keep a single source
+    /// of truth.
+    pub fn from_public_key(public_key: &[u8]) -> Self {
+        let hash = Hash512::blake3(public_key);
+        let bytes = hash.to_bytes();
+        Self::from_slice(&bytes[..20])
     }
 
     /// Returns the inner byte array.
@@ -133,5 +145,30 @@ mod tests {
         let data = [7u8; 20];
         let addr = Address::from_slice(&data);
         assert_eq!(addr.to_bytes(), data);
+    }
+
+    #[test]
+    fn from_public_key_matches_blake3_truncation() {
+        let public_key = [42u8; 32];
+        let expected_hash = Hash512::blake3(&public_key);
+        let expected = Address::from_slice(&expected_hash.to_bytes()[..20]);
+        assert_eq!(Address::from_public_key(&public_key), expected);
+    }
+
+    #[test]
+    fn from_public_key_is_deterministic() {
+        let public_key = [7u8; 32];
+        assert_eq!(
+            Address::from_public_key(&public_key),
+            Address::from_public_key(&public_key)
+        );
+    }
+
+    #[test]
+    fn from_public_key_differs_for_different_keys() {
+        assert_ne!(
+            Address::from_public_key(&[1u8; 32]),
+            Address::from_public_key(&[2u8; 32])
+        );
     }
 }

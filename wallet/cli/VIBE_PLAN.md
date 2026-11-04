@@ -54,7 +54,7 @@ Address derivation: hash of the Ed25519 public key, truncated to 20 bytes, match
 - `clap = { version = "4", features = ["derive"] }` — CLI parsing
 - `hex = "0.4"` — hex encode/decode
 - `rand = "0.8"` — random key generation
-- `atoll-core = { path = "../core" }` — core types
+- `atoll-core = { path = "../../core" }` — core types
 - `serde` with `derive` — already in core
 
 ## Risks

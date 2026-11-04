@@ -13,7 +13,6 @@ pub use keystore::Keystore;
 
 use atoll_core::chain::state::ChainState;
 use atoll_core::primitives::address::Address;
-use atoll_core::primitives::hash::Hash512;
 use atoll_core::primitives::signature::Signature;
 use atoll_core::primitives::transaction::Transaction;
 use clap::Parser;
@@ -29,9 +28,7 @@ const ATOLL: &str = "ATOLL";
 /// Derives an Atoll address from an Ed25519 public key:
 /// `Address = BLAKE3(public_key)[..20]`.
 pub fn derive_address(public_key: &[u8; 32]) -> Address {
-    let hash = Hash512::blake3(public_key);
-    let bytes = hash.to_bytes();
-    Address::from_slice(&bytes[..20])
+    Address::from_public_key(public_key)
 }
 
 /// Wallet errors with user-friendly messages.
@@ -236,6 +233,21 @@ fn cmd_send(
         .parse()
         .map_err(|e| WalletError::Amount(format!("'{amount}': {e}")))?;
 
+    // L4: Reject zero amounts before any signing work.
+    if value == 0 {
+        return Err(WalletError::Amount("amount must be greater than zero".to_string()));
+    }
+
+    // M1: Check sender balance before signing.
+    let state = ChainState::new();
+    let available = state.balance(&from_addr);
+    if available < value {
+        return Err(WalletError::InsufficientBalance {
+            available,
+            requested: value,
+        });
+    }
+
     let keystore = Keystore::load(keystore_path.to_path_buf())?;
     let secret_bytes = keystore
         .get(&from_addr)
@@ -290,6 +302,12 @@ fn cmd_history(address: &str) -> Result<(), WalletError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::env;
+    use std::fs;
+
+    fn temp_path(name: &str) -> PathBuf {
+        env::temp_dir().join(format!("atoll-wallet-test-{name}"))
+    }
 
     #[test]
     fn address_derivation_is_deterministic() {
@@ -364,5 +382,46 @@ mod tests {
         let bytes1 = build_signed().serialize_bytes();
         let bytes2 = build_signed().serialize_bytes();
         assert_eq!(bytes1, bytes2);
+    }
+
+    #[test]
+    fn send_zero_amount_is_rejected() {
+        let from = Address::from_bytes([1u8; 20]);
+        let to = Address::from_bytes([2u8; 20]);
+        let keystore_path = temp_path("send_zero_amount");
+        let _ = fs::remove_file(&keystore_path);
+
+        let mut keystore = Keystore::load(keystore_path.clone()).unwrap();
+        keystore.add(from, vec![3u8; 32]);
+        keystore.save().unwrap();
+
+        let result = cmd_send(&keystore_path, &from.to_hex(), &to.to_hex(), "0", ATOLL);
+        assert!(matches!(
+            result,
+            Err(WalletError::Amount(_))
+        ), "zero amount must be rejected");
+
+        let _ = fs::remove_file(&keystore_path);
+    }
+
+    #[test]
+    fn send_insufficient_balance_is_rejected() {
+        let from = Address::from_bytes([1u8; 20]);
+        let to = Address::from_bytes([2u8; 20]);
+        let keystore_path = temp_path("send_insufficient_balance");
+        let _ = fs::remove_file(&keystore_path);
+
+        let mut keystore = Keystore::load(keystore_path.clone()).unwrap();
+        keystore.add(from, vec![3u8; 32]);
+        keystore.save().unwrap();
+
+        // ChainState::new() has no accounts, so every address has balance 0.
+        let result = cmd_send(&keystore_path, &from.to_hex(), &to.to_hex(), "100", ATOLL);
+        assert!(matches!(
+            result,
+            Err(WalletError::InsufficientBalance { available: 0, requested: 100 })
+        ), "insufficient balance must be rejected");
+
+        let _ = fs::remove_file(&keystore_path);
     }
 }
