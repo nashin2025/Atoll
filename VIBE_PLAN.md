@@ -29,13 +29,13 @@ Cryptocurrency researchers, developers, and users who value formal verification,
 | # | Task | Owner | Status |
 |---|------|-------|--------|
 | 1 | Initialize repository and project structure (Atoll naming) | Forge | ✅ Done |
-| 2 | Phase 0: Literature review - consensus mechanisms, hash functions, blockchain architectures | Scout | pending |
+| 2 | Phase 0: Literature review - consensus mechanisms, hash functions, blockchain architectures | Scout | in_progress |
 | 3 | Phase 0: Theoretical design - Morph-Hash spec, Penta-Consensus formal model | Atlas | pending |
 | 4 | Phase 0: Proof of concept - Python prototypes of core algorithms | Forge | pending |
 | 5 | Phase 0: Academic paper submissions and formal verification setup | Scribe | pending |
 | 6 | Phase 0: Development roadmap finalization | Atlas | pending |
-| 7 | Set up CI/CD pipeline with research → test → PR workflow | Clockwork | pending |
-| 8 | Create .env.example and documentation scaffolding | Scribe | pending |
+| 7 | Set up CI/CD pipeline with research → test → PR workflow | Clockwork | ✅ Done |
+| 8 | Create .env.example and documentation scaffolding | Scribe | ✅ Done |
 | 9 | Security baseline - secret scanning, dependency audit | Sentinel | pending |
 | 10 | Phase 1 kickoff: Core protocol development begins | Forge | pending |
 
@@ -53,4 +53,4 @@ Cryptocurrency researchers, developers, and users who value formal verification,
 - Post-quantum cryptography standards are still evolving
 
 ## Status
-Phase 0: Foundation & Research - IN PROGRESS
+Phase 0: Foundation & Research - IN PROGRESS (Tasks 1, 7, 8 complete)
