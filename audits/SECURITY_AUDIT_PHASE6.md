@@ -142,9 +142,9 @@ Labeled "Phase 2: Simulated verification."
 
 `VRFEngine::evaluate()` uses `blake3::Hasher::new_keyed(secret_key)` — a keyed hash, not a verifiable random function. There is no proof that third parties can verify without the secret key, so a malicious proposer could manipulate VRF output to bias proposer selection.
 
-**Remediation:** Use a proper VRF library (e.g. `vrf`, `schnorrkel`-based, or `merlin`-based VRF) with publicly verifiable proofs. Not fixed silently.
+**Remediation (applied):** Replaced the simulated keyed-blake3 `evaluate()` path with a real schnorrkel Ristretto255 ECVRF (draft-irtf-cfrg-vrf) implementation in `core/src/consensus/penta/pos_vrf.rs`. `VRFEngine::prove()` signs `alpha = epoch || slot || randomness || validator_address` with the validator's secret key and returns a 64-byte beta and 64-byte schnorrkel short proof. `VRFEngine::verify()` publicly verifies the proof against the public key without the secret key. `ProposerSelector::select()` runs `prove()` per validator and carries the proof in `SelectionResult` so the winning selection is publicly re-verifiable.
 
-**Status:** NOT FIXED (requires VRF library)
+**Status:** FIXED — PR #4
 
 ---
 
@@ -368,6 +368,7 @@ Balance comparisons (`from_balance < amount` in `state.rs`), signature compariso
 | 5 | `core/src/network/p2p.rs` | No max message size (DoS) | High | 16 MiB `MAX_MESSAGE_SIZE` limit; generic errors |
 | 6 | `core/src/privacy/zk_starks.rs` | Simulated zk-STARK verification | High | Winterfell-backed prover/verifier with FRI (feature-gated `production-zk`) |
 | 7 | `core/src/consensus/penta/post.rs` | Simulated PoST verification always returns true | High | Real Merkle inclusion proofs, Wesolowski VDF verification, plot-uniqueness registry |
+| 8 | `core/src/consensus/penta/pos_vrf.rs` | Simulated VRF not publicly verifiable | High | schnorrkel VRF with public verification (`prove`/`verify`); proof carried in `SelectionResult` |
 
 ## Files Modified
 
@@ -376,6 +377,7 @@ Balance comparisons (`from_balance < amount` in `state.rs`), signature compariso
 - `core/src/privacy/post_quantum.rs` — verifiable PQ signature simulation, random hybrid classical key
 - `core/src/network/p2p.rs` — max message size limit, generic error messages
 - `core/src/consensus/penta/post.rs` — real Merkle/VDF/uniqueness PoST verification
+- `core/src/consensus/penta/pos_vrf.rs` — schnorrkel VRF with public verification (`prove`/`verify`)
 
 ## Build Verification
 

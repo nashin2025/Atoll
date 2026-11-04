@@ -22,6 +22,9 @@ winterfell = { version = "0.13", optional = true }
 # VDF verification for PoST (Wesolowski VDF — RSA modular arithmetic)
 num-bigint = "0.4"
 
+# VRF for PoS-VRF consensus (Ristretto255 ECVRF — publicly verifiable)
+schnorrkel = "0.11"
+
 # Password hashing (memory-hard)
 argon2 = "0.5"
 scrypt = "0.6"
