@@ -36,8 +36,8 @@ Cryptocurrency researchers, developers, and users who value formal verification,
 | 6 | Phase 0: Development roadmap finalization | Atlas | ✅ Done |
 | 7 | Set up CI/CD pipeline with research → test → PR workflow | Clockwork | ✅ Done |
 | 8 | Create .env.example and documentation scaffolding | Scribe | ✅ Done |
-| 9 | Security baseline - secret scanning, dependency audit | Sentinel | in_progress |
-| 10 | Phase 1 kickoff: Core protocol development begins | Forge | pending |
+| 9 | Security baseline - secret scanning, dependency audit | Sentinel | ✅ Done |
+| 10 | Phase 1 kickoff: Core protocol development begins | Forge | in_progress |
 
 ## Decisions
 - Coin name: **ATOLL** (renamed from Chimera)
