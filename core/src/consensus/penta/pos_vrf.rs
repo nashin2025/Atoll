@@ -49,9 +49,7 @@
 //!   operation.
 
 use crate::primitives::address::Address;
-use crate::primitives::hash::Hash512;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Serde helper for serializing `[u8; 64]` as raw byte arrays.
 ///
@@ -135,33 +133,6 @@ pub struct VRFEngine;
 impl VRFEngine {
     pub fn new() -> Self {
         Self
-    }
-
-    /// Evaluates the VRF for a validator
-    pub fn evaluate(
-        &self,
-        secret_key: &[u8; 64],
-        epoch: u64,
-        slot: u64,
-        randomness: &[u8],
-        validator_address: &str,
-    ) -> VRFOutput {
-        // blake3 keyed mode requires a 32-byte key; derive it from the full
-        // 64-byte VRF secret key so all key material contributes.
-        let output = blake3::hash(secret_key);
-        let mut key = [0u8; 32];
-        key.copy_from_slice(output.as_bytes());
-        let mut hasher = blake3::Hasher::new_keyed(&key);
-        hasher.update(&epoch.to_le_bytes());
-        hasher.update(&slot.to_le_bytes());
-        hasher.update(randomness);
-        hasher.update(validator_address.as_bytes());
-        let mut out = [0u8; 64];
-        hasher.finalize_xof().fill(&mut out);
-        VRFOutput {
-            output: out,
-            proof: out.to_vec(),
-        }
     }
 
     /// Produces a VRF proof and output for the given secret key and alpha.
@@ -330,20 +301,21 @@ mod tests {
     }
 
     #[test]
-    fn vrf_evaluate_is_deterministic() {
+    fn vrf_prove_is_deterministic() {
         let engine = VRFEngine::new();
         let secret = [1u8; 64];
-        let output1 = engine.evaluate(&secret, 0, 0, &[0u8; 32], "validator1");
-        let output2 = engine.evaluate(&secret, 0, 0, &[0u8; 32], "validator1");
+        let alpha = b"epoch0-slot0-randomness0-validator1";
+        let output1 = engine.prove(&secret, alpha);
+        let output2 = engine.prove(&secret, alpha);
         assert_eq!(output1.output, output2.output);
     }
 
     #[test]
-    fn vrf_different_inputs_different_outputs() {
+    fn vrf_prove_different_inputs_different_outputs() {
         let engine = VRFEngine::new();
         let secret = [1u8; 64];
-        let output1 = engine.evaluate(&secret, 0, 0, &[0u8; 32], "validator1");
-        let output2 = engine.evaluate(&secret, 0, 0, &[0u8; 32], "validator2");
+        let output1 = engine.prove(&secret, b"epoch0-slot0-randomness0-validator1");
+        let output2 = engine.prove(&secret, b"epoch0-slot0-randomness0-validator2");
         assert_ne!(output1.output, output2.output);
     }
 

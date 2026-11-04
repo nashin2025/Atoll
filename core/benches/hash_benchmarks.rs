@@ -6,8 +6,8 @@
 use atoll_core::chain::blockchain::Blockchain;
 use atoll_core::chain::sharding::cross_shard::CrossShardManager;
 use atoll_core::chain::state::ChainState;
+use atoll_core::consensus::penta::pos_vrf::{ProposerSelector, VRFEngine, VRFKeyPair, Validator};
 use atoll_core::consensus::penta::{poh, por, pos_vrf, post, pouw, PentaConsensus};
-use atoll_core::consensus::penta::pos_vrf::{ProposerSelector, Validator, VRFEngine, VRFKeyPair};
 use atoll_core::crypto::morph_hash::MorphHashEngine;
 use atoll_core::primitives::address::Address;
 use atoll_core::primitives::block::{Block, BlockBody, BlockHeader};
