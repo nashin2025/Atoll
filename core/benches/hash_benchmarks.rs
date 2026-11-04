@@ -6,6 +6,7 @@
 use atoll_core::chain::blockchain::Blockchain;
 use atoll_core::chain::sharding::cross_shard::CrossShardManager;
 use atoll_core::chain::state::ChainState;
+use atoll_core::consensus::penta::pos_vrf::{ProposerSelector, VRFEngine, VRFKeyPair, Validator};
 use atoll_core::consensus::penta::{poh, por, pos_vrf, post, pouw, PentaConsensus};
 use atoll_core::crypto::morph_hash::MorphHashEngine;
 use atoll_core::primitives::address::Address;
@@ -501,6 +502,78 @@ fn bench_homomorphic_placeholder(c: &mut Criterion) {
     c.bench_function("homomorphic_bfv_placeholder", |b| b.iter(|| black_box(())));
 }
 
+// ---------------------------------------------------------------------------
+// VRF benchmarks
+// ---------------------------------------------------------------------------
+
+fn bench_vrf_keypair_generate(c: &mut Criterion) {
+    c.bench_function("vrf_keypair_generate", |b| {
+        b.iter(|| {
+            let kp = VRFKeyPair::generate();
+            black_box(kp)
+        })
+    });
+}
+
+fn bench_vrf_prove(c: &mut Criterion) {
+    let engine = VRFEngine::new();
+    let kp = VRFKeyPair::generate();
+    let alpha = b"vrf_benchmark_alpha_input";
+    c.bench_function("vrf_prove", |b| {
+        b.iter(|| {
+            let output = engine.prove(black_box(&kp.secret_key), black_box(alpha));
+            black_box(output)
+        })
+    });
+}
+
+fn bench_vrf_verify(c: &mut Criterion) {
+    let engine = VRFEngine::new();
+    let kp = VRFKeyPair::generate();
+    let alpha = b"vrf_benchmark_alpha_input";
+    let proof = engine.prove(&kp.secret_key, alpha);
+    c.bench_function("vrf_verify", |b| {
+        b.iter(|| {
+            let valid = engine.verify(
+                black_box(&kp.public_key),
+                black_box(alpha),
+                black_box(&proof.output),
+                black_box(&proof.proof),
+            );
+            black_box(valid)
+        })
+    });
+}
+
+fn bench_vrf_select_proposer(c: &mut Criterion) {
+    let vrf_engine = VRFEngine::new();
+    let selector = ProposerSelector::new();
+    let mut validators = Vec::new();
+    for i in 0..10u8 {
+        validators.push(Validator {
+            address: Address::from_bytes([i; 20]),
+            stake: 100_000,
+            vrf_secret_key: [i; 64],
+            vrf_public_key: [0u8; 32],
+            reputation_score: 1.0,
+        });
+    }
+    let randomness = [0u8; 32];
+    c.bench_function("vrf_select_proposer", |b| {
+        b.iter(|| {
+            let result = selector.select(
+                black_box(&vrf_engine),
+                black_box(&validators),
+                black_box(0u64),
+                black_box(0u64),
+                black_box(&randomness),
+                black_box(1_000_000u128),
+            );
+            black_box(result)
+        })
+    });
+}
+
 criterion_group! {
     name = benches;
     config = Criterion::default()
@@ -533,6 +606,10 @@ criterion_group! {
     bench_zk_starks_verify,
     bench_zk_starks_roundtrip,
     bench_homomorphic_placeholder,
+    bench_vrf_keypair_generate,
+    bench_vrf_prove,
+    bench_vrf_verify,
+    bench_vrf_select_proposer,
 }
 
 criterion_main!(benches);
