@@ -33,10 +33,10 @@ Cryptocurrency researchers, developers, and users who value formal verification,
 | 3 | Phase 0: Theoretical design - Morph-Hash spec, Penta-Consensus formal model | Atlas | ✅ Done |
 | 4 | Phase 0: Proof of concept - Python prototypes of core algorithms | Forge | ✅ Done |
 | 5 | Phase 0: Academic paper submissions and formal verification setup | Scribe | ✅ Done |
-| 6 | Phase 0: Development roadmap finalization | Atlas | in_progress |
+| 6 | Phase 0: Development roadmap finalization | Atlas | ✅ Done |
 | 7 | Set up CI/CD pipeline with research → test → PR workflow | Clockwork | ✅ Done |
 | 8 | Create .env.example and documentation scaffolding | Scribe | ✅ Done |
-| 9 | Security baseline - secret scanning, dependency audit | Sentinel | pending |
+| 9 | Security baseline - secret scanning, dependency audit | Sentinel | in_progress |
 | 10 | Phase 1 kickoff: Core protocol development begins | Forge | pending |
 
 ## Decisions
