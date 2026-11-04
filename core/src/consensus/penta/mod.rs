@@ -323,6 +323,7 @@ impl PentaConsensus {
 mod tests {
     use super::*;
     use crate::consensus::finality::hotstuff::VoteType;
+    use crate::primitives::merkle::MerkleTree;
 
     fn valid_pouw() -> pouw::PoUWResult {
         pouw::PoUWResult {
@@ -540,5 +541,114 @@ mod tests {
             &block_hash,
         );
         assert_eq!(result, Err(ConsensusError::FinalityNotAchieved));
+    }
+
+    // ---------------------------------------------------------------------------
+    // PoST test helpers (mirrors post::tests so integration can use a real verifier)
+    // ---------------------------------------------------------------------------
+
+    fn leaf(byte: u8) -> Hash512 {
+        let mut arr = [0u8; 64];
+        arr[0] = byte;
+        Hash512::from_array(arr)
+    }
+
+    /// Builds a SpaceProof whose single Merkle proof verifies against the
+    /// plot commitment for the leaf at `index`.
+    fn valid_space_proof(index: usize, leaf: Hash512, path: &[Hash512]) -> post::SpaceProof {
+        let mut path_bytes = Vec::new();
+        for node in path {
+            path_bytes.extend_from_slice(&node.to_bytes());
+        }
+        let mut response = Vec::new();
+        response.extend_from_slice(&(index as u64).to_le_bytes());
+        response.extend_from_slice(&leaf.to_bytes());
+        post::SpaceProof {
+            merkle_proofs: vec![path_bytes],
+            challenge_responses: vec![response],
+        }
+    }
+
+    /// Valid Wesolowski proof for x = 2, T = 30 (even):
+    ///   pi = 1  =>  pi^(2e) = 1 (for any challenge e)
+    ///   T even  => x_factor = x = 2
+    ///   y must equal x_factor = 2
+    fn valid_time_proof() -> post::TimeProof {
+        post::TimeProof {
+            vdf_output: vec![2u8],      // y = 2
+            vdf_proof: vec![1u8],       // pi = 1
+            elapsed_seconds: 30,        // even
+        }
+    }
+
+    #[test]
+    fn invalid_post_fails() {
+        // A PoSTResult with valid == false must be rejected with PoSTFailed,
+        // regardless of the other layers.
+        let consensus = PentaConsensus::new();
+        let bad_post = post::PoSTResult {
+            valid: false,
+            size_score: 0.0,
+        };
+        let result = consensus.validate_block(
+            &valid_pouw(),
+            &valid_pos(),
+            &bad_post,
+            &valid_por(),
+            &valid_poh(),
+        );
+        assert_eq!(result, Err(ConsensusError::PoSTFailed));
+    }
+
+    #[test]
+    fn post_verifier_integration_with_validate_block() {
+        // Build a valid spacetime proof using the real PoSTVerifier.
+        let mut verifier = post::PoSTVerifier::new();
+        let leaves: Vec<Hash512> = (0..8).map(leaf).collect();
+        let tree = MerkleTree::build(&leaves);
+        let root = tree.root();
+        let index = 3;
+        let path = tree.prove(index).unwrap();
+        let proof = post::SpacetimeProof {
+            farmer: Address::zero(),
+            plot_commitment: root,
+            space_proof: valid_space_proof(index, leaves[index], &path),
+            time_proof: valid_time_proof(),
+            plot_size_gb: 500,
+        };
+        assert!(verifier.verify(&proof, &[0u8; 32]));
+
+        // Real verify() == true  ->  PoSTResult.valid == true  ->  validate_block accepts
+        let post_result = post::PoSTResult {
+            valid: true,
+            size_score: 1.0,
+        };
+        let consensus = PentaConsensus::new();
+        let result = consensus.validate_block(
+            &valid_pouw(),
+            &valid_pos(),
+            &post_result,
+            &valid_por(),
+            &valid_poh(),
+        );
+        assert!(result.is_ok());
+        let v = result.unwrap();
+        assert!(v.post_valid);
+        assert_eq!(v.post_score, 1.0);
+        assert!(v.composite_score >= MIN_COMPOSITE_SCORE);
+
+        // Real verify() == false  ->  PoSTResult.valid == false  ->  validate_block rejects
+        let bad_post = post::PoSTResult {
+            valid: false,
+            size_score: 0.0,
+        };
+        let result = consensus.validate_block(
+            &valid_pouw(),
+            &valid_pos(),
+            &bad_post,
+            &valid_por(),
+            &valid_poh(),
+        );
+        assert_eq!(result, Err(ConsensusError::PoSTFailed));
     }
 }

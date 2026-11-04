@@ -125,13 +125,13 @@ The module is explicitly labeled "Phase 1: Interface and simulation" but is used
 **File:** `core/src/consensus/penta/post.rs`
 **Lines:** 91-120
 
-`verify_space_proof()`, `verify_time_proof()`, and `verify_uniqueness()` all unconditionally return `true`. Any farmer can claim 100+ GB of storage and continuous data retention without actually storing anything, breaking Proof-of-Spacetime security and allowing reward extraction without resources.
+`verify_space_proof()`, `verify_time_proof()`, and `verify_uniqueness()` all unconditionally returned `true`. Any farmer could claim 100+ GB of storage and continuous data retention without actually storing anything, breaking Proof-of-Spacetime security and allowing reward extraction without resources.
 
 Labeled "Phase 2: Simulated verification."
 
-**Remediation:** Implement real Merkle proof verification, VDF verification, and plot-uniqueness checks. Not fixed silently — requires Phase-3 implementation.
+**Remediation (applied):** Implemented real Merkle inclusion proof verification against `plot_commitment` via `MerkleTree::verify_proof`, Wesolowski VDF verification (`y ≡ π^(2e) · x^(2^(T mod 2)) (mod N)`, `e = blake3(x || y || T)`), and plot-uniqueness checks via `plot_registry` tracking `blake3(farmer || commitment || sector_size)` plot IDs. All three checks must pass for `PoSTResult.valid == true`. MVP limitations documented in the module-level docs: in-memory registry (lost on restart), hardcoded VDF modulus derived from a blake3 seed (not a trusted setup), `num-bigint` not constant-time.
 
-**Status:** NOT FIXED (requires Phase-2/3 implementation)
+**Status:** FIXED — PR #3
 
 ---
 
@@ -367,6 +367,7 @@ Balance comparisons (`from_balance < amount` in `state.rs`), signature compariso
 | 4 | `core/src/privacy/post_quantum.rs` | Hardcoded zeros secret key in hybrid | Critical | Classical key now random via `OsRng` |
 | 5 | `core/src/network/p2p.rs` | No max message size (DoS) | High | 16 MiB `MAX_MESSAGE_SIZE` limit; generic errors |
 | 6 | `core/src/privacy/zk_starks.rs` | Simulated zk-STARK verification | High | Winterfell-backed prover/verifier with FRI (feature-gated `production-zk`) |
+| 7 | `core/src/consensus/penta/post.rs` | Simulated PoST verification always returns true | High | Real Merkle inclusion proofs, Wesolowski VDF verification, plot-uniqueness registry |
 
 ## Files Modified
 
@@ -374,6 +375,7 @@ Balance comparisons (`from_balance < amount` in `state.rs`), signature compariso
 - `core/src/privacy/homomorphic.rs` — random key generation
 - `core/src/privacy/post_quantum.rs` — verifiable PQ signature simulation, random hybrid classical key
 - `core/src/network/p2p.rs` — max message size limit, generic error messages
+- `core/src/consensus/penta/post.rs` — real Merkle/VDF/uniqueness PoST verification
 
 ## Build Verification
 
