@@ -24,6 +24,8 @@ bincode = "2"
 # Async runtime
 tokio = { version = "1", features = ["full"] }
 
+# Networking
+
 # CLI
 clap = { version = "4", features = ["derive"] }
 
