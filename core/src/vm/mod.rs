@@ -181,7 +181,8 @@ impl VMRouter {
             }
             VMType::ZK => {
                 let mut zk = zk_vm::ZKVMExecutor::new(context.clone(), context.gas_limit);
-                execute_safe(|| zk.execute(bytecode, &[], bytecode))
+                let circuit_id = Hash512::blake3(bytecode);
+                execute_safe(|| zk.execute(&circuit_id, &[], bytecode))
             }
         };
 
