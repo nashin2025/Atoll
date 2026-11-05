@@ -1,16 +1,27 @@
 //! REST API server for the Atoll Protocol node.
 //!
-//! Serves the `/health` endpoint and the `/metrics` endpoint (Prometheus text
-//! format). RPC, GraphQL, and WebSocket endpoints are added in later tasks.
+//! Serves the `/health` endpoint, the `/metrics` endpoint (Prometheus text
+//! format), and the `/graphql` endpoint (GraphQL over HTTP for the Block
+//! Explorer).
 
 use crate::api::auth::auth_and_rate_limit;
+use crate::api::graphql::build_schema;
 use crate::api::health::health_handler;
 use crate::chain::blockchain::Blockchain;
 use crate::chain::state::ChainState;
 use crate::network::peer_manager::PeerManager;
 use crate::telemetry::health::HealthMonitor;
 use crate::telemetry::metrics::Metrics;
-use axum::{extract::State, http::StatusCode, middleware, routing::get, Router};
+use async_graphql::Request as GraphQLRequest;
+use axum::{
+    body::Body,
+    extract::State,
+    http::{header, StatusCode},
+    middleware,
+    response::Response,
+    routing::{get, post},
+    Router,
+};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::RwLock;
@@ -31,9 +42,32 @@ pub struct AppState {
 /// `X-API-Key` header and applies per-IP token-bucket rate limiting.
 pub fn router(state: Arc<AppState>) -> Router {
     let auth_state = state.auth.clone();
+    let schema = build_schema();
+
     Router::new()
         .route("/health", get(health_handler))
         .route("/metrics", get(metrics_handler))
+        .route(
+            "/graphql",
+            post(
+                move |State(app_state): State<Arc<AppState>>, body: String| {
+                    let schema = schema.clone();
+                    async move {
+                        let request: GraphQLRequest =
+                            serde_json::from_str(&body).unwrap_or_else(|_| GraphQLRequest::new(""));
+                        let request = request.data(app_state);
+                        let response = schema.execute(request).await;
+                        let json =
+                            serde_json::to_string(&response).unwrap_or_else(|_| "{}".to_string());
+                        Response::builder()
+                            .status(StatusCode::OK)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Body::from(json))
+                            .unwrap()
+                    }
+                },
+            ),
+        )
         .with_state(state)
         .layer(middleware::from_fn_with_state(
             auth_state,
