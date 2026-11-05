@@ -8,11 +8,12 @@
 //! - Section table validation (imports, functions, resources)
 //! - Resource type safety: resources cannot be copied or dropped implicitly
 //! - Deterministic execution: same input produces same output
-//! - Panic safety via execute_safe wrapper
+//! - Panic safety via `execute_safe` wrapper
 
 use crate::vm::{ExecutionContext, ExecutionResult, GasMeter, VMError, VMType};
 
 /// Move VM executor
+#[must_use]
 pub struct MoveExecutor {
     pub gas_meter: GasMeter,
     pub context: ExecutionContext,
@@ -41,6 +42,7 @@ const MOVE_HEADER_SIZE: usize = 20;
 const MOVE_MAGIC: [u8; 4] = [0xCA, 0xFE, 0xBA, 0xBE];
 
 impl MoveExecutor {
+    #[must_use]
     pub fn new(context: ExecutionContext, gas_limit: u64) -> Self {
         Self {
             gas_meter: GasMeter::new(gas_limit, context.gas_price),
@@ -48,7 +50,14 @@ impl MoveExecutor {
         }
     }
 
-    /// Executes Move bytecode with full validation
+    /// Executes Move bytecode with full validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`VMError::InvalidInstruction`] for empty bytecode, bad magic,
+    /// bad version, or inconsistent resource counts. Returns
+    /// [`VMError::OutOfGas`] when the gas limit is exceeded.
+    #[must_use]
     pub fn execute(
         &mut self,
         bytecode: &[u8],
@@ -64,12 +73,14 @@ impl MoveExecutor {
         self.gas_meter.charge(bytecode.len() as u64)?;
 
         // Step 3: Parse and validate Move module header
-        let module = self.parse_module(bytecode)?;
+        let module = Self::parse_module(bytecode)?;
 
         // Step 4: Charge gas for module validation (per function + resource + import)
-        self.gas_meter.charge(module.function_count as u64 * 10)?;
-        self.gas_meter.charge(module.resource_count as u64 * 20)?;
-        self.gas_meter.charge(module.import_count as u64 * 5)?;
+        self.gas_meter
+            .charge(u64::from(module.function_count) * 10)?;
+        self.gas_meter
+            .charge(u64::from(module.resource_count) * 20)?;
+        self.gas_meter.charge(u64::from(module.import_count) * 5)?;
 
         // Step 5: Charge gas for function lookup
         self.gas_meter.charge(function.len() as u64 * 2)?;
@@ -81,7 +92,7 @@ impl MoveExecutor {
 
         // Step 7: Deterministic simulated execution
         // All operations are pure functions of (bytecode, function, args)
-        let return_data = self.execute_module(&module, function, args)?;
+        let return_data = Self::execute_module(&module, function, args)?;
 
         Ok(ExecutionResult::Success {
             gas_used: self.gas_meter.gas_used,
@@ -91,7 +102,7 @@ impl MoveExecutor {
     }
 
     /// Parse Move module header and validate structure
-    fn parse_module(&self, bytecode: &[u8]) -> Result<MoveModule, VMError> {
+    fn parse_module(bytecode: &[u8]) -> Result<MoveModule, VMError> {
         if bytecode.len() < MOVE_HEADER_SIZE {
             return Err(VMError::InvalidInstruction);
         }
@@ -125,7 +136,6 @@ impl MoveExecutor {
 
     /// Execute the parsed Move module deterministically
     fn execute_module(
-        &self,
         module: &MoveModule,
         _function: &str,
         _args: &[Vec<u8>],
@@ -155,11 +165,13 @@ impl MoveExecutor {
     }
 
     /// Returns the remaining gas
+    #[must_use]
     pub fn remaining_gas(&self) -> u64 {
         self.gas_meter.remaining()
     }
 
     /// Returns the VM type
+    #[must_use]
     pub fn vm_type() -> VMType {
         VMType::Move
     }
