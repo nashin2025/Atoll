@@ -72,12 +72,19 @@ impl HotStuffState {
     }
 
     /// Adds a vote to the state
-    pub fn add_vote(&mut self, vote: BFTVote) {
+    pub fn add_vote(
+        &mut self,
+        vote: BFTVote,
+    ) {
         self.votes.push(vote);
     }
 
     /// Clears votes for a different height/round
-    pub fn clear_stale_votes(&mut self, height: u64, round: u64) {
+    pub fn clear_stale_votes(
+        &mut self,
+        height: u64,
+        round: u64,
+    ) {
         self.votes
             .retain(|v| v.height == height && v.round == round);
     }
@@ -95,7 +102,11 @@ impl HotStuffBFT {
     ///
     /// Finality is achieved when a quorum of validators has committed to
     /// the block at the current height and round (3 HotStuff rounds).
-    pub fn check_finality(&self, state: &HotStuffState, block_hash: &Hash512) -> bool {
+    pub fn check_finality(
+        &self,
+        state: &HotStuffState,
+        block_hash: &Hash512,
+    ) -> bool {
         state.has_quorum(
             block_hash,
             state.current_height,

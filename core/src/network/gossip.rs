@@ -45,7 +45,11 @@ impl GossipProtocol {
     }
 
     /// Broadcasts a message to the network using gossip
-    pub fn broadcast(&mut self, message: &NetworkMessage, sender: NodeId) {
+    pub fn broadcast(
+        &mut self,
+        message: &NetworkMessage,
+        sender: NodeId,
+    ) {
         let message_hash = Self::hash_message(message);
 
         // Skip if we've already seen this message
@@ -104,12 +108,18 @@ impl GossipProtocol {
     }
 
     /// Returns whether it's time to gossip
-    pub fn should_gossip(&self, now_ms: u64) -> bool {
+    pub fn should_gossip(
+        &self,
+        now_ms: u64,
+    ) -> bool {
         now_ms - self.last_gossip >= self.config.gossip_interval_ms
     }
 
     /// Updates the last gossip timestamp
-    pub fn update_gossip_time(&mut self, now_ms: u64) {
+    pub fn update_gossip_time(
+        &mut self,
+        now_ms: u64,
+    ) {
         self.last_gossip = now_ms;
     }
 

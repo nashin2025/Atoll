@@ -75,7 +75,10 @@ impl BootstrapClient {
     }
 
     /// Connects to a single seed node and collects its advertised neighbors.
-    async fn fetch_from_seed(&self, seed: &BootstrapNode) -> Result<Vec<PeerInfo>, String> {
+    async fn fetch_from_seed(
+        &self,
+        seed: &BootstrapNode,
+    ) -> Result<Vec<PeerInfo>, String> {
         let mut connection = timeout(
             self.connect_timeout,
             PeerConnection::connect(&self.identity, &seed.address, Some(seed.node_id)),

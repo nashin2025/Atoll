@@ -1,0 +1,25 @@
+[clippy::all]
+# Force warnings to be errors in CI
+[clippy::pedantic]
+# Allow some pedantic lints that are too strict
+allow = [
+    "clippy::must_use",
+    "clippy::missing_errors_doc",
+    "clippy::cast_possible_truncation",
+    "clippy::cast_lossless",
+    "clippy::uninlined_format_args",
+    "clippy::manual_let_else",
+    "clippy::cast_sign_loss",
+    "clippy::wildcard_imports",
+    "clippy::multiple_inherent_impl",
+    "clippy::similar_names",
+    "clippy::too_many_arguments",
+    "clippy::option_if_let_else",
+    "clippy::needless_pass_by_value",
+]
+
+[clippy::perf]
+# Performance lints are warnings, not errors
+allow = [
+    "clippy::needless_pass_by_value",
+]

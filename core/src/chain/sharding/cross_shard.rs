@@ -150,7 +150,10 @@ impl CrossShardManager {
     }
 
     /// Returns pending receipts for a shard
-    pub fn get_pending_receipts_for_shard(&self, shard_id: u16) -> Vec<CrossShardReceipt> {
+    pub fn get_pending_receipts_for_shard(
+        &self,
+        shard_id: u16,
+    ) -> Vec<CrossShardReceipt> {
         let mut result = Vec::new();
         if let Some(queue) = self.shard_receipt_queues.get(&shard_id) {
             for id in queue {
@@ -193,12 +196,18 @@ impl CrossShardManager {
     }
 
     /// Sets timeout in blocks
-    pub fn set_timeout_blocks(&mut self, blocks: u64) {
+    pub fn set_timeout_blocks(
+        &mut self,
+        blocks: u64,
+    ) {
         self.timeout_blocks = blocks;
     }
 
     /// Cleans up expired receipts
-    pub fn cleanup_expired(&mut self, current_block: u64) {
+    pub fn cleanup_expired(
+        &mut self,
+        current_block: u64,
+    ) {
         let expired: Vec<Hash512> = self
             .pending_receipts
             .iter()
@@ -213,7 +222,10 @@ impl CrossShardManager {
     }
 
     /// Checks if a receipt has already been executed (replay protection)
-    pub fn is_receipt_executed(&self, receipt_id: &Hash512) -> bool {
+    pub fn is_receipt_executed(
+        &self,
+        receipt_id: &Hash512,
+    ) -> bool {
         self.executed_receipts.contains_key(receipt_id)
     }
 }

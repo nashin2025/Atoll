@@ -20,7 +20,10 @@ pub struct Signature {
 
 impl Signature {
     /// Creates a new hybrid signature.
-    pub fn new(ed25519: [u8; 64], dilithium: Vec<u8>) -> Self {
+    pub fn new(
+        ed25519: [u8; 64],
+        dilithium: Vec<u8>,
+    ) -> Self {
         Self { ed25519, dilithium }
     }
 
@@ -45,7 +48,10 @@ impl Default for Signature {
 }
 
 impl fmt::Debug for Signature {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
         f.debug_struct("Signature")
             .field("ed25519", &hex::encode(self.ed25519))
             .field("dilithium_len", &self.dilithium.len())
@@ -55,7 +61,10 @@ impl fmt::Debug for Signature {
 }
 
 impl fmt::Display for Signature {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
         write!(
             f,
             "Signature(ed25519={}, dilithium={} bytes)",

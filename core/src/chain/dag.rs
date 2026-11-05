@@ -32,7 +32,10 @@ pub struct DAG {
 
 impl DAG {
     /// Creates a new DAG with genesis vertex
-    pub fn new(genesis_hash: Hash512, k: u32) -> Self {
+    pub fn new(
+        genesis_hash: Hash512,
+        k: u32,
+    ) -> Self {
         let mut vertices = HashMap::new();
         let mut tips = HashSet::new();
 
@@ -119,7 +122,10 @@ impl DAG {
     }
 
     /// Returns a vertex by hash
-    pub fn get_vertex(&self, hash: &Hash512) -> Option<&DAGVertex> {
+    pub fn get_vertex(
+        &self,
+        hash: &Hash512,
+    ) -> Option<&DAGVertex> {
         self.vertices.get(hash)
     }
 
@@ -134,7 +140,10 @@ impl DAG {
     }
 
     /// Calculates GHOSTDAG blue score and work for a new vertex
-    fn calculate_ghostdag_scores(&self, parents: &[Hash512]) -> (u64, u64, bool) {
+    fn calculate_ghostdag_scores(
+        &self,
+        parents: &[Hash512],
+    ) -> (u64, u64, bool) {
         if parents.is_empty() {
             return (1, 1, true);
         }
@@ -169,7 +178,11 @@ impl DAG {
     }
 
     /// Calculates anticone size for a new vertex
-    fn calculate_anticone_size(&self, _hash: &Hash512, _parents: &[Hash512]) -> u32 {
+    fn calculate_anticone_size(
+        &self,
+        _hash: &Hash512,
+        _parents: &[Hash512],
+    ) -> u32 {
         // Phase 1: Simplified anticone calculation
         // Phase 2: Full anticone calculation with topological ordering
         0

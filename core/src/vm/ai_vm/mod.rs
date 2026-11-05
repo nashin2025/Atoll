@@ -17,7 +17,10 @@ pub struct AIVMExecutor {
 }
 
 impl AIVMExecutor {
-    pub fn new(context: ExecutionContext, gas_limit: u64) -> Self {
+    pub fn new(
+        context: ExecutionContext,
+        gas_limit: u64,
+    ) -> Self {
         Self {
             gas_meter: GasMeter::new(gas_limit, context.gas_price),
             context,
@@ -27,7 +30,10 @@ impl AIVMExecutor {
     }
 
     /// Deploys an AI model on-chain
-    pub fn deploy_model(&mut self, model_bytes: &[u8]) -> Result<ExecutionResult, VMError> {
+    pub fn deploy_model(
+        &mut self,
+        model_bytes: &[u8],
+    ) -> Result<ExecutionResult, VMError> {
         if model_bytes.len() > self.max_model_size {
             return Err(VMError::UnsupportedOperation);
         }

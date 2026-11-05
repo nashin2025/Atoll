@@ -1,0 +1,47 @@
+# Global fallback
+* @nashin2025
+
+# Core protocol
+/core/src/ @nashin2025
+
+# Smart contract VMs
+/core/src/vm/ @nashin2025
+
+# Consensus
+/core/src/consensus/ @nashin2025
+
+# Cryptography
+/core/src/crypto/ @nashin2025
+
+# Networking
+/core/src/network/ @nashin2025
+
+# Chain
+/core/src/chain/ @nashin2025
+
+# Privacy
+/core/src/privacy/ @nashin2025
+
+# API
+/core/src/api/ @nashin2025
+
+# CLI Wallet
+/wallet/cli/ @nashin2025
+
+# GUI Wallet
+/wallet/gui/ @nashin2025
+
+# Block Explorer
+/explorer/ @nashin2025
+
+# Documentation
+/docs/ @nashin2025
+
+# Specification
+/specification/ @nashin2025
+
+# CI/CD
+.github/workflows/ @nashin2025
+
+# Security
+/audits/ @nashin2025

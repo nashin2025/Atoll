@@ -281,7 +281,10 @@ pub enum SlashingEvidence {
 
 impl PentaConsensus {
     /// Checks slashing conditions and returns the appropriate action
-    pub fn check_slashing(&self, evidence: &SlashingEvidence) -> Option<SlashAction> {
+    pub fn check_slashing(
+        &self,
+        evidence: &SlashingEvidence,
+    ) -> Option<SlashAction> {
         match evidence {
             SlashingEvidence::DoubleVote { validator, .. } => Some(SlashAction {
                 validator: validator.clone(),
@@ -555,7 +558,11 @@ mod tests {
 
     /// Builds a SpaceProof whose single Merkle proof verifies against the
     /// plot commitment for the leaf at `index`.
-    fn valid_space_proof(index: usize, leaf: Hash512, path: &[Hash512]) -> post::SpaceProof {
+    fn valid_space_proof(
+        index: usize,
+        leaf: Hash512,
+        path: &[Hash512],
+    ) -> post::SpaceProof {
         let mut path_bytes = Vec::new();
         for node in path {
             path_bytes.extend_from_slice(&node.to_bytes());

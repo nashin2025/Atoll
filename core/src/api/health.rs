@@ -25,7 +25,7 @@ pub struct HealthResponse {
 /// Reads a fresh health snapshot from the [`HealthMonitor`] held in
 /// [`AppState`] and returns it as JSON.
 pub async fn health_handler(
-    State(app_state): State<Arc<AppState>>,
+    State(app_state): State<Arc<AppState>>
 ) -> Result<Json<HealthResponse>, StatusCode> {
     let status = app_state.monitor.check();
     Ok(Json(HealthResponse {

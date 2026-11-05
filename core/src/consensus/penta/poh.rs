@@ -65,12 +65,18 @@ impl NullifierRegistry {
     }
 
     /// Checks if a nullifier has already been used
-    pub fn check_nullifier(&self, nullifier: &[u8; 32]) -> bool {
+    pub fn check_nullifier(
+        &self,
+        nullifier: &[u8; 32],
+    ) -> bool {
         !self.nullifiers.contains(nullifier)
     }
 
     /// Registers a new nullifier
-    pub fn register_nullifier(&mut self, nullifier: [u8; 32]) {
+    pub fn register_nullifier(
+        &mut self,
+        nullifier: [u8; 32],
+    ) {
         self.nullifiers.insert(nullifier);
     }
 
@@ -89,7 +95,10 @@ impl ZKVerifier {
     }
 
     /// Verifies a biometric ZK proof
-    pub fn verify_biometric_proof(&self, proof: &[u8]) -> bool {
+    pub fn verify_biometric_proof(
+        &self,
+        proof: &[u8],
+    ) -> bool {
         // Phase 2: Simulated verification
         // Phase 3: Full zk-SNARK verification
         !proof.is_empty() && proof.len() <= 10_000

@@ -93,7 +93,10 @@ impl GqlBlock {
     }
 
     /// Transactions included in this block.
-    async fn transactions(&self, ctx: &Context<'_>) -> Result<Vec<GqlTransaction>> {
+    async fn transactions(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Vec<GqlTransaction>> {
         let app_state = ctx.data::<Arc<AppState>>()?;
         let blockchain = app_state
             .blockchain
@@ -273,7 +276,10 @@ fn core_address_to_gql(addr: &CoreAddress) -> GqlAddress {
     }
 }
 
-fn core_transaction_to_gql(tx: &CoreTransaction, block_height: u64) -> GqlTransaction {
+fn core_transaction_to_gql(
+    tx: &CoreTransaction,
+    block_height: u64,
+) -> GqlTransaction {
     let tx_hash = Hash512::blake3(&tx.serialize_bytes()).to_hex();
     GqlTransaction {
         hash: tx_hash,
@@ -290,7 +296,10 @@ fn core_transaction_to_gql(tx: &CoreTransaction, block_height: u64) -> GqlTransa
     }
 }
 
-fn core_block_to_gql(block_hash: &Hash512, block: &CoreBlock) -> GqlBlock {
+fn core_block_to_gql(
+    block_hash: &Hash512,
+    block: &CoreBlock,
+) -> GqlBlock {
     GqlBlock {
         hash: block_hash.to_hex(),
         height: block.header.height.to_string(),
@@ -315,7 +324,11 @@ pub struct Query;
 #[Object]
 impl Query {
     /// Look up a block by its hash.
-    async fn block(&self, ctx: &Context<'_>, hash: Option<String>) -> Result<Option<GqlBlock>> {
+    async fn block(
+        &self,
+        ctx: &Context<'_>,
+        hash: Option<String>,
+    ) -> Result<Option<GqlBlock>> {
         let Some(hash) = hash else {
             return Ok(None);
         };
@@ -334,7 +347,11 @@ impl Query {
     }
 
     /// Look up a block by its height.
-    async fn block_by_height(&self, ctx: &Context<'_>, height: String) -> Result<Option<GqlBlock>> {
+    async fn block_by_height(
+        &self,
+        ctx: &Context<'_>,
+        height: String,
+    ) -> Result<Option<GqlBlock>> {
         let height = height
             .parse::<u64>()
             .map_err(|e| Error::new(format!("Invalid block height: {}", e)))?;
@@ -392,7 +409,11 @@ impl Query {
     /// Scans all blocks for a transaction whose BLAKE3 hash of its serialized
     /// bytes matches the requested hash. This is a linear scan and suitable
     /// for the MVP; a transaction index can be added later.
-    async fn transaction(&self, ctx: &Context<'_>, hash: String) -> Result<Option<GqlTransaction>> {
+    async fn transaction(
+        &self,
+        ctx: &Context<'_>,
+        hash: String,
+    ) -> Result<Option<GqlTransaction>> {
         let app_state = ctx.data::<Arc<AppState>>()?;
         let blockchain = app_state
             .blockchain
@@ -460,7 +481,11 @@ impl Query {
     }
 
     /// Look up an address and its chain state.
-    async fn address(&self, ctx: &Context<'_>, address: String) -> Result<Option<GqlAddressInfo>> {
+    async fn address(
+        &self,
+        ctx: &Context<'_>,
+        address: String,
+    ) -> Result<Option<GqlAddressInfo>> {
         let core_address = CoreAddress::from_hex(&address)
             .map_err(|e| Error::new(format!("Invalid address: {}", e)))?;
 
@@ -539,7 +564,10 @@ impl Query {
     }
 
     /// Network-wide statistics.
-    async fn network_stats(&self, ctx: &Context<'_>) -> Result<GqlNetworkStats> {
+    async fn network_stats(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<GqlNetworkStats> {
         let app_state = ctx.data::<Arc<AppState>>()?;
 
         let blockchain = app_state
