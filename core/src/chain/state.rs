@@ -266,8 +266,8 @@ mod tests {
     fn code_and_storage() {
         let mut state = ChainState::new();
         let addr = Address::from_bytes([1u8; 20]);
-        let code_hash = Hash512::from_bytes(&[42u8; 64]);
-        let storage_root = Hash512::from_bytes(&[99u8; 64]);
+        let code_hash = Hash512::from_bytes(&[42u8; 64]).unwrap();
+        let storage_root = Hash512::from_bytes(&[99u8; 64]).unwrap();
 
         state.set_code_hash(addr, code_hash);
         state.set_storage_root(addr, storage_root);

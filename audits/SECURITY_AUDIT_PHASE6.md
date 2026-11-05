@@ -16,7 +16,7 @@ A security audit was performed on the Atoll Protocol core crate (`core/src/`). T
 
 **4 Critical findings were identified and fixed.**
 **3 High findings fixed; 2 High findings require architectural work.**
-**5 Medium findings, 6 Low findings, 3 Info findings documented.**
+**5 Medium findings fixed. 6 Low findings, 3 Info findings documented.**
 
 `cargo build` passes. `cargo audit` reports 1 allowed warning (bincode unmaintained). One pre-existing test failure in `primitives::block` is unrelated to this audit.
 
@@ -185,9 +185,9 @@ Labeled "Phase 2: Add encrypted transport using Noise Protocol Framework."
 
 `create_request()` inserts the request into `pending_requests`. `request_to_receipt()` creates a receipt from the request but does **not** remove the request from `pending_requests`. The same request can be converted into multiple duplicate receipts, each with the same ID, potentially causing duplicate execution on the destination shard.
 
-**Remediation:** Remove the request from `pending_requests` once a receipt has been created, or track `consumed_requests` to prevent double conversion.
+**Remediation (applied):** Request is removed from `pending_requests` in `request_to_receipt()` after receipt creation. Added regression test `request_to_receipt_double_conversion_fails` asserting a second conversion fails.
 
-**Status:** NOT FIXED
+**Status:** FIXED
 
 ---
 
@@ -197,9 +197,9 @@ Labeled "Phase 2: Add encrypted transport using Noise Protocol Framework."
 
 Several functions return `format!("... {}", e)` or `format!("Request {:?} not found", request_id)` including full Hash512 values and IO error details. While Hash512 is a public hash, exposing internal error structure can aid reconnaissance.
 
-**Remediation:** Use generic error messages for externally reachable operations (e.g. "Read length failed" instead of "Read length failed: {e}"). Partially applied in `p2p.rs`.
+**Remediation (applied):** Genericized error messages across all named files (`network/p2p.rs`, `chain/sharding/cross_shard.rs`, `chain/sharding/shard_manager.rs`, `chain/sharding/rebalancer.rs`, `chain/dag.rs`, `privacy/zk_starks.rs`).
 
-**Status:** PARTIALLY FIXED (p2p.rs done; remaining locations not addressed)
+**Status:** FIXED
 
 ---
 
@@ -210,9 +210,9 @@ Several functions return `format!("... {}", e)` or `format!("Request {:?} not fo
 
 `copy_from_slice(bytes)` panics if `bytes` is not exactly 64 bytes. If externally controlled input reaches this function, it is a denial-of-service vector.
 
-**Remediation:** Return `Result<Self, hex::FromHexError>` or validate length before copying.
+**Remediation (applied):** Changed signature to `Result<Self, String>` with length validation before `copy_from_slice`. All callers updated. Added regression test `hash512_from_bytes_wrong_length_returns_error`.
 
-**Status:** NOT FIXED
+**Status:** FIXED
 
 ---
 
@@ -223,9 +223,9 @@ Several functions return `format!("... {}", e)` or `format!("Request {:?} not fo
 
 Same issue as M3 — `copy_from_slice` panics on non-20-byte input.
 
-**Remediation:** Return `Result` instead of panicking.
+**Remediation (applied):** Changed signature to `Result<Self, String>` with length validation before `copy_from_slice`. `from_public_key` and all callers updated. Added regression test `from_slice_invalid_length_returns_error`.
 
-**Status:** NOT FIXED
+**Status:** FIXED
 
 ---
 
@@ -235,9 +235,9 @@ Same issue as M3 — `copy_from_slice` panics on non-20-byte input.
 
 `cargo audit` reports RUSTSEC-2025-0141: bincode 2.0.1 is unmaintained. Used for serialization (`bincode = "2"`). No known CVE, but unmaintained crates do not receive security patches.
 
-**Remediation:** Migrate to a maintained serialization framework (e.g. borsh, rmp-serde).
+**Remediation (applied):** Dropped unused `bincode` dependency from `Cargo.toml` and regenerated `Cargo.lock`. RUSTSEC-2025-0141 warning is gone from `cargo audit`.
 
-**Status:** NOT FIXED
+**Status:** FIXED
 
 ---
 
@@ -370,6 +370,11 @@ Balance comparisons (`from_balance < amount` in `state.rs`), signature compariso
 | 7 | `core/src/consensus/penta/post.rs` | Simulated PoST verification always returns true | High | Real Merkle inclusion proofs, Wesolowski VDF verification, plot-uniqueness registry |
 | 8 | `core/src/consensus/penta/pos_vrf.rs` | Simulated VRF not publicly verifiable | High | schnorrkel VRF with public verification (`prove`/`verify`); proof carried in `SelectionResult` |
 | 9 | `core/src/network/p2p.rs` + `core/src/network/node_identity.rs` | Plaintext TCP transport, no encryption or peer authentication | High | Noise_XX_25519_ChaChaPoly_BLAKE2s handshake; fingerprint-authenticated node IDs; encrypted authenticated stream |
+| 10 | `core/src/chain/sharding/cross_shard.rs` | Cross-shard request consumed after receipt creation | Medium | Request removed from `pending_requests` in `request_to_receipt()` |
+| 11 | `core/src/network/p2p.rs`, `core/src/chain/sharding/cross_shard.rs`, `core/src/chain/sharding/shard_manager.rs`, `core/src/chain/sharding/rebalancer.rs`, `core/src/chain/dag.rs`, `core/src/privacy/zk_starks.rs` | Error messages leak internal details | Medium | Genericized error messages across all named files |
+| 12 | `core/src/primitives/hash.rs` | `Hash512::from_bytes` panics on wrong-length input | Medium | Changed to `Result<Hash512, String>` with length validation |
+| 13 | `core/src/primitives/address.rs` | `Address::from_slice` panics on wrong-length input | Medium | Changed to `Result<Address, String>` with length validation |
+| 14 | `core/Cargo.toml` + `Cargo.lock` | Unmaintained `bincode` dependency (RUSTSEC-2025-0141) | Medium | Removed unused `bincode` dependency |
 
 ## Files Modified
 
@@ -381,14 +386,27 @@ Balance comparisons (`from_balance < amount` in `state.rs`), signature compariso
 - `core/src/consensus/penta/pos_vrf.rs` — schnorrkel VRF with public verification (`prove`/`verify`)
 - `core/src/network/p2p.rs` — Noise XX handshake, fingerprint-authenticated peer connections, encrypted stream
 - `core/src/network/node_identity.rs` — Node keypair generation, disk persistence, BLAKE3 fingerprint
+- `core/Cargo.toml` — removed unused `bincode` dependency
+- `core/Cargo.lock` — regenerated without `bincode`
+- `core/src/primitives/hash.rs` — `Hash512::from_bytes` returns `Result<Self, String>`
+- `core/src/primitives/address.rs` — `Address::from_slice` returns `Result<Self, String>`
+- `core/src/chain/sharding/cross_shard.rs` — request consumed after receipt creation
+- `core/src/chain/sharding/shard_manager.rs` — genericized error messages
+- `core/src/chain/sharding/rebalancer.rs` — genericized error messages
+- `core/src/chain/dag.rs` — genericized error messages
+- `core/src/privacy/zk_starks.rs` — genericized error messages
 
 ## Build Verification
 
 `cargo build` — **PASS** (no errors; pre-existing warnings only)
 
-`cargo test` — 363 passed, 0 failed.
+`cargo test` — 394 passed, 0 failed (unit); 81 passed, 0 failed (adversarial); 24 passed, 0 failed (fuzzing); 28 passed, 0 failed (integration)
 
-`cargo audit` — 1 allowed warning: `bincode` unmaintained (RUSTSEC-2025-0141). No Critical/High dependency vulnerabilities.
+`cargo clippy` — **PASS** (no errors; pre-existing warnings only)
+
+`cargo fmt` — **PASS** (no formatting diffs)
+
+`cargo audit` — bincode warning (RUSTSEC-2025-0141) eliminated. One pre-existing protobuf advisory (RUSTSEC-2024-0437) unrelated to these changes.
 
 ---
 

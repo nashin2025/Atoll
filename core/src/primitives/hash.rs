@@ -43,12 +43,18 @@ impl Hash512 {
 
     /// Creates a Hash512 from a byte slice.
     ///
-    /// # Panics
-    /// Panics if `bytes` is not exactly 64 bytes long.
-    pub fn from_bytes(bytes: &[u8]) -> Self {
+    /// # Errors
+    /// Returns an error if `bytes` is not exactly 64 bytes long.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() != 64 {
+            return Err(format!(
+                "Invalid Hash512 length: expected 64 bytes, got {}",
+                bytes.len()
+            ));
+        }
         let mut result = [0u8; 64];
         result.copy_from_slice(bytes);
-        Self(result)
+        Ok(Self(result))
     }
 
     /// Creates a Hash512 from a 64-byte array.

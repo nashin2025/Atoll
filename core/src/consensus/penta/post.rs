@@ -174,7 +174,7 @@ impl PoSTVerifier {
                 return false;
             }
             let index = u64::from_le_bytes(response[..8].try_into().unwrap()) as usize; // len == 72
-            let leaf = Hash512::from_bytes(&response[8..72]); // len == 72
+            let leaf = Hash512::from_bytes(&response[8..72]).unwrap(); // len == 72
 
             // Path: serialized Hash512 nodes, 64 bytes each
             if path_bytes.len() % 64 != 0 {
@@ -182,7 +182,7 @@ impl PoSTVerifier {
             }
             let path: Vec<Hash512> = path_bytes
                 .chunks_exact(64)
-                .map(|chunk| Hash512::from_bytes(chunk.try_into().unwrap()))
+                .map(|chunk| Hash512::from_bytes(chunk.try_into().unwrap()).unwrap())
                 .collect();
 
             if !MerkleTree::verify_proof(*commitment, leaf, index, &path) {

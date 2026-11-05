@@ -171,7 +171,7 @@ mod tests {
     #[test]
     fn cross_shard_request_creation() {
         let request = CrossShardRequest {
-            id: Hash512::from_bytes(&[7u8; 64]),
+            id: Hash512::from_bytes(&[7u8; 64]).unwrap(),
             source_shard: 5,
             destination_shard: 10,
             sender: Address::from_bytes([2u8; 20]),

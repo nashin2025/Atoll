@@ -86,12 +86,12 @@ impl ShardRebalancer {
         let state = self
             .shard_manager
             .get_shard_state(shard_id)
-            .ok_or_else(|| format!("Shard {} does not exist", shard_id))?;
+            .ok_or_else(|| "Shard does not exist".to_string())?;
 
         let config = self
             .shard_manager
             .get_shard_config(shard_id)
-            .ok_or_else(|| format!("Shard {} config not found", shard_id))?;
+            .ok_or_else(|| "Shard config not found".to_string())?;
 
         // Only split if validator count supports it
         if state.validator_count < config.min_validators * 2 {
@@ -108,7 +108,7 @@ impl ShardRebalancer {
         let validators = self
             .shard_manager
             .get_shard_validators(shard_id)
-            .ok_or_else(|| format!("Shard {} validators not found", shard_id))?;
+            .ok_or_else(|| "Shard validators not found".to_string())?;
         let validator_list: Vec<Address> = validators.iter().cloned().collect();
         let half = validator_list.len() / 2;
 
@@ -182,7 +182,7 @@ impl ShardRebalancer {
         let validators = self
             .shard_manager
             .get_shard_validators(shard_id)
-            .ok_or_else(|| format!("Shard {} validators not found", shard_id))?;
+            .ok_or_else(|| "Shard validators not found".to_string())?;
         let validator_list: Vec<Address> = validators.iter().cloned().collect();
 
         if !validator_list.is_empty() {

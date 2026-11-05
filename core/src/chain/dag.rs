@@ -67,7 +67,7 @@ impl DAG {
         // Verify all parents exist
         for parent in &parents {
             if !self.vertices.contains_key(parent) {
-                return Err(format!("Parent {:?} not found in DAG", parent));
+                return Err("Parent not found in DAG".to_string());
             }
         }
 
@@ -213,7 +213,7 @@ mod tests {
         let genesis = Hash512::zero();
         let mut dag = DAG::new(genesis, 10);
 
-        let block1 = Hash512::from_bytes(&[1u8; 64]);
+        let block1 = Hash512::from_bytes(&[1u8; 64]).unwrap();
         dag.add_vertex(block1, vec![genesis], 1).unwrap();
 
         assert!(!dag.tips().contains(&genesis));
@@ -226,10 +226,10 @@ mod tests {
         let genesis = Hash512::zero();
         let mut dag = DAG::new(genesis, 10);
 
-        let block1 = Hash512::from_bytes(&[1u8; 64]);
+        let block1 = Hash512::from_bytes(&[1u8; 64]).unwrap();
         dag.add_vertex(block1, vec![genesis], 1).unwrap();
 
-        let block2 = Hash512::from_bytes(&[2u8; 64]);
+        let block2 = Hash512::from_bytes(&[2u8; 64]).unwrap();
         dag.add_vertex(block2, vec![genesis, block1], 2).unwrap();
 
         assert_eq!(dag.vertex_count(), 3);
@@ -244,20 +244,20 @@ mod tests {
         let mut dag = DAG::new(genesis, 10);
 
         // Build chain: genesis -> b1 -> b2 -> b3
-        let b1 = Hash512::from_bytes(&[1u8; 64]);
+        let b1 = Hash512::from_bytes(&[1u8; 64]).unwrap();
         dag.add_vertex(b1, vec![genesis], 1).unwrap();
 
-        let b2 = Hash512::from_bytes(&[2u8; 64]);
+        let b2 = Hash512::from_bytes(&[2u8; 64]).unwrap();
         dag.add_vertex(b2, vec![b1], 2).unwrap();
 
-        let b3 = Hash512::from_bytes(&[3u8; 64]);
+        let b3 = Hash512::from_bytes(&[3u8; 64]).unwrap();
         dag.add_vertex(b3, vec![b2], 3).unwrap();
 
         // Build fork: genesis -> f1 -> f2 (shorter)
-        let f1 = Hash512::from_bytes(&[4u8; 64]);
+        let f1 = Hash512::from_bytes(&[4u8; 64]).unwrap();
         dag.add_vertex(f1, vec![genesis], 1).unwrap();
 
-        let f2 = Hash512::from_bytes(&[5u8; 64]);
+        let f2 = Hash512::from_bytes(&[5u8; 64]).unwrap();
         dag.add_vertex(f2, vec![f1], 2).unwrap();
 
         // b3 should be selected (higher blue work)
@@ -269,10 +269,10 @@ mod tests {
         let genesis = Hash512::zero();
         let mut dag = DAG::new(genesis, 10);
 
-        let b1 = Hash512::from_bytes(&[1u8; 64]);
+        let b1 = Hash512::from_bytes(&[1u8; 64]).unwrap();
         dag.add_vertex(b1, vec![genesis], 1).unwrap();
 
-        let b2 = Hash512::from_bytes(&[2u8; 64]);
+        let b2 = Hash512::from_bytes(&[2u8; 64]).unwrap();
         dag.add_vertex(b2, vec![b1], 2).unwrap();
 
         let blue = dag.blue_set();
@@ -288,8 +288,8 @@ mod tests {
         let mut dag = DAG::new(genesis, 10);
 
         // Try to add a vertex with a completely unknown parent
-        let unknown_parent = Hash512::from_bytes(&[88u8; 64]);
-        let unknown_child = Hash512::from_bytes(&[99u8; 64]);
+        let unknown_parent = Hash512::from_bytes(&[88u8; 64]).unwrap();
+        let unknown_child = Hash512::from_bytes(&[99u8; 64]).unwrap();
         let result = dag.add_vertex(unknown_child, vec![unknown_parent], 1);
         assert!(result.is_err());
     }

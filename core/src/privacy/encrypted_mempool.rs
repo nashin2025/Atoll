@@ -315,7 +315,7 @@ mod tests {
 
         let tx1 = EncryptedTransaction {
             ciphertext: vec![1],
-            order_commitment: Hash512::from_bytes(&[1u8; 64]),
+            order_commitment: Hash512::from_bytes(&[1u8; 64]).unwrap(),
             fee_commitment: Hash512::zero(),
             submitter_proof: vec![],
             submitter: Address::zero(),
@@ -323,7 +323,7 @@ mod tests {
         };
         let tx2 = EncryptedTransaction {
             ciphertext: vec![2],
-            order_commitment: Hash512::from_bytes(&[2u8; 64]),
+            order_commitment: Hash512::from_bytes(&[2u8; 64]).unwrap(),
             fee_commitment: Hash512::zero(),
             submitter_proof: vec![],
             submitter: Address::zero(),

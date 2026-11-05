@@ -607,7 +607,7 @@ mod winterfell_backend {
 
         let proof = prover
             .prove(trace)
-            .map_err(|e| format!("Winterfell proof generation failed: {e:?}"))?;
+            .map_err(|_| "Winterfell proof generation failed".to_string())?;
 
         // Serialize the Winterfell proof; this becomes the proof_of_work.
         let proof_bytes = proof.to_bytes();

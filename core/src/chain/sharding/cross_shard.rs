@@ -87,7 +87,7 @@ impl CrossShardManager {
         let request = self
             .pending_requests
             .get(request_id)
-            .ok_or_else(|| format!("Request {:?} not found", request_id))?;
+            .ok_or_else(|| "Request not found".to_string())?;
 
         let receipt = CrossShardReceipt {
             id: request.id,
@@ -110,6 +110,9 @@ impl CrossShardManager {
 
         self.pending_receipts.insert(receipt.id, receipt.clone());
 
+        // Consume the request so it cannot be converted into duplicate receipts
+        self.pending_requests.remove(request_id);
+
         Ok(receipt)
     }
 
@@ -122,18 +125,18 @@ impl CrossShardManager {
         let mut receipt = self
             .pending_receipts
             .get(receipt_id)
-            .ok_or_else(|| format!("Receipt {:?} not found", receipt_id))?
+            .ok_or_else(|| "Receipt not found".to_string())?
             .clone();
 
         if receipt.executed {
-            return Err(format!("Receipt {:?} already executed", receipt_id));
+            return Err("Receipt already executed".to_string());
         }
 
         // Check timeout
         if block_height > receipt.block_height + self.timeout_blocks {
             self.failed_cross_shard_tx += 1;
             self.pending_receipts.remove(receipt_id);
-            return Err(format!("Receipt {:?} expired", receipt_id));
+            return Err("Receipt expired".to_string());
         }
 
         receipt.executed = true;
@@ -262,6 +265,35 @@ mod tests {
         assert_eq!(receipt.amount, 100_000_000);
         assert!(!receipt.executed);
         assert_eq!(manager.pending_receipt_count(), 1);
+        // Request is consumed after receipt creation
+        assert_eq!(manager.pending_request_count(), 0);
+    }
+
+    #[test]
+    fn request_to_receipt_double_conversion_fails() {
+        let mut manager = CrossShardManager::new();
+        let request_id = manager.create_request(
+            0,
+            1,
+            Address::from_bytes([1u8; 20]),
+            Address::from_bytes([2u8; 20]),
+            100_000_000,
+            vec![],
+            1000,
+        );
+
+        // First conversion succeeds
+        let receipt = manager.request_to_receipt(&request_id).unwrap();
+        assert_eq!(manager.pending_request_count(), 0);
+
+        // Second conversion for the same request ID must fail
+        let result = manager.request_to_receipt(&request_id);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Request not found");
+
+        // Only one receipt exists for this request
+        assert_eq!(manager.pending_receipt_count(), 1);
+        assert!(manager.is_receipt_executed(&receipt.id) == false);
     }
 
     #[test]
