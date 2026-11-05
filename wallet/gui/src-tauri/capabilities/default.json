@@ -1,0 +1,9 @@
+{
+  "$schema": "https://tauri.app/json/v2",
+  "identifier": "default",
+  "description": "Default capability for the Atoll GUI Wallet",
+  "windows": ["main"],
+  "permissions": [
+    "core:default"
+  ]
+}
