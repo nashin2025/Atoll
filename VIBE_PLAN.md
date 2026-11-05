@@ -75,6 +75,18 @@ Mainnet Preparation (Docker, CI/CD, health/metrics, genesis, bootstrap, TLS, aut
 
 RC Tag: v0.1.0-rc.1
 
+Security Audit (Phase 6): ALL findings resolved
+- Critical (4): FIXED — PRs #2-#5
+- High (4): FIXED — PRs #2-#5
+- Medium (5): FIXED — PR #10
+
+Remaining work (priority order):
+1. GUI Wallet (TypeScript + Tauri) — desktop wallet with balance, transactions, staking
+2. Block Explorer (TypeScript + React + GraphQL) — view blocks, transactions, validators
+3. Smart Contract VM Production Hardening — EVM, WASM, Move, RISC-V, AI VM, ZK VM audit + optimization
+4. Sharding Production Hardening — cross-shard rebalancing, load detection under load
+5. Formal Verification Completion — Coq/TLA+/Isabelle proofs for consensus correctness
+
 ---
 
 ## Feature Plan: Encrypted Authenticated P2P Transport (Security Finding H4)
