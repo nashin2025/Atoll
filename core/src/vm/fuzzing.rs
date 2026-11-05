@@ -55,50 +55,15 @@ pub fn test_determinism<F>(
     for i in 0..iterations {
         let result = execute_fn(input);
 
-        match &result {
-            ExecutionResult::Error { message, .. } => {
-                panic!(
-                    "Determinism test failed on iteration {}: execution error: {}",
-                    i, message
-                );
-            }
-            ExecutionResult::Revert { reason, .. } => {
-                panic!(
-                    "Determinism test failed on iteration {}: execution reverted: {}",
-                    i, reason
-                );
-            }
-            _ => {}
-        }
-
         match &first_result {
             None => first_result = Some(result.clone()),
-            Some(prev) => match prev {
-                ExecutionResult::Success {
-                    gas_used: g1,
-                    return_value: v1,
-                    ..
-                } => match &result {
-                    ExecutionResult::Success {
-                        gas_used: g2,
-                        return_value: v2,
-                        ..
-                    } => {
-                        assert_eq!(
-                            v1, v2,
-                            "Determinism violation on iteration {}: return_value differs",
-                            i
-                        );
-                        assert_eq!(
-                            g1, g2,
-                            "Determinism violation on iteration {}: gas_used differs",
-                            i
-                        );
-                    }
-                    _ => panic!("Expected Success"),
-                },
-                _ => panic!("Expected Success"),
-            },
+            Some(prev) => {
+                assert_eq!(
+                    *prev, result,
+                    "Determinism violation on iteration {}: results differ",
+                    i
+                );
+            }
         }
     }
 }
@@ -340,6 +305,91 @@ mod tests {
             |input| {
                 let mut evm = EVMExecutor::new(test_context(), DEFAULT_GAS_LIMIT);
                 crate::vm::execute_safe(|| evm.execute(input, &[]))
+            },
+            &input,
+            5,
+        );
+    }
+
+    #[test]
+    fn wasm_determinism_test() {
+        // WASM VM expects ELF64 header
+        let input = vec![
+            0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00, // magic, class, data, version, osabi
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,       // abiversion, pad
+            0x02, 0x00,                                     // e_type = ET_EXEC
+            0xf3, 0x00,                                     // e_machine = EM_RISCV
+            0x01, 0x00, 0x00, 0x00,                         // e_version
+            0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // e_entry
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // e_phoff
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // e_shoff
+            0x00, 0x00, 0x00, 0x00,                         // e_flags
+            0x40, 0x00,                                     // e_ehsize
+            0x00, 0x00,                                     // e_phentsize
+            0x00, 0x00,                                     // e_phnum
+            0x00, 0x00,                                     // e_shentsize
+            0x00, 0x00,                                     // e_shnum
+            0x00, 0x00,                                     // e_shstrndx
+        ];
+        test_determinism(
+            |input| {
+                let mut wasm = WASMExecutor::new(test_context(), DEFAULT_GAS_LIMIT);
+                crate::vm::execute_safe(|| wasm.execute(input, "main", &[]))
+            },
+            &input,
+            5,
+        );
+    }
+
+    #[test]
+    fn move_determinism_test() {
+        // Move magic: 0xCA, 0xFE, 0xBA, 0xBE + version 1
+        let input = vec![0xCA, 0xFE, 0xBA, 0xBE, 0x01, 0x00, 0x00, 0x00];
+        test_determinism(
+            |input| {
+                let mut mv = MoveExecutor::new(test_context(), DEFAULT_GAS_LIMIT);
+                crate::vm::execute_safe(|| mv.execute(input, "main", &[]))
+            },
+            &input,
+            5,
+        );
+    }
+
+    #[test]
+    fn riscv_determinism_test() {
+        // RISC-V ELF64 magic: \x7fELF + class 2 (64-bit)
+        let input = vec![0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00];
+        test_determinism(
+            |input| {
+                let mut riscv = RISCVExecutor::new(test_context(), DEFAULT_GAS_LIMIT);
+                crate::vm::execute_safe(|| riscv.execute(input, 0x1000, &[]))
+            },
+            &input,
+            5,
+        );
+    }
+
+    #[test]
+    fn ai_determinism_test() {
+        let input = vec![0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        test_determinism(
+            |input| {
+                let mut ai = AIVMExecutor::new(test_context(), DEFAULT_GAS_LIMIT);
+                crate::vm::execute_safe(|| ai.deploy_model(input))
+            },
+            &input,
+            5,
+        );
+    }
+
+    #[test]
+    fn zk_determinism_test() {
+        let input = vec![0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        test_determinism(
+            |input| {
+                let mut zk = ZKVMExecutor::new(test_context(), DEFAULT_GAS_LIMIT);
+                let circuit_id = Hash512::blake3(input);
+                crate::vm::execute_safe(|| zk.execute(&circuit_id, &[], input))
             },
             &input,
             5,

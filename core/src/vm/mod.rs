@@ -29,7 +29,7 @@ pub enum VMType {
 }
 
 /// A VM execution log (event) emitted during contract execution.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Log {
     /// Address of the contract that emitted the log.
     pub address: Address,
@@ -40,7 +40,7 @@ pub struct Log {
 }
 
 /// Execution result from a VM
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExecutionResult {
     Success {
         gas_used: u64,
