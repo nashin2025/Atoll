@@ -139,10 +139,7 @@ impl HomomorphicEngine {
     }
 
     /// Encrypts plaintext to ciphertext
-    pub fn encrypt(
-        &self,
-        plaintext: &Plaintext,
-    ) -> Result<Ciphertext, String> {
+    pub fn encrypt(&self, plaintext: &Plaintext) -> Result<Ciphertext, String> {
         let _key_pair = self
             .key_pair
             .as_ref()
@@ -157,10 +154,7 @@ impl HomomorphicEngine {
     }
 
     /// Decrypts ciphertext to plaintext
-    pub fn decrypt(
-        &self,
-        ciphertext: &Ciphertext,
-    ) -> Result<Plaintext, String> {
+    pub fn decrypt(&self, ciphertext: &Ciphertext) -> Result<Plaintext, String> {
         let _key_pair = self
             .key_pair
             .as_ref()
@@ -174,11 +168,7 @@ impl HomomorphicEngine {
     }
 
     /// Homomorphic addition of two ciphertexts
-    pub fn add(
-        &self,
-        ct1: &Ciphertext,
-        ct2: &Ciphertext,
-    ) -> Result<Ciphertext, String> {
+    pub fn add(&self, ct1: &Ciphertext, ct2: &Ciphertext) -> Result<Ciphertext, String> {
         if ct1.scheme != ct2.scheme {
             return Err("Ciphertext schemes must match".to_string());
         }
@@ -204,11 +194,7 @@ impl HomomorphicEngine {
     }
 
     /// Homomorphic multiplication of two ciphertexts
-    pub fn multiply(
-        &self,
-        ct1: &Ciphertext,
-        ct2: &Ciphertext,
-    ) -> Result<Ciphertext, String> {
+    pub fn multiply(&self, ct1: &Ciphertext, ct2: &Ciphertext) -> Result<Ciphertext, String> {
         if ct1.scheme != ct2.scheme {
             return Err("Ciphertext schemes must match".to_string());
         }
@@ -236,10 +222,7 @@ impl HomomorphicEngine {
     }
 
     /// Relinearization: reduces ciphertext size after multiplication
-    pub fn relinearize(
-        &self,
-        ciphertext: &Ciphertext,
-    ) -> Result<Ciphertext, String> {
+    pub fn relinearize(&self, ciphertext: &Ciphertext) -> Result<Ciphertext, String> {
         if self.context.scheme != HomomorphicScheme::BFV {
             return Err("Relinearization only supported for BFV".to_string());
         }
@@ -263,10 +246,7 @@ impl HomomorphicEngine {
     }
 
     /// Bootstrapping: refreshes ciphertext noise
-    pub fn bootstrap(
-        &self,
-        ciphertext: &Ciphertext,
-    ) -> Result<Ciphertext, String> {
+    pub fn bootstrap(&self, ciphertext: &Ciphertext) -> Result<Ciphertext, String> {
         if ciphertext.noise_level < 100 {
             return Ok(ciphertext.clone()); // No need to bootstrap
         }

@@ -173,10 +173,7 @@ impl MorphAlgorithm {
 /// - Argon2id, Scrypt via password hashing crates
 /// - Custom ATOLL primitives via native implementations
 /// - All other algorithms via simplified placeholder implementations
-fn apply_algorithm(
-    algo: MorphAlgorithm,
-    input: &[u8],
-) -> Vec<u8> {
+fn apply_algorithm(algo: MorphAlgorithm, input: &[u8]) -> Vec<u8> {
     match algo {
         MorphAlgorithm::SHA512 => {
             let mut hasher = Sha512::new();
@@ -281,10 +278,7 @@ fn salt_for_algorithm(name: &str) -> &[u8] {
 ///
 /// Phase 2: Uses BLAKE3 with algorithm-specific salt as a placeholder.
 /// Phase 3: Replace with full algorithm implementations.
-fn simplified_hash(
-    input: &[u8],
-    algo_name: &str,
-) -> Vec<u8> {
+fn simplified_hash(input: &[u8], algo_name: &str) -> Vec<u8> {
     let salt = algo_name.as_bytes();
     let mut key = [0u8; 32];
     key[..salt.len().min(32)].copy_from_slice(&salt[..salt.len().min(32)]);
@@ -456,10 +450,7 @@ fn atoll_tree_hash(input: &[u8]) -> Vec<u8> {
 // ---------------------------------------------------------------------------
 
 /// Derives a deterministic pseudo-random index from seed bytes.
-fn derive_index(
-    seed: &[u8],
-    i: usize,
-) -> usize {
+fn derive_index(seed: &[u8], i: usize) -> usize {
     let mut hasher = DefaultHasher::new();
     seed.hash(&mut hasher);
     i.hash(&mut hasher);
@@ -468,20 +459,14 @@ fn derive_index(
 }
 
 /// Mixes the seed for the next Fisher-Yates iteration.
-fn mix_seed(
-    seed: &[u8],
-    i: u64,
-) -> Vec<u8> {
+fn mix_seed(seed: &[u8], i: u64) -> Vec<u8> {
     blake3::hash(&[seed, &i.to_le_bytes()].concat())
         .as_bytes()
         .to_vec()
 }
 
 /// Fisher-Yates shuffle seeded with block hash entropy.
-fn fisher_yates_shuffle(
-    seed: &[u8],
-    n: usize,
-) -> Vec<usize> {
+fn fisher_yates_shuffle(seed: &[u8], n: usize) -> Vec<usize> {
     let mut indices: Vec<usize> = (0..n).collect();
     let mut current_seed = seed.to_vec();
 
@@ -495,10 +480,7 @@ fn fisher_yates_shuffle(
 }
 
 /// Selects 16 of 32 algorithms based on previous block hash and block height.
-pub fn select_algorithm_chain(
-    prev_hash: &Hash512,
-    block_height: u64,
-) -> Vec<MorphAlgorithm> {
+pub fn select_algorithm_chain(prev_hash: &Hash512, block_height: u64) -> Vec<MorphAlgorithm> {
     let shuffled = fisher_yates_shuffle(prev_hash.as_ref(), ALGORITHM_POOL_SIZE);
     let mut selected: Vec<MorphAlgorithm> = shuffled
         .into_iter()
@@ -518,10 +500,7 @@ pub fn select_algorithm_chain(
 // ---------------------------------------------------------------------------
 
 /// Evolved S-box transformation using generation-based key.
-fn evolved_sbox_transform(
-    data: &[u8],
-    generation: u64,
-) -> Vec<u8> {
+fn evolved_sbox_transform(data: &[u8], generation: u64) -> Vec<u8> {
     let key = generation.wrapping_mul(0x9E3779B97F4A7C15).to_le_bytes();
     let mut result = data.to_vec();
     for (i, byte) in result.iter_mut().enumerate() {
@@ -559,10 +538,7 @@ impl MemoryHardLayer {
         }
     }
 
-    pub fn init_buffer(
-        &self,
-        seed: &Hash512,
-    ) -> Vec<u8> {
+    pub fn init_buffer(&self, seed: &Hash512) -> Vec<u8> {
         let mut buffer = vec![0u8; self.buffer_size];
         let mut counter = 0u64;
         let chunk_size = 64;
@@ -592,10 +568,7 @@ impl MemoryHardLayer {
 
     /// Initializes the internal buffer in-place (reusing the existing allocation)
     /// and returns a mutable reference to it. Avoids re-allocating on every hash call.
-    pub fn init_buffer_in_place(
-        &mut self,
-        seed: &Hash512,
-    ) -> &mut [u8] {
+    pub fn init_buffer_in_place(&mut self, seed: &Hash512) -> &mut [u8] {
         let buffer = &mut self.buffer;
         let mut counter = 0u64;
         let chunk_size = 64;
@@ -623,11 +596,7 @@ impl MemoryHardLayer {
         buffer
     }
 
-    pub fn memory_hard_mix(
-        &self,
-        state: &mut [u8],
-        buffer: &[u8],
-    ) {
+    pub fn memory_hard_mix(&self, state: &mut [u8], buffer: &[u8]) {
         for _round in 0..self.access_rounds.min(state.len() * 8) {
             let addr = u64::from_le_bytes(state[..8].try_into().unwrap_or([0; 8])) as usize
                 % (buffer.len().saturating_sub(64));
@@ -651,10 +620,7 @@ impl PostQuantumFinalizer {
         Self
     }
 
-    pub fn finalize(
-        &self,
-        state: &[u8],
-    ) -> [u8; 64] {
+    pub fn finalize(&self, state: &[u8]) -> [u8; 64] {
         // Phase 2: SHA-512 stand-in for SWIFFT lattice construction
         // Phase 3: Full lattice-based finalization with NTT and matrix multiplication
         use sha2::{Digest, Sha512};
@@ -712,10 +678,7 @@ impl MorphHashEngine {
         self.sbox_generation
     }
 
-    pub fn set_sbox_generation(
-        &mut self,
-        generation: u64,
-    ) {
+    pub fn set_sbox_generation(&mut self, generation: u64) {
         self.sbox_generation = generation;
     }
 
@@ -743,11 +706,7 @@ impl MorphHashEngine {
         Hash512::from_array(finalized)
     }
 
-    fn derive_memory_index(
-        state: &[u8],
-        i: usize,
-        buffer: &[u8],
-    ) -> usize {
+    fn derive_memory_index(state: &[u8], i: usize, buffer: &[u8]) -> usize {
         let mut hasher = DefaultHasher::new();
         state.hash(&mut hasher);
         (i as u64).hash(&mut hasher);
@@ -755,10 +714,7 @@ impl MorphHashEngine {
         (state_hash % (buffer.len() as u64 - 64).max(1)) as usize
     }
 
-    fn xor_mix(
-        state: &[u8],
-        mem_data: &[u8],
-    ) -> Vec<u8> {
+    fn xor_mix(state: &[u8], mem_data: &[u8]) -> Vec<u8> {
         state
             .iter()
             .enumerate()

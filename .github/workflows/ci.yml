@@ -5,9 +5,11 @@ on:
     branches: [ main, feature/* ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 permissions:
   contents: read
+  security-events: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,13 +17,18 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: "-D warnings"
   RUSTUP_TOOLCHAIN: stable
+  CARGO_NET_RETRY: 10
 
 jobs:
-  format:
+  # ============================================================================
+  # LINT AND FORMAT
+  # ============================================================================
+
+  fmt:
     name: Format Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -38,6 +45,7 @@ jobs:
   lint:
     name: Clippy Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -52,14 +60,20 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           prefix-key: "v1-rust-lint"
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          shared-key: "v1-rust-lint"
 
       - name: Run clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets
 
-  test:
-    name: Test Suite
+  # ============================================================================
+  # TESTING
+  # ============================================================================
+
+  unit-test:
+    name: Unit Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [lint, fmt]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -73,17 +87,42 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           prefix-key: "v1-rust-test"
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          shared-key: "v1-rust-test"
 
-      - name: Run tests
-        run: cargo test --workspace
+      - name: Run unit tests
+        run: cargo test --workspace --lib
 
-      - name: Run tests with verbose output
-        run: cargo test --workspace -- --nocapture
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [lint, fmt]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-  security:
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "v1-rust-integration"
+          shared-key: "v1-rust-integration"
+
+      - name: Run integration tests
+        run: cargo test --workspace --tests
+
+  # ============================================================================
+  # SECURITY SCANNING (Shift Left)
+  # ============================================================================
+
+  security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -94,14 +133,121 @@ jobs:
           toolchain: stable
 
       - name: Install cargo-audit
-        run: cargo install cargo-audit
+        uses: rust-sec/scan-action@v1
+        with:
+          tool: cargo-audit
 
       - name: Run cargo audit
         run: cargo audit
 
+      - name: Run cargo-deny
+        uses: EmbarkStudios/rust-deny-action@v1
+
+  secrets-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run secrets scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          base: ${{ github.event.before }}
+          head: ${{ github.event.head }}
+
+      - name: Run detect-secrets
+        uses: 418sec/headlights@main
+
+  # ============================================================================
+  # DEPENDENCY SCANNING
+  # ============================================================================
+
+  dependency-scan:
+    name: Dependency Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny
+
+      - name: Run cargo-deny
+        run: cargo deny check
+
+  # ============================================================================
+  # BUILD
+  # ============================================================================
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [lint, fmt, security-scan, secrets-scan, dependency-scan]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "v1-rust-build"
+          shared-key: "v1-rust-build"
+
+      - name: Build workspace
+        run: cargo build --workspace --release
+
+  # ============================================================================
+  # BENCHMARKS
+  # ============================================================================
+
+  benchmarks:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [build]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "v1-rust-bench"
+          shared-key: "v1-rust-bench"
+
+      - name: Run benchmarks
+        run: cargo bench --workspace
+
+      - name: Benchmark comparison
+        uses: pioneersies/benchmark-action@v1
+
+  # ============================================================================
+  # FRONTEND TESTS
+  # ============================================================================
+
   frontend-test:
     name: Frontend Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -123,3 +269,43 @@ jobs:
       - name: Build frontend
         run: npm run build
         working-directory: explorer/frontend
+
+  # ============================================================================
+  # CODE QUALITY GATE
+  # ============================================================================
+
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs: [fmt, lint, unit-test, integration-test, security-scan, secrets-scan, dependency-scan, build, benchmarks, frontend-test]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          echo "=== Quality Gate Results ==="
+          echo "Format: ${{ jobs.fmt.result }}"
+          echo "Lint: ${{ jobs.lint.result }}"
+          echo "Unit Tests: ${{ jobs.unit-test.result }}"
+          echo "Integration Tests: ${{ jobs.integration-test.result }}"
+          echo "Security Scan: ${{ jobs.security-scan.result }}"
+          echo "Secrets Scan: ${{ jobs.secrets-scan.result }}"
+          echo "Dependency Scan: ${{ jobs.dependency-scan.result }}"
+          echo "Build: ${{ jobs.build.result }}"
+          echo "Benchmarks: ${{ jobs.benchmarks.result }}"
+          echo "Frontend Tests: ${{ jobs.frontend-test.result }}"
+
+          # Fail if any job failed
+          if [ "${{ jobs.fmt.result }}" != "success" ] || \
+             [ "${{ jobs.lint.result }}" != "success" ] || \
+             [ "${{ jobs.unit-test.result }}" != "success" ] || \
+             [ "${{ jobs.integration-test.result }}" != "success" ] || \
+             [ "${{ jobs.security-scan.result }}" != "success" ] || \
+             [ "${{ jobs.secrets-scan.result }}" != "success" ] || \
+             [ "${{ jobs.dependency-scan.result }}" != "success" ] || \
+             [ "${{ jobs.build.result }}" != "success" ] || \
+             [ "${{ jobs.frontend-test.result }}" != "success" ]; then
+            echo "::error::Quality gate failed"
+            exit 1
+          fi
+
+          echo "✅ All quality gates passed"

@@ -46,10 +46,7 @@ impl HealthMonitor {
     }
 
     /// Sets the syncing flag (e.g. when the sync module is catching up).
-    pub fn set_syncing(
-        &self,
-        syncing: bool,
-    ) {
+    pub fn set_syncing(&self, syncing: bool) {
         self.syncing.store(syncing, Ordering::SeqCst);
     }
 

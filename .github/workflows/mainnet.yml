@@ -5,23 +5,41 @@ on:
     tags:
       - 'v*'
 
-jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
+permissions:
+  contents: read
+  packages: write
+  security-events: write
 
-      - name: Install Rust
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+  RUSTUP_TOOLCHAIN: stable
+
+jobs:
+  # ============================================================================
+  # BUILD AND TEST
+  # ============================================================================
+
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
           profile: minimal
 
       - name: Cache dependencies
-        uses: actions/cache@v4
+        uses: Swatinem/rust-cache@v2
         with:
           path: |
             ~/.cargo/registry
@@ -30,7 +48,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run full test suite
-        run: cargo test
+        run: cargo test --workspace
 
       - name: Run cargo clippy
         run: cargo clippy --all-targets -D warnings
@@ -43,6 +61,22 @@ jobs:
           cargo install cargo-audit
           cargo audit
 
+      - name: Run cargo deny
+        run: cargo install cargo-deny && cargo deny check
+
+  # ============================================================================
+  # BUILD DOCKER IMAGE
+  # ============================================================================
+
+  docker-build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [build-and-test]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -53,15 +87,38 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/atoll-node
+          tags: |
+            type=ref,event=tag
+            type=sha,prefix=sha-
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/atoll-node:${{ github.ref_name }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/atoll-node:cache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/atoll-node:cache,mode=max
+
+  # ============================================================================
+  # GENERATE SBOM
+  # ============================================================================
+
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [docker-build]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Generate SBOM
         uses: anchore/sbom-action@v0
@@ -74,3 +131,52 @@ jobs:
         with:
           name: sbom-atoll-node
           path: sbom.atoll-node.json
+          retention-days: 90
+
+      - name: Scan SBOM for vulnerabilities
+        uses: anchore/scan-action@v3
+        with:
+          image: ghcr.io/${{ github.repository_owner }}/atoll-node:${{ github.ref_name }}
+          fail-build: true
+          severity-cutoff: medium
+
+  # ============================================================================
+  # RELEASE
+  # ============================================================================
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [docker-build, sbom]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## Atoll Protocol ${{ github.ref_name }}
+
+            ### Docker Image
+            `ghcr.io/${{ github.repository_owner }}/atoll-node:${{ github.ref_name }}`
+
+            ### SBOM
+            See attached SBOM for vulnerability scanning results.
+
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+
+      - name: Upload SBOM to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: sbom.atoll-node.json
+          asset_name: sbom.atoll-node.json
+          asset_content_type: application/json

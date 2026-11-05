@@ -91,11 +91,7 @@ fn make_valid_poh() -> poh::PoHResult {
     poh::PoHResult { is_verified: true }
 }
 
-fn make_block_with_prev(
-    prev_hash: Hash512,
-    height: u64,
-    proposer: Address,
-) -> Block {
+fn make_block_with_prev(prev_hash: Hash512, height: u64, proposer: Address) -> Block {
     Block {
         header: BlockHeader {
             version: 1,

@@ -12,6 +12,7 @@ RUN apt-get update \
         pkg-config \
         libssl-dev \
         ca-certificates \
+        build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy workspace manifests first so dependency downloads are cached in a
@@ -19,6 +20,9 @@ RUN apt-get update \
 COPY Cargo.lock Cargo.toml ./
 COPY core/Cargo.toml core/Cargo.toml
 COPY wallet/cli/Cargo.toml wallet/cli/Cargo.toml
+COPY wallet/gui/src-tauri/Cargo.toml wallet/gui/src-tauri/Cargo.toml
+COPY explorer/frontend/package.json explorer/frontend/package.json
+COPY explorer/frontend/package-lock.json explorer/frontend/package-lock.json
 
 # Download and cache dependencies separately from source compilation.
 RUN cargo fetch --locked
@@ -29,19 +33,20 @@ COPY wallet/cli/src wallet/cli/src
 RUN cargo build --release --locked -p atoll-core
 
 # ---------------------------------------------------------------------------
-# Runtime stage: distroless container with a small attack surface.
-# The `:debug` variant includes a shell + busybox so HEALTHCHECK can run wget.
+# Runtime stage: distroless container with minimal attack surface.
+# Uses distroless/static (no shell) for maximum security.
 # ---------------------------------------------------------------------------
-FROM gcr.io/distroless/cc-debian12:debug
+FROM gcr.io/distroless/static-debian12:nonroot
 WORKDIR /app
 
 COPY --from=builder /app/target/release/atoll-core /usr/local/bin/atoll-node
 COPY config/default.config.toml /etc/atoll/config.toml
 
 EXPOSE 8080/tcp
+EXPOSE 30333/tcp
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD wget --spider -q http://localhost:8080/health || exit 1
+    CMD ["/healthcheck"] || exit 1
 
 USER nonroot:nonroot
-ENTRYPOINT ["atoll-node", "--config", "/etc/atoll/config.toml"]
+ENTRYPOINT ["/usr/local/bin/atoll-node", "--config", "/etc/atoll/config.toml"]

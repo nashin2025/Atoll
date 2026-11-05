@@ -118,10 +118,7 @@ impl PeerConnection {
     /// Framing (4-byte little-endian length + payload) and the
     /// [`NetworkMessage`] byte format are unchanged from Phase 1; each
     /// `write_all` call is carried as one or more Noise transport messages.
-    pub async fn send_message(
-        &mut self,
-        message: &NetworkMessage,
-    ) -> Result<(), String> {
+    pub async fn send_message(&mut self, message: &NetworkMessage) -> Result<(), String> {
         let payload = Self::serialize_message(message)?;
 
         // Send length-prefixed payload
@@ -382,10 +379,7 @@ fn perform_initiator_handshake(
 }
 
 /// Send a single Noise message framed with a 4-byte little-endian length prefix.
-fn send_frame(
-    tcp: &mut StdTcpStream,
-    data: &[u8],
-) -> io::Result<()> {
+fn send_frame(tcp: &mut StdTcpStream, data: &[u8]) -> io::Result<()> {
     let len = (data.len() as u32).to_le_bytes();
     tcp.write_all(&len)?;
     tcp.write_all(data)?;
@@ -393,10 +387,7 @@ fn send_frame(
 }
 
 /// Receive a single Noise message framed with a 4-byte little-endian length prefix.
-fn recv_frame<'a>(
-    tcp: &mut StdTcpStream,
-    buf: &'a mut [u8],
-) -> io::Result<&'a [u8]> {
+fn recv_frame<'a>(tcp: &mut StdTcpStream, buf: &'a mut [u8]) -> io::Result<&'a [u8]> {
     let mut len_bytes = [0u8; 4];
     tcp.read_exact(&mut len_bytes)?;
     let n = u32::from_le_bytes(len_bytes) as usize;
@@ -448,10 +439,7 @@ impl NoiseStream {
 }
 
 impl Read for NoiseStream {
-    fn read(
-        &mut self,
-        buf: &mut [u8],
-    ) -> io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if buf.is_empty() {
             return Ok(0);
         }
@@ -484,10 +472,7 @@ impl Read for NoiseStream {
 }
 
 impl Write for NoiseStream {
-    fn write(
-        &mut self,
-        buf: &[u8],
-    ) -> io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if buf.is_empty() {
             return Ok(0);
         }
@@ -554,17 +539,11 @@ impl AsyncWrite for NoiseStream {
         Poll::Ready(Ok(n))
     }
 
-    fn poll_flush(
-        self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
-    ) -> Poll<io::Result<()>> {
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
     }
 
-    fn poll_shutdown(
-        self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
-    ) -> Poll<io::Result<()>> {
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
     }
 }
@@ -578,10 +557,7 @@ pub struct PeerListener {
 
 impl PeerListener {
     /// Creates a new listener on the given address
-    pub async fn bind(
-        address: &str,
-        identity: NodeIdentity,
-    ) -> Result<Self, String> {
+    pub async fn bind(address: &str, identity: NodeIdentity) -> Result<Self, String> {
         let listener = tokio::net::TcpListener::bind(address)
             .await
             .map_err(|e| format!("Bind failed: {}", e))?;

@@ -59,10 +59,7 @@ use serde::{Deserialize, Serialize};
 mod secret_key_serde {
     use serde::{de, Deserialize, Deserializer, Serializer};
 
-    pub fn serialize<S>(
-        key: &[u8; 64],
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(key: &[u8; 64], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -146,11 +143,7 @@ impl VRFEngine {
     /// Returns a `VRFOutput` whose `output` is 64 bytes (the 32-byte VRF
     /// preout followed by 32 derived bytes) and whose `proof` is the 64-byte
     /// schnorrkel VRF proof.
-    pub fn prove(
-        &self,
-        secret_key: &[u8; 64],
-        alpha: &[u8],
-    ) -> VRFOutput {
+    pub fn prove(&self, secret_key: &[u8; 64], alpha: &[u8]) -> VRFOutput {
         let secret = schnorrkel::SecretKey::from_bytes(&secret_key[..])
             .expect("invalid 64-byte VRF secret key");
         let public = secret.to_public();

@@ -27,11 +27,7 @@ pub struct EncryptedMempool {
 
 impl EncryptedMempool {
     /// Creates a new encrypted mempool
-    pub fn new(
-        threshold_public_key: [u8; 32],
-        committee: Vec<NodeId>,
-        threshold: usize,
-    ) -> Self {
+    pub fn new(threshold_public_key: [u8; 32], committee: Vec<NodeId>, threshold: usize) -> Self {
         Self {
             threshold_public_key,
             committee,
@@ -42,11 +38,7 @@ impl EncryptedMempool {
     }
 
     /// Adds an encrypted transaction to the mempool
-    pub fn add_transaction(
-        &mut self,
-        tx: crate::network::EncryptedTx,
-        peer_id: NodeId,
-    ) {
+    pub fn add_transaction(&mut self, tx: crate::network::EncryptedTx, peer_id: NodeId) {
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
@@ -69,10 +61,7 @@ impl EncryptedMempool {
     }
 
     /// Removes a transaction from the mempool (after decryption/inclusion)
-    pub fn remove_transaction(
-        &mut self,
-        tx_hash: &Hash512,
-    ) {
+    pub fn remove_transaction(&mut self, tx_hash: &Hash512) {
         self.pending.remove(tx_hash);
         // Remove from order queue (inefficient but simple for Phase 1)
         self.order_queue.retain(|h| h != tx_hash);
@@ -102,10 +91,7 @@ impl EncryptedMempool {
     }
 
     /// Checks if we have enough shares to decrypt
-    pub fn can_decrypt(
-        &self,
-        shares: &[NodeId],
-    ) -> bool {
+    pub fn can_decrypt(&self, shares: &[NodeId]) -> bool {
         shares.len() >= self.threshold
     }
 }

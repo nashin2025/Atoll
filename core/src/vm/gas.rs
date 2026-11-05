@@ -42,10 +42,7 @@ pub struct GasMeter {
 }
 
 impl GasMeter {
-    pub fn new(
-        gas_limit: u64,
-        gas_price: u128,
-    ) -> Self {
+    pub fn new(gas_limit: u64, gas_price: u128) -> Self {
         Self {
             gas_limit,
             gas_used: 0,
@@ -57,10 +54,7 @@ impl GasMeter {
     ///
     /// Returns [`VMError::OutOfGas`] if the charge would exceed the gas
     /// limit. No gas is consumed on failure.
-    pub fn charge(
-        &mut self,
-        gas: u64,
-    ) -> Result<(), VMError> {
+    pub fn charge(&mut self, gas: u64) -> Result<(), VMError> {
         if self.gas_used.saturating_add(gas) > self.gas_limit {
             return Err(VMError::OutOfGas);
         }
@@ -73,10 +67,7 @@ impl GasMeter {
     /// Refunds are clamped to the gas already used, so `gas_used` never
     /// drops below zero and never exceeds the limit. Returns the amount of
     /// gas actually refunded.
-    pub fn refund(
-        &mut self,
-        gas: u64,
-    ) -> u64 {
+    pub fn refund(&mut self, gas: u64) -> u64 {
         let refunded = gas.min(self.gas_used);
         self.gas_used -= refunded;
         refunded

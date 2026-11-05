@@ -7,6 +7,7 @@
 
 pub mod ai_vm;
 pub mod evm;
+pub mod fuzzing;
 pub mod gas;
 pub mod move_vm;
 pub mod riscv;
@@ -28,7 +29,7 @@ pub enum VMType {
 }
 
 /// A VM execution log (event) emitted during contract execution.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Log {
     /// Address of the contract that emitted the log.
     pub address: Address,
@@ -39,7 +40,7 @@ pub struct Log {
 }
 
 /// Execution result from a VM
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExecutionResult {
     Success {
         gas_used: u64,
@@ -71,10 +72,7 @@ pub enum VMError {
 }
 
 impl std::fmt::Display for VMError {
-    fn fmt(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             VMError::OutOfGas => write!(f, "out of gas"),
             VMError::InvalidOpcode => write!(f, "invalid opcode"),
@@ -144,10 +142,7 @@ impl VMRouter {
     ///
     /// Panics raised inside a VM executor are caught by [`execute_safe`] and
     /// returned as `ExecutionResult::Error` rather than aborting the host.
-    pub fn execute(
-        context: ExecutionContext,
-        bytecode: &[u8],
-    ) -> ExecutionResult {
+    pub fn execute(context: ExecutionContext, bytecode: &[u8]) -> ExecutionResult {
         let vm_type = match Self::route(bytecode) {
             Ok(vt) => vt,
             Err(err) => {
@@ -181,7 +176,8 @@ impl VMRouter {
             }
             VMType::ZK => {
                 let mut zk = zk_vm::ZKVMExecutor::new(context.clone(), context.gas_limit);
-                execute_safe(|| zk.execute(bytecode, &[], bytecode))
+                let circuit_id = Hash512::blake3(bytecode);
+                execute_safe(|| zk.execute(&circuit_id, &[], bytecode))
             }
         };
 

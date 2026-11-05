@@ -21,10 +21,7 @@ pub struct WASMExecutor {
 }
 
 impl WASMExecutor {
-    pub fn new(
-        context: ExecutionContext,
-        gas_limit: u64,
-    ) -> Self {
+    pub fn new(context: ExecutionContext, gas_limit: u64) -> Self {
         Self {
             gas_meter: GasMeter::new(gas_limit, context.gas_price),
             context,
@@ -164,10 +161,7 @@ impl Default for WASMExecutor {
 
 /// Builds a raw WASM section: id + unsigned LEB128 size + payload.
 #[allow(dead_code)] // only used in tests
-fn section(
-    id: u8,
-    payload: &[u8],
-) -> Vec<u8> {
+fn section(id: u8, payload: &[u8]) -> Vec<u8> {
     let mut out = vec![id];
     let mut size = payload.len();
     loop {

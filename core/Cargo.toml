@@ -80,6 +80,10 @@ quickcheck = "1.0"
 name = "hash_benchmarks"
 harness = false
 
+[[bench]]
+name = "vm_benchmarks"
+harness = false
+
 [[bin]]
 name = "atoll-node"
 path = "src/main.rs"

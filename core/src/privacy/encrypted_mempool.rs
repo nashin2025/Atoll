@@ -52,11 +52,7 @@ pub struct EncryptedMempool {
 
 impl EncryptedMempool {
     /// Creates a new encrypted mempool
-    pub fn new(
-        threshold_public_key: Hash512,
-        committee: Vec<Address>,
-        threshold: usize,
-    ) -> Self {
+    pub fn new(threshold_public_key: Hash512, committee: Vec<Address>, threshold: usize) -> Self {
         Self {
             threshold_public_key,
             committee,
@@ -96,10 +92,7 @@ impl EncryptedMempool {
     }
 
     /// Removes a transaction from the mempool
-    pub fn remove_transaction(
-        &mut self,
-        tx_hash: &Hash512,
-    ) -> Option<MempoolEntry> {
+    pub fn remove_transaction(&mut self, tx_hash: &Hash512) -> Option<MempoolEntry> {
         let entry = self.pending.remove(tx_hash);
         self.order_queue.retain(|h| h != tx_hash);
         self.decryption_shares.remove(tx_hash);
@@ -107,10 +100,7 @@ impl EncryptedMempool {
     }
 
     /// Adds a decryption share for a transaction
-    pub fn add_decryption_share(
-        &mut self,
-        share: DecryptionShare,
-    ) -> Result<(), String> {
+    pub fn add_decryption_share(&mut self, share: DecryptionShare) -> Result<(), String> {
         if !self.pending.contains_key(&share.tx_hash) {
             return Err("Transaction not in mempool".to_string());
         }
@@ -165,10 +155,7 @@ impl EncryptedMempool {
     }
 
     /// Checks if we have enough shares to decrypt
-    pub fn can_decrypt(
-        &self,
-        tx_hash: &Hash512,
-    ) -> bool {
+    pub fn can_decrypt(&self, tx_hash: &Hash512) -> bool {
         self.decryption_shares
             .get(tx_hash)
             .map(|shares| shares.len() >= self.threshold)
@@ -176,10 +163,7 @@ impl EncryptedMempool {
     }
 
     /// Returns decryption shares for a transaction
-    pub fn get_decryption_shares(
-        &self,
-        tx_hash: &Hash512,
-    ) -> Option<&Vec<DecryptionShare>> {
+    pub fn get_decryption_shares(&self, tx_hash: &Hash512) -> Option<&Vec<DecryptionShare>> {
         self.decryption_shares.get(tx_hash)
     }
 
@@ -196,19 +180,12 @@ impl EncryptedMempool {
     }
 
     /// Sets the maximum mempool size
-    pub fn set_max_size(
-        &mut self,
-        size: usize,
-    ) {
+    pub fn set_max_size(&mut self, size: usize) {
         self.max_mempool_size = size;
     }
 
     /// Cleans up old transactions (older than max_age blocks)
-    pub fn cleanup_old(
-        &mut self,
-        current_block: u64,
-        max_age: u64,
-    ) {
+    pub fn cleanup_old(&mut self, current_block: u64, max_age: u64) {
         let to_remove: Vec<Hash512> = self
             .pending
             .iter()

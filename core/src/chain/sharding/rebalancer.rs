@@ -63,10 +63,7 @@ impl ShardRebalancer {
     }
 
     /// Performs rebalancing: splits overloaded shards and merges underloaded ones
-    pub fn rebalance(
-        &mut self,
-        current_block: u64,
-    ) -> Result<(), String> {
+    pub fn rebalance(&mut self, current_block: u64) -> Result<(), String> {
         let _avg_load = self.shard_manager.average_load();
 
         // First, handle overloaded shards (split)
@@ -85,11 +82,7 @@ impl ShardRebalancer {
     }
 
     /// Splits an overloaded shard into two
-    pub fn split_shard(
-        &mut self,
-        shard_id: u16,
-        current_block: u64,
-    ) -> Result<(), String> {
+    pub fn split_shard(&mut self, shard_id: u16, current_block: u64) -> Result<(), String> {
         let state = self
             .shard_manager
             .get_shard_state(shard_id)
@@ -172,11 +165,7 @@ impl ShardRebalancer {
     }
 
     /// Merges an underloaded shard with another shard
-    pub fn merge_shard(
-        &mut self,
-        shard_id: u16,
-        current_block: u64,
-    ) -> Result<(), String> {
+    pub fn merge_shard(&mut self, shard_id: u16, current_block: u64) -> Result<(), String> {
         // Find another shard to merge with (preferably nearby ID)
         let target_shard_id = if shard_id > 0 {
             shard_id - 1
@@ -239,10 +228,7 @@ impl ShardRebalancer {
     }
 
     /// Sets the rebalance interval
-    pub fn set_rebalance_interval(
-        &mut self,
-        blocks: u64,
-    ) {
+    pub fn set_rebalance_interval(&mut self, blocks: u64) {
         self.rebalance_interval = blocks;
     }
 
