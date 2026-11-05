@@ -20,7 +20,11 @@ impl ForkChoice {
         }
     }
 
-    pub fn insert_block(&mut self, hash: Hash512, height: u64) {
+    pub fn insert_block(
+        &mut self,
+        hash: Hash512,
+        height: u64,
+    ) {
         self.blocks.insert(hash, height);
         if self.tip.is_none() || height > self.blocks.get(&self.tip.unwrap()).copied().unwrap_or(0)
         {
@@ -32,7 +36,10 @@ impl ForkChoice {
         self.tip.as_ref()
     }
 
-    pub fn block_height(&self, hash: &Hash512) -> Option<u64> {
+    pub fn block_height(
+        &self,
+        hash: &Hash512,
+    ) -> Option<u64> {
         self.blocks.get(hash).copied()
     }
 

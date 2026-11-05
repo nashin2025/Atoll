@@ -98,13 +98,19 @@ impl AsRef<[u8]> for Address {
 }
 
 impl fmt::Debug for Address {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
         write!(f, "Address({})", self.to_hex())
     }
 }
 
 impl fmt::Display for Address {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
         write!(f, "{}", self.to_hex())
     }
 }

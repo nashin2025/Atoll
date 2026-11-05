@@ -27,7 +27,10 @@ mod address_map {
     use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
     use std::collections::HashMap;
 
-    pub fn serialize<S>(map: &HashMap<Address, u128>, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(
+        map: &HashMap<Address, u128>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -139,7 +142,10 @@ impl GenesisLoader {
     ///
     /// Returns an error if the recomputed hash does not match `expected`,
     /// indicating a tampered or corrupted genesis block.
-    pub fn validate_genesis_hash(block: &Block, expected: Hash512) -> Result<Hash512, String> {
+    pub fn validate_genesis_hash(
+        block: &Block,
+        expected: Hash512,
+    ) -> Result<Hash512, String> {
         let mut engine = MorphHashEngine::new();
         let computed = engine.morph_hash(&block.serialize_bytes(), &Hash512::zero(), 0);
         if computed != expected {

@@ -39,27 +39,45 @@ impl ChainState {
     }
 
     /// Returns the balance of an address
-    pub fn balance(&self, address: &Address) -> u128 {
+    pub fn balance(
+        &self,
+        address: &Address,
+    ) -> u128 {
         self.accounts.get(address).map(|a| a.balance).unwrap_or(0)
     }
 
     /// Returns the nonce of an address
-    pub fn nonce(&self, address: &Address) -> u64 {
+    pub fn nonce(
+        &self,
+        address: &Address,
+    ) -> u64 {
         self.accounts.get(address).map(|a| a.nonce).unwrap_or(0)
     }
 
     /// Sets the balance of an address
-    pub fn set_balance(&mut self, address: Address, balance: u128) {
+    pub fn set_balance(
+        &mut self,
+        address: Address,
+        balance: u128,
+    ) {
         self.accounts.entry(address).or_default().balance = balance;
     }
 
     /// Increments the nonce of an address
-    pub fn increment_nonce(&mut self, address: &Address) {
+    pub fn increment_nonce(
+        &mut self,
+        address: &Address,
+    ) {
         self.accounts.entry(*address).or_default().nonce += 1;
     }
 
     /// Transfers balance from one address to another
-    pub fn transfer(&mut self, from: &Address, to: &Address, amount: u128) -> Result<(), String> {
+    pub fn transfer(
+        &mut self,
+        from: &Address,
+        to: &Address,
+        amount: u128,
+    ) -> Result<(), String> {
         let from_balance = self.balance(from);
         if from_balance < amount {
             return Err("Insufficient balance".to_string());
@@ -84,24 +102,38 @@ impl ChainState {
     }
 
     /// Sets the code hash for a contract address
-    pub fn set_code_hash(&mut self, address: Address, code_hash: Hash512) {
+    pub fn set_code_hash(
+        &mut self,
+        address: Address,
+        code_hash: Hash512,
+    ) {
         self.accounts.entry(address).or_default().code_hash = Some(code_hash);
     }
 
     /// Gets the code hash for an address
-    pub fn get_code_hash(&self, address: &Address) -> Option<&Hash512> {
+    pub fn get_code_hash(
+        &self,
+        address: &Address,
+    ) -> Option<&Hash512> {
         self.accounts
             .get(address)
             .and_then(|a| a.code_hash.as_ref())
     }
 
     /// Sets the storage root for an address
-    pub fn set_storage_root(&mut self, address: Address, storage_root: Hash512) {
+    pub fn set_storage_root(
+        &mut self,
+        address: Address,
+        storage_root: Hash512,
+    ) {
         self.accounts.entry(address).or_default().storage_root = storage_root;
     }
 
     /// Returns the storage root for an address
-    pub fn get_storage_root(&self, address: &Address) -> Option<&Hash512> {
+    pub fn get_storage_root(
+        &self,
+        address: &Address,
+    ) -> Option<&Hash512> {
         self.accounts.get(address).map(|a| &a.storage_root)
     }
 
@@ -111,7 +143,10 @@ impl ChainState {
     }
 
     /// Sets the total supply
-    pub fn set_total_supply(&mut self, supply: u128) {
+    pub fn set_total_supply(
+        &mut self,
+        supply: u128,
+    ) {
         self.total_supply = supply;
     }
 
@@ -121,7 +156,10 @@ impl ChainState {
     }
 
     /// Sets the MIND supply
-    pub fn set_mind_supply(&mut self, supply: u128) {
+    pub fn set_mind_supply(
+        &mut self,
+        supply: u128,
+    ) {
         self.mind_supply = supply;
     }
 
@@ -131,7 +169,10 @@ impl ChainState {
     }
 
     /// Sets the block number
-    pub fn set_block_number(&mut self, number: u64) {
+    pub fn set_block_number(
+        &mut self,
+        number: u64,
+    ) {
         self.block_number = number;
     }
 
@@ -141,12 +182,19 @@ impl ChainState {
     }
 
     /// Returns an account state if it exists
-    pub fn get_account(&self, address: &Address) -> Option<&AccountState> {
+    pub fn get_account(
+        &self,
+        address: &Address,
+    ) -> Option<&AccountState> {
         self.accounts.get(address)
     }
 
     /// Mints new ATOLL tokens
-    pub fn mint_atoll(&mut self, address: Address, amount: u128) -> Result<(), String> {
+    pub fn mint_atoll(
+        &mut self,
+        address: Address,
+        amount: u128,
+    ) -> Result<(), String> {
         let current = self.balance(&address);
         let new_balance = current
             .checked_add(amount)
@@ -161,7 +209,11 @@ impl ChainState {
     }
 
     /// Burns ATOLL tokens
-    pub fn burn_atoll(&mut self, address: &Address, amount: u128) -> Result<(), String> {
+    pub fn burn_atoll(
+        &mut self,
+        address: &Address,
+        amount: u128,
+    ) -> Result<(), String> {
         let current = self.balance(address);
         if current < amount {
             return Err("Insufficient balance for burn".to_string());

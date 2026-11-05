@@ -80,7 +80,10 @@ impl BeaconChain {
     }
 
     /// Adds a new beacon block
-    pub fn add_block(&mut self, block: BeaconBlock) {
+    pub fn add_block(
+        &mut self,
+        block: BeaconBlock,
+    ) {
         self.current_height = block.height;
         self.finalized_checkpoint = block
             .finalized_checkpoint
@@ -89,7 +92,12 @@ impl BeaconChain {
     }
 
     /// Registers a validator
-    pub fn register_validator(&mut self, address: Address, stake: u128, activation_epoch: u64) {
+    pub fn register_validator(
+        &mut self,
+        address: Address,
+        stake: u128,
+        activation_epoch: u64,
+    ) {
         self.validator_registry.validators.insert(
             address.clone(),
             ValidatorInfo {
@@ -106,7 +114,11 @@ impl BeaconChain {
     }
 
     /// Exits a validator
-    pub fn exit_validator(&mut self, address: &Address, exit_epoch: u64) {
+    pub fn exit_validator(
+        &mut self,
+        address: &Address,
+        exit_epoch: u64,
+    ) {
         if let Some(info) = self.validator_registry.validators.get_mut(address) {
             info.exit_epoch = Some(exit_epoch);
             info.exit_initiated = true;
@@ -115,7 +127,11 @@ impl BeaconChain {
     }
 
     /// Slashes a validator
-    pub fn slash_validator(&mut self, address: &Address, penalty_percent: u8) {
+    pub fn slash_validator(
+        &mut self,
+        address: &Address,
+        penalty_percent: u8,
+    ) {
         if let Some(info) = self.validator_registry.validators.get_mut(address) {
             info.slashed = true;
             // Reduce stake by penalty
@@ -127,7 +143,11 @@ impl BeaconChain {
     }
 
     /// Assigns validators to shards
-    pub fn assign_validators_to_shard(&mut self, shard_id: u16, validators: Vec<Address>) {
+    pub fn assign_validators_to_shard(
+        &mut self,
+        shard_id: u16,
+        validators: Vec<Address>,
+    ) {
         let shard_validators = self
             .shard_assignments
             .entry(shard_id)
@@ -138,12 +158,20 @@ impl BeaconChain {
     }
 
     /// Returns validators for a shard
-    pub fn shard_validators(&self, shard_id: u16) -> Option<&HashSet<Address>> {
+    pub fn shard_validators(
+        &self,
+        shard_id: u16,
+    ) -> Option<&HashSet<Address>> {
         self.shard_assignments.get(&shard_id)
     }
 
     /// Creates a crosslink for a shard block
-    pub fn create_crosslink(&mut self, shard_id: u16, shard_block_root: Hash512, slot: u64) {
+    pub fn create_crosslink(
+        &mut self,
+        shard_id: u16,
+        shard_block_root: Hash512,
+        slot: u64,
+    ) {
         self.crosslinks.push(Crosslink {
             shard_id,
             shard_block_root,
@@ -179,12 +207,18 @@ impl ValidatorRegistry {
     }
 
     /// Returns validator info if exists
-    pub fn get_validator(&self, address: &Address) -> Option<&ValidatorInfo> {
+    pub fn get_validator(
+        &self,
+        address: &Address,
+    ) -> Option<&ValidatorInfo> {
         self.validators.get(address)
     }
 
     /// Checks if a validator is active
-    pub fn is_active(&self, address: &Address) -> bool {
+    pub fn is_active(
+        &self,
+        address: &Address,
+    ) -> bool {
         self.active_validators.contains(address)
     }
 }

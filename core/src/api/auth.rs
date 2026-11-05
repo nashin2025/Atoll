@@ -53,7 +53,10 @@ impl AuthConfig {
     }
 
     /// Returns `true` if `key` is a configured API key.
-    pub fn is_valid(&self, key: Option<&str>) -> bool {
+    pub fn is_valid(
+        &self,
+        key: Option<&str>,
+    ) -> bool {
         key.map_or(false, |k| self.api_keys.contains(k))
     }
 }
@@ -105,7 +108,10 @@ impl RateLimiter {
     /// Checks whether a request from `ip` is allowed, consuming one token.
     ///
     /// Returns `true` if allowed, `false` if the IP is rate limited.
-    pub fn check(&self, ip: SocketAddr) -> bool {
+    pub fn check(
+        &self,
+        ip: SocketAddr,
+    ) -> bool {
         let mut buckets = self.buckets.lock().expect("rate limiter lock poisoned");
         let now = Instant::now();
         let bucket = buckets.entry(ip).or_insert_with(|| Bucket {
@@ -139,7 +145,10 @@ pub struct AuthState {
 }
 
 impl AuthState {
-    pub fn new(auth_config: AuthConfig, rate_limiter: RateLimiter) -> Self {
+    pub fn new(
+        auth_config: AuthConfig,
+        rate_limiter: RateLimiter,
+    ) -> Self {
         Self {
             auth_config: Arc::new(auth_config),
             rate_limiter: Arc::new(rate_limiter),

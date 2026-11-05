@@ -38,7 +38,10 @@ impl ShardManager {
     }
 
     /// Creates a new shard with the given configuration
-    pub fn create_shard(&mut self, config: ShardConfig) -> Result<ShardId, String> {
+    pub fn create_shard(
+        &mut self,
+        config: ShardConfig,
+    ) -> Result<ShardId, String> {
         if self.total_shards >= self.max_shards {
             return Err("Maximum number of shards reached".to_string());
         }
@@ -63,7 +66,10 @@ impl ShardManager {
     }
 
     /// Removes a shard from the network
-    pub fn remove_shard(&mut self, shard_id: ShardId) -> Result<(), String> {
+    pub fn remove_shard(
+        &mut self,
+        shard_id: ShardId,
+    ) -> Result<(), String> {
         if !self.shards.contains_key(&shard_id) {
             return Err("Shard does not exist".to_string());
         }
@@ -165,17 +171,26 @@ impl ShardManager {
     }
 
     /// Returns shard state if it exists
-    pub fn get_shard_state(&self, shard_id: ShardId) -> Option<&ShardState> {
+    pub fn get_shard_state(
+        &self,
+        shard_id: ShardId,
+    ) -> Option<&ShardState> {
         self.shards.get(&shard_id)
     }
 
     /// Returns shard configuration if it exists
-    pub fn get_shard_config(&self, shard_id: ShardId) -> Option<&ShardConfig> {
+    pub fn get_shard_config(
+        &self,
+        shard_id: ShardId,
+    ) -> Option<&ShardConfig> {
         self.configs.get(&shard_id)
     }
 
     /// Returns validators assigned to a shard
-    pub fn get_shard_validators(&self, shard_id: ShardId) -> Option<&HashSet<Address>> {
+    pub fn get_shard_validators(
+        &self,
+        shard_id: ShardId,
+    ) -> Option<&HashSet<Address>> {
         self.validator_assignments.get(&shard_id)
     }
 
@@ -204,7 +219,10 @@ impl ShardManager {
     }
 
     /// Returns shard statistics for monitoring
-    pub fn get_shard_stats(&self, shard_id: ShardId) -> Option<ShardStats> {
+    pub fn get_shard_stats(
+        &self,
+        shard_id: ShardId,
+    ) -> Option<ShardStats> {
         let state = self.shards.get(&shard_id)?;
         let validators = self
             .validator_assignments

@@ -43,7 +43,10 @@ const MOVE_MAGIC: [u8; 4] = [0xCA, 0xFE, 0xBA, 0xBE];
 
 impl MoveExecutor {
     #[must_use]
-    pub fn new(context: ExecutionContext, gas_limit: u64) -> Self {
+    pub fn new(
+        context: ExecutionContext,
+        gas_limit: u64,
+    ) -> Self {
         Self {
             gas_meter: GasMeter::new(gas_limit, context.gas_price),
             context,
@@ -187,7 +190,11 @@ impl Default for MoveExecutor {
 mod tests {
     use super::*;
 
-    fn make_valid_module_bytecode(functions: u32, resources: u32, imports: u32) -> Vec<u8> {
+    fn make_valid_module_bytecode(
+        functions: u32,
+        resources: u32,
+        imports: u32,
+    ) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&MOVE_MAGIC);
         bytes.extend_from_slice(&1u32.to_le_bytes()); // version

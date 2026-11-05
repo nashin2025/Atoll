@@ -123,7 +123,10 @@ impl Metrics {
     }
 
     /// Increments the transactions processed counter by `count`.
-    pub fn inc_txs_processed(&self, count: u64) {
+    pub fn inc_txs_processed(
+        &self,
+        count: u64,
+    ) {
         self.txs_processed.inc_by(count);
     }
 
@@ -142,7 +145,10 @@ impl Metrics {
     /// Prometheus gauges are `f64`, so the `u64` height is intentionally cast;
     /// block heights never approach `2^53` in practice.
     #[allow(clippy::cast_precision_loss)]
-    pub fn set_block_height(&self, height: u64) {
+    pub fn set_block_height(
+        &self,
+        height: u64,
+    ) {
         self.block_height.set(height as f64);
     }
 
@@ -151,7 +157,10 @@ impl Metrics {
     /// Prometheus gauges are `f64`, so the `u128` supply is intentionally cast;
     /// precision loss is inherent to float64 exposition.
     #[allow(clippy::cast_precision_loss)]
-    pub fn set_supply_atoll(&self, supply: u128) {
+    pub fn set_supply_atoll(
+        &self,
+        supply: u128,
+    ) {
         self.supply_atoll.set(supply as f64);
     }
 
@@ -160,17 +169,26 @@ impl Metrics {
     /// Prometheus gauges are `f64`, so the `u128` supply is intentionally cast;
     /// precision loss is inherent to float64 exposition.
     #[allow(clippy::cast_precision_loss)]
-    pub fn set_supply_mind(&self, supply: u128) {
+    pub fn set_supply_mind(
+        &self,
+        supply: u128,
+    ) {
         self.supply_mind.set(supply as f64);
     }
 
     /// Observes a block validation duration in milliseconds.
-    pub fn observe_block_validation_ms(&self, ms: f64) {
+    pub fn observe_block_validation_ms(
+        &self,
+        ms: f64,
+    ) {
         self.block_validation_ms.observe(ms);
     }
 
     /// Observes an RPC/REST request duration in milliseconds.
-    pub fn observe_rpc_request_ms(&self, ms: f64) {
+    pub fn observe_rpc_request_ms(
+        &self,
+        ms: f64,
+    ) {
         self.rpc_request_ms.observe(ms);
     }
 

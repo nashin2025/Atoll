@@ -15,7 +15,10 @@ pub struct ZKVMExecutor {
 }
 
 impl ZKVMExecutor {
-    pub fn new(context: ExecutionContext, gas_limit: u64) -> Self {
+    pub fn new(
+        context: ExecutionContext,
+        gas_limit: u64,
+    ) -> Self {
         Self {
             gas_meter: GasMeter::new(gas_limit, context.gas_price),
             context,

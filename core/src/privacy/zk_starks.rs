@@ -40,7 +40,10 @@ pub struct StarkProver {
 
 impl StarkProver {
     /// Creates a new STARK prover
-    pub fn new(security_parameter: u32, field_size: u32) -> Self {
+    pub fn new(
+        security_parameter: u32,
+        field_size: u32,
+    ) -> Self {
         Self {
             security_parameter,
             field_size,
@@ -179,7 +182,11 @@ pub struct StarkVerificationResult {
 }
 
 impl StarkVerificationResult {
-    pub fn new(valid: bool, computation_hash: Hash512, queries_checked: u32) -> Self {
+    pub fn new(
+        valid: bool,
+        computation_hash: Hash512,
+        queries_checked: u32,
+    ) -> Self {
         Self {
             valid,
             computation_hash,
@@ -478,7 +485,10 @@ mod winterfell_backend {
     }
 
     impl IterationProver {
-        pub fn new(options: ProofOptions, c: BaseElement) -> Self {
+        pub fn new(
+            options: ProofOptions,
+            c: BaseElement,
+        ) -> Self {
             Self { options, c }
         }
     }
@@ -497,7 +507,10 @@ mod winterfell_backend {
         type ConstraintEvaluator<'a, E: FieldElement<BaseField = Self::BaseField>> =
             DefaultConstraintEvaluator<'a, Self::Air, E>;
 
-        fn get_pub_inputs(&self, trace: &Self::Trace) -> IterationPublicInputs {
+        fn get_pub_inputs(
+            &self,
+            trace: &Self::Trace,
+        ) -> IterationPublicInputs {
             let last_step = trace.length() - 1;
             IterationPublicInputs {
                 start: trace.get(0, 0),

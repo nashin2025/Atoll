@@ -16,7 +16,10 @@ pub struct DiscoveryProtocol {
 
 impl DiscoveryProtocol {
     /// Creates a new discovery protocol instance
-    pub fn new(node_id: NodeId, bucket_size: usize) -> Self {
+    pub fn new(
+        node_id: NodeId,
+        bucket_size: usize,
+    ) -> Self {
         Self {
             node_id,
             known_peers: HashMap::new(),
@@ -25,7 +28,10 @@ impl DiscoveryProtocol {
     }
 
     /// Registers a known peer
-    pub fn register_peer(&mut self, info: PeerInfo) {
+    pub fn register_peer(
+        &mut self,
+        info: PeerInfo,
+    ) {
         self.known_peers.insert(info.node_id, info);
     }
 
@@ -52,7 +58,10 @@ impl DiscoveryProtocol {
     }
 
     /// Handles an incoming ping and returns a pong
-    pub fn handle_ping(&self, ping: PingMessage) -> PongMessage {
+    pub fn handle_ping(
+        &self,
+        ping: PingMessage,
+    ) -> PongMessage {
         PongMessage {
             nonce: ping.nonce,
             timestamp: ping.timestamp,
@@ -60,20 +69,29 @@ impl DiscoveryProtocol {
     }
 
     /// Handles an incoming pong
-    pub fn handle_pong(&self, _pong: PongMessage) {
+    pub fn handle_pong(
+        &self,
+        _pong: PongMessage,
+    ) {
         // Phase 1: No-op
         // Phase 2: Update RTT statistics
     }
 
     /// Creates a FindNode request for a target node ID
-    pub fn create_find_node(&self, target: NodeId) -> FindNodeMessage {
+    pub fn create_find_node(
+        &self,
+        target: NodeId,
+    ) -> FindNodeMessage {
         FindNodeMessage {
             target_node_id: target,
         }
     }
 
     /// Handles a FindNode request and returns closest peers
-    pub fn handle_find_node(&self, request: &FindNodeMessage) -> NeighborsMessage {
+    pub fn handle_find_node(
+        &self,
+        request: &FindNodeMessage,
+    ) -> NeighborsMessage {
         let mut peers: Vec<_> = self.known_peers.values().cloned().collect();
 
         // Sort by XOR distance to target
@@ -95,7 +113,10 @@ impl DiscoveryProtocol {
 }
 
 /// XOR distance between two node IDs (Kademlia distance metric)
-fn xor_distance(a: &[u8; 32], b: &[u8; 32]) -> [u8; 32] {
+fn xor_distance(
+    a: &[u8; 32],
+    b: &[u8; 32],
+) -> [u8; 32] {
     let mut result = [0u8; 32];
     for i in 0..32 {
         result[i] = a[i] ^ b[i];
