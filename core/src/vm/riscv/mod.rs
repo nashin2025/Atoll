@@ -1,10 +1,9 @@
 //! RISC-V VM for the Atoll Protocol.
 //!
 //! Phase 1: RISC-V instruction decoding and execution simulation.
-//! Phase 2: Full RISC-V RV64IMC support with privileged modes.
+//! Phase 2: Full RV64IMC support with privileged modes.
 
-use crate::primitives::hash::Hash512;
-use crate::vm::{ExecutionContext, ExecutionResult, GasMeter, VMType};
+use crate::vm::{ExecutionContext, ExecutionResult, GasMeter, VMError, VMType};
 
 /// RISC-V executor
 pub struct RISCVExecutor {
@@ -26,17 +25,17 @@ impl RISCVExecutor {
         binary: &[u8],
         entry_point: u64,
         args: &[Vec<u8>],
-    ) -> Result<ExecutionResult, String> {
+    ) -> Result<ExecutionResult, VMError> {
         // Phase 1: Basic RISC-V ELF validation
         // Phase 2: Full RV64IMC instruction set with privileged modes
 
         if binary.len() < 8 {
-            return Err("RISC-V binary too short".to_string());
+            return Err(VMError::InvalidInstruction);
         }
 
         // Validate ELF magic number
         if &binary[0..4] != b"\x7fELF" {
-            return Err("Invalid RISC-V ELF magic number".to_string());
+            return Err(VMError::InvalidInstruction);
         }
 
         // Charge gas for binary validation
@@ -56,8 +55,8 @@ impl RISCVExecutor {
 
         Ok(ExecutionResult::Success {
             gas_used: self.gas_meter.gas_used,
-            return_data,
-            state_root: Hash512::zero(),
+            return_value: return_data,
+            logs: vec![],
         })
     }
 
@@ -97,7 +96,7 @@ mod tests {
         let binary = vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
         let result = riscv.execute(&binary, 0x1000, &[]);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Invalid RISC-V ELF magic number");
+        assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
     }
 
     #[test]
@@ -106,7 +105,7 @@ mod tests {
         let binary = vec![0x7f, 0x45];
         let result = riscv.execute(&binary, 0x1000, &[]);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "RISC-V binary too short");
+        assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
     }
 
     #[test]
