@@ -6,8 +6,7 @@
 //! Phase 1: ZK proof verification interface.
 //! Phase 2: Full zk-STARK prover and verifier.
 
-use crate::primitives::hash::Hash512;
-use crate::vm::{ExecutionContext, ExecutionResult, GasMeter, VMType};
+use crate::vm::{ExecutionContext, ExecutionResult, GasMeter, VMError, VMType};
 
 /// ZK VM executor for zero-knowledge smart contracts
 pub struct ZKVMExecutor {
@@ -29,16 +28,16 @@ impl ZKVMExecutor {
         circuit_id: &[u8],
         public_inputs: &[Vec<u8>],
         proof: &[u8],
-    ) -> Result<ExecutionResult, String> {
+    ) -> Result<ExecutionResult, VMError> {
         // Phase 1: Basic ZK proof verification interface
         // Phase 2: Full zk-STARK prover and verifier
 
         if proof.is_empty() {
-            return Err("Empty ZK proof".to_string());
+            return Err(VMError::InvalidInstruction);
         }
 
         if circuit_id.is_empty() {
-            return Err("Empty circuit ID".to_string());
+            return Err(VMError::InvalidInstruction);
         }
 
         // Charge gas for proof verification
@@ -54,8 +53,8 @@ impl ZKVMExecutor {
 
         Ok(ExecutionResult::Success {
             gas_used: self.gas_meter.gas_used,
-            return_data: vec![1u8; 32], // Verification success indicator
-            state_root: Hash512::zero(),
+            return_value: vec![1u8; 32], // Verification success indicator
+            logs: vec![],
         })
     }
 
@@ -65,7 +64,7 @@ impl ZKVMExecutor {
         _circuit_id: &[u8],
         _public_inputs: &[Vec<u8>],
         proof: &[u8],
-    ) -> Result<bool, String> {
+    ) -> Result<bool, VMError> {
         if proof.is_empty() {
             return Ok(false);
         }
@@ -112,7 +111,7 @@ mod tests {
         let mut zk_vm = ZKVMExecutor::default();
         let result = zk_vm.execute(&[1], &[], &[]);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Empty ZK proof");
+        assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
     }
 
     #[test]
@@ -120,7 +119,7 @@ mod tests {
         let mut zk_vm = ZKVMExecutor::default();
         let result = zk_vm.execute(&[], &[], &[1]);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Empty circuit ID");
+        assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
     }
 
     #[test]

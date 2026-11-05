@@ -6,8 +6,7 @@
 //! Phase 1: ONNX model loading and deterministic inference simulation.
 //! Phase 2: Full ONNX runtime with gas metering and verification proofs.
 
-use crate::primitives::hash::Hash512;
-use crate::vm::{ExecutionContext, ExecutionResult, GasMeter, VMType};
+use crate::vm::{ExecutionContext, ExecutionResult, GasMeter, VMError, VMType};
 
 /// AI VM executor for on-chain AI inference
 pub struct AIVMExecutor {
@@ -28,14 +27,14 @@ impl AIVMExecutor {
     }
 
     /// Deploys an AI model on-chain
-    pub fn deploy_model(&mut self, model_bytes: &[u8]) -> Result<ExecutionResult, String> {
+    pub fn deploy_model(&mut self, model_bytes: &[u8]) -> Result<ExecutionResult, VMError> {
         if model_bytes.len() > self.max_model_size {
-            return Err("Model too large".to_string());
+            return Err(VMError::UnsupportedOperation);
         }
 
         // Validate ONNX model (Phase 1: basic check)
         if model_bytes.len() < 12 {
-            return Err("Invalid ONNX model".to_string());
+            return Err(VMError::InvalidInstruction);
         }
 
         // Charge gas for model deployment
@@ -49,8 +48,8 @@ impl AIVMExecutor {
 
         Ok(ExecutionResult::Success {
             gas_used: self.gas_meter.gas_used,
-            return_data: model_hash.to_bytes(),
-            state_root: Hash512::zero(),
+            return_value: model_hash.to_bytes(),
+            logs: vec![],
         })
     }
 
@@ -59,7 +58,7 @@ impl AIVMExecutor {
         &mut self,
         model_hash: &crate::primitives::hash::Hash512,
         input_data: &[u8],
-    ) -> Result<ExecutionResult, String> {
+    ) -> Result<ExecutionResult, VMError> {
         // Charge gas for model lookup
         self.gas_meter.charge(1_000)?;
 
@@ -74,8 +73,8 @@ impl AIVMExecutor {
 
         Ok(ExecutionResult::Success {
             gas_used: self.gas_meter.gas_used,
-            return_data: output,
-            state_root: Hash512::zero(),
+            return_value: output,
+            logs: vec![],
         })
     }
 
@@ -86,12 +85,12 @@ impl AIVMExecutor {
         _input_data: &[u8],
         _output: &[u8],
         proof: &[u8],
-    ) -> Result<bool, String> {
+    ) -> Result<bool, VMError> {
         // Phase 1: Simulated verification
         // Phase 2: Full zk-SNARK verification of AI inference
 
         if proof.is_empty() {
-            return Err("Empty proof".to_string());
+            return Err(VMError::InvalidInstruction);
         }
 
         self.gas_meter.charge(5_000)?;
@@ -137,7 +136,7 @@ mod tests {
         let model_bytes = vec![0u8; 101 * 1024 * 1024]; // 101 MB > 100 MB limit
         let result = ai_vm.deploy_model(&model_bytes);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Model too large");
+        assert_eq!(result.unwrap_err(), VMError::UnsupportedOperation);
     }
 
     #[test]
@@ -146,7 +145,7 @@ mod tests {
         let model_bytes = vec![0x00, 0x01];
         let result = ai_vm.deploy_model(&model_bytes);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Invalid ONNX model");
+        assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
     }
 
     #[test]
@@ -179,7 +178,7 @@ mod tests {
         let proof = vec![];
         let result = ai_vm.verify_inference(&model_hash, &input, &output, &proof);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Empty proof");
+        assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
     }
 
     #[test]

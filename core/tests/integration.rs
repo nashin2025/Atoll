@@ -585,7 +585,14 @@ fn evm_execution_with_gas_metering() {
 fn wasm_execution_with_gas_metering() {
     let context = ExecutionContext::default();
     let mut wasm = WASMExecutor::new(context, 10_000);
-    let wasm_bytes = vec![0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00];
+    // Minimal valid WASM module exporting `main: () -> ()`.
+    let wasm_bytes = vec![
+        0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, // header
+        0x01, 0x04, 0x01, 0x60, 0x00, 0x00, // type section: () -> ()
+        0x03, 0x02, 0x01, 0x00, // function section
+        0x07, 0x08, 0x01, 0x04, b'm', b'a', b'i', b'n', 0x00, 0x00, // export "main"
+        0x0a, 0x04, 0x01, 0x02, 0x00, 0x0b, // code section: end
+    ];
     let result = wasm.execute(&wasm_bytes, "main", &[]).unwrap();
     assert!(result.gas_used() > 0);
 }
@@ -616,8 +623,8 @@ fn ai_vm_deploy_and_infer() {
     ];
     let deploy_result = ai_vm.deploy_model(&model_bytes).unwrap();
     match deploy_result {
-        ExecutionResult::Success { return_data, .. } => {
-            assert_eq!(return_data.len(), 64);
+        ExecutionResult::Success { return_value, .. } => {
+            assert_eq!(return_value.len(), 64);
         }
         _ => panic!("Expected Success"),
     }

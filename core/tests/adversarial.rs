@@ -41,7 +41,7 @@ use atoll_core::vm::move_vm::MoveExecutor;
 use atoll_core::vm::riscv::RISCVExecutor;
 use atoll_core::vm::wasm::WASMExecutor;
 use atoll_core::vm::zk_vm::ZKVMExecutor;
-use atoll_core::vm::{ExecutionContext, GasMeter, VMRouter, VMType};
+use atoll_core::vm::{ExecutionContext, GasMeter, VMRouter, VMError, VMType};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -899,29 +899,30 @@ fn evm_out_of_gas_on_expensive_opcode() {
 fn evm_invalid_add_operands() {
     let context = ExecutionContext::default();
     let mut evm = EVMExecutor::new(context, 10_000);
-    // ADD opcode without enough operands
+    // ADD with an empty stack underflows.
     let result = evm.execute(&[0x01, 0x01], &[]);
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err(), "Invalid ADD operands");
+    assert_eq!(result.unwrap_err(), VMError::StackUnderflow);
 }
 
 #[test]
 fn evm_invalid_mul_operands() {
     let context = ExecutionContext::default();
     let mut evm = EVMExecutor::new(context, 10_000);
+    // MUL with an empty stack underflows.
     let result = evm.execute(&[0x02, 0x01], &[]);
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err(), "Invalid MUL operands");
+    assert_eq!(result.unwrap_err(), VMError::StackUnderflow);
 }
 
 #[test]
 fn evm_push_operand_out_of_bounds() {
     let context = ExecutionContext::default();
     let mut evm = EVMExecutor::new(context, 10_000);
-    // PUSH1 (0x60) requires 1 byte operand, but none provided
+    // PUSH1 (0x60) requires 1 byte operand, but none provided.
     let result = evm.execute(&[0x60], &[]);
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err(), "PUSH operand out of bounds");
+    assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
 }
 
 #[test]
@@ -934,7 +935,7 @@ fn wasm_invalid_magic_number() {
         &[],
     );
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err(), "Invalid WASM magic number");
+    assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
 }
 
 #[test]
@@ -947,7 +948,7 @@ fn wasm_unsupported_version() {
         &[],
     );
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err(), "Unsupported WASM version: 2");
+    assert_eq!(result.unwrap_err(), VMError::UnsupportedOperation);
 }
 
 #[test]
@@ -956,7 +957,7 @@ fn wasm_too_short() {
     let mut wasm = WASMExecutor::new(context, 10_000);
     let result = wasm.execute(&[0x00, 0x61, 0x73], "main", &[]);
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err(), "WASM module too short");
+    assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
 }
 
 #[test]
@@ -965,7 +966,7 @@ fn move_empty_bytecode() {
     let mut mv = MoveExecutor::new(context, 10_000);
     let result = mv.execute(&[], "main", &[]);
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err(), "Empty Move bytecode");
+    assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
 }
 
 #[test]
@@ -978,7 +979,7 @@ fn riscv_invalid_elf_magic() {
         &[],
     );
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err(), "Invalid RISC-V ELF magic number");
+    assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
 }
 
 #[test]
@@ -987,7 +988,7 @@ fn riscv_too_short() {
     let mut riscv = RISCVExecutor::new(context, 10_000);
     let result = riscv.execute(&[0x7f, 0x45], 0x1000, &[]);
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err(), "RISC-V binary too short");
+    assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
 }
 
 #[test]
@@ -997,7 +998,7 @@ fn ai_vm_model_too_large() {
     let model = vec![0u8; 101 * 1024 * 1024]; // 101 MB > 100 MB limit
     let result = ai_vm.deploy_model(&model);
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err(), "Model too large");
+    assert_eq!(result.unwrap_err(), VMError::UnsupportedOperation);
 }
 
 #[test]
@@ -1006,7 +1007,7 @@ fn ai_vm_invalid_model() {
     let mut ai_vm = AIVMExecutor::new(context, 50_000_000);
     let result = ai_vm.deploy_model(&[0x00, 0x01]);
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err(), "Invalid ONNX model");
+    assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
 }
 
 #[test]
@@ -1015,7 +1016,7 @@ fn ai_vm_verify_empty_proof() {
     let mut ai_vm = AIVMExecutor::new(context, 50_000_000);
     let result = ai_vm.verify_inference(&zero_hash(), &[], &[], &[]);
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err(), "Empty proof");
+    assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
 }
 
 #[test]
@@ -1024,7 +1025,7 @@ fn zk_vm_empty_proof() {
     let mut zk_vm = ZKVMExecutor::new(context, 100_000_000);
     let result = zk_vm.execute(&[1], &[], &[]);
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err(), "Empty ZK proof");
+    assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
 }
 
 #[test]
@@ -1033,7 +1034,7 @@ fn zk_vm_empty_circuit_id() {
     let mut zk_vm = ZKVMExecutor::new(context, 100_000_000);
     let result = zk_vm.execute(&[], &[], &[1]);
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err(), "Empty circuit ID");
+    assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
 }
 
 #[test]

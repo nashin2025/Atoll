@@ -3,8 +3,7 @@
 //! Phase 1: Move bytecode validation and execution simulation.
 //! Phase 2: Full Move VM with resource-oriented programming.
 
-use crate::primitives::hash::Hash512;
-use crate::vm::{ExecutionContext, ExecutionResult, GasMeter, VMType};
+use crate::vm::{ExecutionContext, ExecutionResult, GasMeter, VMError, VMType};
 
 /// Move VM executor
 pub struct MoveExecutor {
@@ -26,12 +25,12 @@ impl MoveExecutor {
         bytecode: &[u8],
         function: &str,
         args: &[Vec<u8>],
-    ) -> Result<ExecutionResult, String> {
+    ) -> Result<ExecutionResult, VMError> {
         // Phase 1: Basic Move bytecode validation
         // Phase 2: Full Move VM with resource-oriented type system
 
         if bytecode.is_empty() {
-            return Err("Empty Move bytecode".to_string());
+            return Err(VMError::InvalidInstruction);
         }
 
         // Charge gas for module validation
@@ -51,8 +50,8 @@ impl MoveExecutor {
 
         Ok(ExecutionResult::Success {
             gas_used: self.gas_meter.gas_used,
-            return_data,
-            state_root: Hash512::zero(),
+            return_value: return_data,
+            logs: vec![],
         })
     }
 
@@ -90,7 +89,7 @@ mod tests {
         let mut move_vm = MoveExecutor::default();
         let result = move_vm.execute(&[], "main", &[]);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Empty Move bytecode");
+        assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
     }
 
     #[test]
