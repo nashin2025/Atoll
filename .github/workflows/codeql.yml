@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'rust' ]
+        language: [ 'javascript', 'typescript' ]
 
     steps:
       - name: Checkout repository
@@ -33,10 +33,6 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           queries: +security-and-quality
-
-      - name: Build Rust project
-        run: |
-          cargo build --workspace
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
