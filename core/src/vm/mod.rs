@@ -297,11 +297,13 @@ mod tests {
 
     #[test]
     fn execute_safe_returns_success_on_ok() {
-        let result = execute_safe::<_, String>(|| Ok(ExecutionResult::Success {
-            gas_used: 10,
-            return_value: vec![1, 2, 3],
-            logs: vec![],
-        }));
+        let result = execute_safe::<_, String>(|| {
+            Ok(ExecutionResult::Success {
+                gas_used: 10,
+                return_value: vec![1, 2, 3],
+                logs: vec![],
+            })
+        });
         match result {
             ExecutionResult::Success { gas_used, .. } => assert_eq!(gas_used, 10),
             _ => panic!("Expected Success"),
