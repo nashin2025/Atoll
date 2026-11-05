@@ -1,0 +1,26 @@
+{
+  "$schema": "https://tauri.app/json/v2",
+  "productName": "Atoll GUI Wallet",
+  "version": "0.1.0",
+  "identifier": "protocol.atoll.gui",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Atoll GUI Wallet",
+        "width": 1024,
+        "height": 768,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' tauri:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' tauri: http://localhost:*;"
+    }
+  }
+}

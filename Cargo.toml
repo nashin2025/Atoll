@@ -2,6 +2,7 @@
 members = [
     "core",
     "wallet/cli",
+    "wallet/gui/src-tauri",
 ]
 
 resolver = "2"
