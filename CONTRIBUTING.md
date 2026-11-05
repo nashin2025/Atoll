@@ -1,6 +1,8 @@
+# CONTRIBUTING.md
+
 # Contributing to Atoll Protocol
 
-Thank you for your interest in contributing to the Atoll Protocol! This document outlines the process for contributing code, documentation, and other improvements.
+Thank you for your interest in contributing to Atoll Protocol! This document outlines the process for contributing code, documentation, and other improvements.
 
 ## Table of Contents
 
@@ -76,18 +78,21 @@ git checkout -b fix/<bug-description> main
 ```
 
 Branch naming conventions:
-- `feat/<name>` — new features
-- `fix/<name>` — bug fixes
-- `docs/<name>` — documentation changes
-- `perf/<name>` — performance improvements
-- `refactor/<name>` — code refactoring
-- `test/<name>` — test additions or improvements
-- `chore/<name>` — maintenance tasks
-- `security/<name>` — security fixes
+
+| Type | Description |
+|------|-------------|
+| `feat/<name>` | New features |
+| `fix/<name>` | Bug fixes |
+| `docs/<name>` | Documentation changes |
+| `perf/<name>` | Performance improvements |
+| `refactor/<name>` | Code refactoring |
+| `test/<name>` | Test additions or improvements |
+| `chore/<name>` | Maintenance tasks |
+| `security/<name>` | Security fixes |
 
 ### 2. Implement Your Changes
 
-Follow the Research → Implement → Test → PR workflow:
+Follow the **Research → Implement → Test → PR** workflow:
 
 1. **Research** — Understand the problem, read relevant specs and code
 2. **Implement** — Write clean, idiomatic Rust with full error handling
@@ -190,7 +195,7 @@ All PRs are squash-merged into `main`. Ensure your commit history is clean and d
 ## Review Requirements
 
 - **At least one human review** is required for all PRs
-- **CODEOWNERS-based review routing** — file owners are automatically requested
+- **CODEOWNERS-based review** — file owners are automatically requested
 - **All CI checks must pass** before merge
 - **No merge conflicts** with `main`
 - **Up-to-date branch** — rebase onto latest `main` before merge

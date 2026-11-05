@@ -72,10 +72,7 @@ pub enum VMError {
 }
 
 impl std::fmt::Display for VMError {
-    fn fmt(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             VMError::OutOfGas => write!(f, "out of gas"),
             VMError::InvalidOpcode => write!(f, "invalid opcode"),
@@ -145,10 +142,7 @@ impl VMRouter {
     ///
     /// Panics raised inside a VM executor are caught by [`execute_safe`] and
     /// returned as `ExecutionResult::Error` rather than aborting the host.
-    pub fn execute(
-        context: ExecutionContext,
-        bytecode: &[u8],
-    ) -> ExecutionResult {
+    pub fn execute(context: ExecutionContext, bytecode: &[u8]) -> ExecutionResult {
         let vm_type = match Self::route(bytecode) {
             Ok(vt) => vt,
             Err(err) => {

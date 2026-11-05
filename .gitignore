@@ -1,34 +1,172 @@
+# ============================================================================
+# DEPENDENCIES AND BUILD ARTIFACTS
+# ============================================================================
+
+# Rust
+target/
+Cargo.lock.*
+
+# Node.js
 node_modules/
-.env
-.env.local
-.env.production
-.env.development
-.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+.pnpm-store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+parts/
+lib/
+lib64/
+var/
+sdist/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# Build outputs
 dist/
 build/
-.next/
-*.log
-__pycache__/
-venv/
-.vercel/
-target/
 *.pdb
 *.dll
 *.so
 *.dylib
-codebase-memory/
-.cache/
-.coverage/
-pytest_cache/
-.ruff_cache/
-.mypy_cache/
-idea/
+*.exe
+*.app
+*.ipa
+*.apk
+
+# IDEs and editors
+.idea/
 .vscode/
 *.swp
 *.swo
 *~
+.DS_Store
+Thumbs.db
+*settings.json
+*.tmproj
+
+# Package managers
 vendor/
 Gopkg.lock
 Gopkg.toml
 glide.lock
-vendor/
+Pipfile.lock
+poetry.lock
+Gemfile.lock
+package-lock.json
+yarn.lock
+
+# Environment and secrets
+.env
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.*.local
+.secret
+*.key
+*.pem
+*.crt
+*.pfx
+*.keystore
+*.jks
+*.kdbx
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Coverage
+.coverage/
+htmlcov/
+coverage/
+.coverage.*
+.pytest_cache/
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+.cache/
+.tmp/
+.temp/
+.turbo/
+.swp
+.swo
+
+# OS specific
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# IDE and editor specific
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+.factorypath
+
+# Documentation
+docs/_build/
+site/
+_book/
+.gitbook/
+
+# Testing
+test-results/
+test-reports/
+e2e-results/
+
+# CI/CD
+.github/workflows/*.log
+
+# Tool-specific
+.ruff_cache/
+.mypy_cache/
+.pyright/
+
+# Output directories
+out/
+out-*/
+
+# Certificate files
+*.crt
+*.pem
+*.key
+
+# Secrets
+*.secret
+*.encrypted
+*.gpg

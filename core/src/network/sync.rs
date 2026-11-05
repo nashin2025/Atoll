@@ -33,11 +33,7 @@ impl SyncManager {
     }
 
     /// Updates a peer's sync state
-    pub fn update_peer_height(
-        &mut self,
-        node_id: crate::network::p2p::NodeId,
-        height: u64,
-    ) {
+    pub fn update_peer_height(&mut self, node_id: crate::network::p2p::NodeId, height: u64) {
         self.peer_states
             .entry(node_id)
             .or_insert(PeerSyncState {
@@ -50,10 +46,7 @@ impl SyncManager {
     }
 
     /// Returns peers that are behind our height (need blocks from us)
-    pub fn peers_needing_blocks(
-        &self,
-        our_height: u64,
-    ) -> Vec<crate::network::p2p::NodeId> {
+    pub fn peers_needing_blocks(&self, our_height: u64) -> Vec<crate::network::p2p::NodeId> {
         self.peer_states
             .iter()
             .filter(|(_, state)| state.current_height < our_height)
@@ -62,10 +55,7 @@ impl SyncManager {
     }
 
     /// Returns peers that are ahead of us (we need blocks from them)
-    pub fn peers_ahead_of_us(
-        &self,
-        our_height: u64,
-    ) -> Vec<crate::network::p2p::NodeId> {
+    pub fn peers_ahead_of_us(&self, our_height: u64) -> Vec<crate::network::p2p::NodeId> {
         self.peer_states
             .iter()
             .filter(|(_, state)| state.current_height > our_height)
@@ -86,18 +76,12 @@ impl SyncManager {
     }
 
     /// Caches a block header
-    pub fn cache_header(
-        &mut self,
-        header: BlockHeader,
-    ) {
+    pub fn cache_header(&mut self, header: BlockHeader) {
         self.header_cache.insert(header.hash, header);
     }
 
     /// Returns a cached header if available
-    pub fn get_cached_header(
-        &self,
-        hash: &Hash512,
-    ) -> Option<&BlockHeader> {
+    pub fn get_cached_header(&self, hash: &Hash512) -> Option<&BlockHeader> {
         self.header_cache.get(hash)
     }
 
@@ -107,11 +91,7 @@ impl SyncManager {
     }
 
     /// Marks a peer as syncing
-    pub fn set_syncing(
-        &mut self,
-        node_id: crate::network::p2p::NodeId,
-        syncing: bool,
-    ) {
+    pub fn set_syncing(&mut self, node_id: crate::network::p2p::NodeId, syncing: bool) {
         if let Some(state) = self.peer_states.get_mut(&node_id) {
             state.syncing = syncing;
         }

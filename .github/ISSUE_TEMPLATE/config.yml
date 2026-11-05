@@ -9,3 +9,6 @@ contact_links:
   - name: GitHub Discussions
     url: https://github.com/nashin2025/Atoll/discussions
     about: Ask questions and discuss with the community
+  - name: Documentation
+    url: https://docs.atollprotocol.org
+    about: View project documentation

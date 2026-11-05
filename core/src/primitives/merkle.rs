@@ -77,10 +77,7 @@ impl MerkleTree {
     ///
     /// The proof is the list of sibling hashes from the leaf up to the
     /// root. Returns `None` if `index` is out of bounds.
-    pub fn prove(
-        &self,
-        index: usize,
-    ) -> Option<Vec<Hash512>> {
+    pub fn prove(&self, index: usize) -> Option<Vec<Hash512>> {
         if index >= self.leaf_count {
             return None;
         }
@@ -108,12 +105,7 @@ impl MerkleTree {
     /// Re-hashes the path from `leaf` up to the root and compares the
     /// result to `root`. Returns `false` if `index` is out of bounds
     /// for the proof depth or if the recomputed root does not match.
-    pub fn verify_proof(
-        root: Hash512,
-        leaf: Hash512,
-        index: usize,
-        path: &[Hash512],
-    ) -> bool {
+    pub fn verify_proof(root: Hash512, leaf: Hash512, index: usize, path: &[Hash512]) -> bool {
         if path.is_empty() {
             return leaf == root;
         }

@@ -122,11 +122,7 @@ impl PoSTVerifier {
     ///
     /// Requires `&mut self` because verified plot IDs are recorded in
     /// `plot_registry` to enforce uniqueness.
-    pub fn verify(
-        &mut self,
-        proof: &SpacetimeProof,
-        challenge: &[u8],
-    ) -> bool {
+    pub fn verify(&mut self, proof: &SpacetimeProof, challenge: &[u8]) -> bool {
         // 1. Verify space commitment (data is actually stored)
         let space_valid =
             self.verify_space_proof(&proof.space_proof, &proof.plot_commitment, challenge);
@@ -202,11 +198,7 @@ impl PoSTVerifier {
     /// Checks `y ≡ π^(2e) · x^(2^(T mod 2)) (mod N)` where `e = blake3(x ||
     /// y || T)`. Rejects zero elapsed time and empty VDF output/proof as
     /// degenerate. Takes `&self` only; it does not touch `plot_registry`.
-    fn verify_time_proof(
-        &self,
-        proof: &TimeProof,
-        _commitment: &Hash512,
-    ) -> bool {
+    fn verify_time_proof(&self, proof: &TimeProof, _commitment: &Hash512) -> bool {
         // Zero elapsed time means no VDF computation was performed; reject.
         if proof.elapsed_seconds == 0 {
             return false;
@@ -239,10 +231,7 @@ impl PoSTVerifier {
     /// sector size, then rejects the proof if that plot ID is already in
     /// the registry. Otherwise the plot ID is recorded and the proof is
     /// accepted as unique.
-    fn verify_uniqueness(
-        &mut self,
-        proof: &SpacetimeProof,
-    ) -> bool {
+    fn verify_uniqueness(&mut self, proof: &SpacetimeProof) -> bool {
         let sector_size_bytes = proof.plot_size_gb * BYTES_PER_GIB;
         let plot_id =
             Self::compute_plot_id(&proof.farmer, &proof.plot_commitment, sector_size_bytes);
@@ -255,11 +244,7 @@ impl PoSTVerifier {
     }
 
     /// Computes `blake3(farmer_address || plot_commitment || sector_size_bytes)`.
-    fn compute_plot_id(
-        farmer: &Address,
-        commitment: &Hash512,
-        sector_size_bytes: u64,
-    ) -> Hash512 {
+    fn compute_plot_id(farmer: &Address, commitment: &Hash512, sector_size_bytes: u64) -> Hash512 {
         let mut hasher = blake3::Hasher::new();
         hasher.update(farmer.as_ref());
         hasher.update(commitment.as_ref());
@@ -276,10 +261,7 @@ impl PoSTVerifier {
 }
 
 /// Serialize a BigUint to big-endian bytes, zero-padded on the left to `width` bytes.
-fn fixed_width_bytes(
-    n: &BigUint,
-    width: usize,
-) -> Vec<u8> {
+fn fixed_width_bytes(n: &BigUint, width: usize) -> Vec<u8> {
     let mut bytes = n.to_bytes_be();
     if bytes.len() < width {
         let mut padded = vec![0u8; width - bytes.len()];
@@ -306,12 +288,7 @@ fn vdf_modulus() -> BigUint {
 ///
 /// x and y are encoded as fixed-width big-endian bytes using the byte length of N
 /// so the encoding is deterministic; T is encoded as an 8-byte big-endian integer.
-fn wesolowski_challenge(
-    x: &BigUint,
-    y: &BigUint,
-    T: u64,
-    N: &BigUint,
-) -> BigUint {
+fn wesolowski_challenge(x: &BigUint, y: &BigUint, T: u64, N: &BigUint) -> BigUint {
     let width = (N.bits() as usize + 7) / 8;
     let mut hasher = blake3::Hasher::new();
     hasher.update(&fixed_width_bytes(x, width));
@@ -327,13 +304,7 @@ fn wesolowski_challenge(
 /// where `e = blake3(x || y || T)` interpreted as a BigUint.
 ///
 /// Returns `true` if the proof is valid, `false` otherwise.
-pub fn verify_wesolowski(
-    x: &BigUint,
-    y: &BigUint,
-    pi: &BigUint,
-    T: u64,
-    N: &BigUint,
-) -> bool {
+pub fn verify_wesolowski(x: &BigUint, y: &BigUint, pi: &BigUint, T: u64, N: &BigUint) -> bool {
     // Reject degenerate moduli; modpow panics on modulus 0.
     if N == &BigUint::from(0u32) || N == &BigUint::from(1u32) {
         return false;
@@ -370,11 +341,7 @@ mod tests {
 
     /// Builds a SpaceProof whose single Merkle proof verifies against the
     /// plot commitment for the leaf at `index`.
-    fn valid_space_proof(
-        index: usize,
-        leaf: Hash512,
-        path: &[Hash512],
-    ) -> SpaceProof {
+    fn valid_space_proof(index: usize, leaf: Hash512, path: &[Hash512]) -> SpaceProof {
         let mut path_bytes = Vec::new();
         for node in path {
             path_bytes.extend_from_slice(&node.to_bytes());

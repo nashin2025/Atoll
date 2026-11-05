@@ -177,10 +177,7 @@ fn to_signed(word: &[u8; WORD_BYTES]) -> (bool, BigUint) {
 }
 
 /// Converts a sign/magnitude pair back into a 256-bit two's complement word.
-fn from_signed(
-    negative: bool,
-    mag: &BigUint,
-) -> [u8; WORD_BYTES] {
+fn from_signed(negative: bool, mag: &BigUint) -> [u8; WORD_BYTES] {
     let mag = wrap(mag.clone());
     if negative && !is_zero(&mag) {
         biguint_to_word(&((&two_pow_256() - &mag) % &two_pow_256()))
@@ -209,10 +206,7 @@ impl EvmStack {
         self.items.len()
     }
 
-    pub fn push(
-        &mut self,
-        value: [u8; WORD_BYTES],
-    ) -> Result<(), VMError> {
+    pub fn push(&mut self, value: [u8; WORD_BYTES]) -> Result<(), VMError> {
         if self.items.len() >= MAX_STACK_DEPTH {
             return Err(VMError::StackOverflow);
         }
@@ -225,10 +219,7 @@ impl EvmStack {
     }
 
     /// Peeks at the `n`-th item from the top (`0` is the top of the stack).
-    pub fn peek(
-        &self,
-        n: usize,
-    ) -> Result<[u8; WORD_BYTES], VMError> {
+    pub fn peek(&self, n: usize) -> Result<[u8; WORD_BYTES], VMError> {
         let idx = self
             .items
             .len()
@@ -239,20 +230,14 @@ impl EvmStack {
 
     /// Duplicates the `n`-th stack item (1-indexed from the top) onto the
     /// top of the stack (`DUPn` semantics).
-    pub fn dup(
-        &mut self,
-        n: usize,
-    ) -> Result<(), VMError> {
+    pub fn dup(&mut self, n: usize) -> Result<(), VMError> {
         let value = self.peek(n - 1)?;
         self.push(value)
     }
 
     /// Swaps the top item with the `n`-th item below it (1-indexed;
     /// `SWAPn` semantics).
-    pub fn swap(
-        &mut self,
-        n: usize,
-    ) -> Result<(), VMError> {
+    pub fn swap(&mut self, n: usize) -> Result<(), VMError> {
         let top = self
             .items
             .len()
@@ -286,11 +271,7 @@ impl EvmMemory {
 
     /// Ensures memory covers `offset + size` bytes, growing to a word
     /// boundary. Returns the number of newly allocated 32-byte words.
-    pub fn expand_to(
-        &mut self,
-        offset: usize,
-        size: usize,
-    ) -> Result<usize, VMError> {
+    pub fn expand_to(&mut self, offset: usize, size: usize) -> Result<usize, VMError> {
         let needed = offset
             .checked_add(size)
             .ok_or(VMError::InvalidMemoryAccess)?;
@@ -309,10 +290,7 @@ impl EvmMemory {
 
     /// Reads a 32-byte word from `offset`, zero-padding beyond the end of
     /// allocated memory.
-    pub fn read_word(
-        &self,
-        offset: usize,
-    ) -> [u8; WORD_BYTES] {
+    pub fn read_word(&self, offset: usize) -> [u8; WORD_BYTES] {
         let mut word = [0u8; WORD_BYTES];
         if offset < self.data.len() {
             let available = (self.data.len() - offset).min(WORD_BYTES);
@@ -335,11 +313,7 @@ impl EvmMemory {
 
     /// Writes `value` at `offset`, expanding memory as needed.
     /// Returns the number of newly allocated words (for gas metering).
-    pub fn write_bytes(
-        &mut self,
-        offset: usize,
-        value: &[u8],
-    ) -> Result<usize, VMError> {
+    pub fn write_bytes(&mut self, offset: usize, value: &[u8]) -> Result<usize, VMError> {
         let words_added = self.expand_to(offset, value.len())?;
         self.data[offset..offset + value.len()].copy_from_slice(value);
         Ok(words_added)
@@ -347,11 +321,7 @@ impl EvmMemory {
 
     /// Reads `size` bytes from `offset`, zero-padding beyond the end of
     /// allocated memory. No expansion occurs.
-    pub fn read_bytes(
-        &self,
-        offset: usize,
-        size: usize,
-    ) -> Vec<u8> {
+    pub fn read_bytes(&self, offset: usize, size: usize) -> Vec<u8> {
         let mut out = vec![0u8; size];
         if offset < self.data.len() {
             let available = (self.data.len() - offset).min(size);
@@ -376,10 +346,7 @@ pub struct EVMExecutor {
 }
 
 impl EVMExecutor {
-    pub fn new(
-        context: ExecutionContext,
-        gas_limit: u64,
-    ) -> Self {
+    pub fn new(context: ExecutionContext, gas_limit: u64) -> Self {
         Self {
             gas_meter: GasMeter::new(gas_limit, context.gas_price),
             context,
@@ -390,17 +357,11 @@ impl EVMExecutor {
         }
     }
 
-    fn charge(
-        &mut self,
-        gas: u64,
-    ) -> Result<(), VMError> {
+    fn charge(&mut self, gas: u64) -> Result<(), VMError> {
         self.gas_meter.charge(gas)
     }
 
-    fn push_result(
-        &mut self,
-        value: BigUint,
-    ) -> Result<(), VMError> {
+    fn push_result(&mut self, value: BigUint) -> Result<(), VMError> {
         self.stack.push(biguint_to_word(&wrap(value)))
     }
 
@@ -423,11 +384,7 @@ impl EVMExecutor {
     /// [`VMError::StackOverflow`]/[`VMError::StackUnderflow`] for stack
     /// violations. Execution halts on `STOP`, `RETURN`, `REVERT`,
     /// `SELFDESTRUCT`, `INVALID`, or any error.
-    pub fn execute(
-        &mut self,
-        bytecode: &[u8],
-        input: &[u8],
-    ) -> Result<ExecutionResult, VMError> {
+    pub fn execute(&mut self, bytecode: &[u8], input: &[u8]) -> Result<ExecutionResult, VMError> {
         // Base charge for loading the bytecode.
         self.gas_meter.charge(bytecode.len() as u64 * 2)?;
 

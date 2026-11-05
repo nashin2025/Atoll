@@ -43,11 +43,8 @@ pub fn test_context() -> ExecutionContext {
 ///
 /// # Panics
 /// Panics if any execution returns an error or if outputs differ across instances.
-pub fn test_determinism<F>(
-    execute_fn: F,
-    input: &[u8],
-    iterations: usize,
-) where
+pub fn test_determinism<F>(execute_fn: F, input: &[u8], iterations: usize)
+where
     F: Fn(&[u8]) -> ExecutionResult + Clone,
 {
     let mut first_result: Option<ExecutionResult> = None;
@@ -80,11 +77,8 @@ pub fn test_determinism<F>(
 ///
 /// # Panics
 /// Panics if any execution panics, exceeds gas limit, or returns an unexpected variant.
-pub fn test_fuzz<F, G>(
-    execute_fn: F,
-    mut input_gen: G,
-    iterations: usize,
-) where
+pub fn test_fuzz<F, G>(execute_fn: F, mut input_gen: G, iterations: usize)
+where
     F: Fn(&[u8]) -> ExecutionResult,
     G: FnMut() -> Vec<u8>,
 {

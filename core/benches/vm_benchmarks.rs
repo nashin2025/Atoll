@@ -194,11 +194,7 @@ fn bench_zk_vm_deploy_and_execute(c: &mut Criterion) {
 
 /// Registers a single VM router bench. `bytecode` is moved into the benchmark
 /// closure and borrowed on every iteration; `context` is cloned per iteration.
-fn bench_router(
-    c: &mut Criterion,
-    name: &str,
-    bytecode: Vec<u8>,
-) {
+fn bench_router(c: &mut Criterion, name: &str, bytecode: Vec<u8>) {
     let context = ExecutionContext::default();
     c.bench_function(name, |b| {
         b.iter(|| {

@@ -17,10 +17,7 @@ use std::fmt;
 pub struct Hash512(pub [u8; 64]);
 
 impl Serialize for Hash512 {
-    fn serialize<S>(
-        &self,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -104,10 +101,7 @@ impl Hash512 {
     }
 
     /// Computes the BLAKE3 hash with keyed mode (64 bytes via XOF).
-    pub fn blake3_keyed(
-        key: &[u8; 32],
-        input: &[u8],
-    ) -> Self {
+    pub fn blake3_keyed(key: &[u8; 32], input: &[u8]) -> Self {
         let mut hasher = blake3::Hasher::new_keyed(key);
         hasher.update(input);
         let mut out = [0u8; 64];
@@ -129,19 +123,13 @@ impl AsRef<[u8]> for Hash512 {
 }
 
 impl fmt::Debug for Hash512 {
-    fn fmt(
-        &self,
-        f: &mut fmt::Formatter<'_>,
-    ) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Hash512({})", self.to_hex())
     }
 }
 
 impl fmt::Display for Hash512 {
-    fn fmt(
-        &self,
-        f: &mut fmt::Formatter<'_>,
-    ) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.to_hex())
     }
 }
