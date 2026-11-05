@@ -1,0 +1,20 @@
+# Atoll Protocol Node Configuration
+# Copied to /etc/atoll/config.toml inside the container image.
+
+[network]
+listen_address = "0.0.0.0:8080"
+p2p_listen_address = "0.0.0.0:30333"
+max_peers = 256
+
+[chain]
+chain_id = 777777
+genesis_timestamp = 1798761600
+
+[logging]
+level = "info"
+format = "json"
+
+[api]
+enabled = true
+host = "0.0.0.0"
+port = 8080

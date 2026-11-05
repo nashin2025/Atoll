@@ -1,0 +1,26 @@
+services:
+  atoll-node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ghcr.io/atoll-protocol/atoll-node:latest
+    container_name: atoll-node
+    ports:
+      - "8080:8080"
+      - "30333:30333"
+    volumes:
+      - ./config:/etc/atoll:ro
+      - atoll-data:/var/lib/atoll
+    environment:
+      - ATOLL_LOG_LEVEL=info
+      - ATOLL_CONFIG=/etc/atoll/config.toml
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  atoll-data:

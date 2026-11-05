@@ -1,0 +1,12 @@
+target/
+**/target/
+.git
+.gitignore
+*.md
+audits/
+bridges/
+docs/
+explorer/
+prototypes/
+scripts/
+specification/
