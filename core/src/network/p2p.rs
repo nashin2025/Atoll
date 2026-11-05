@@ -5,7 +5,7 @@
 //! (`Noise_XX_25519_ChaChaPoly_BLAKE2s`).
 
 use crate::network::node_identity::NodeIdentity;
-use crate::network::NetworkMessage;
+use crate::network::{NeighborsMessage, NetworkMessage, PeerInfo};
 
 use blake3::Hasher;
 use snow::{Builder, TransportState};
@@ -275,6 +275,58 @@ impl PeerConnection {
                 Ok(NetworkMessage::FindNode(crate::network::FindNodeMessage {
                     target_node_id: target,
                 }))
+            }
+            3 => {
+                if payload.len() < 4 {
+                    return Err("Neighbors message too short".to_string());
+                }
+                let count = u32::from_le_bytes(payload[..4].try_into().unwrap()) as usize;
+                let mut offset = 4usize;
+                let mut peers = Vec::with_capacity(count);
+                for _ in 0..count {
+                    if offset + 32 > payload.len() {
+                        return Err("Neighbors peer node_id truncated".to_string());
+                    }
+                    let mut node_id = [0u8; 32];
+                    node_id.copy_from_slice(&payload[offset..offset + 32]);
+                    offset += 32;
+
+                    if offset + 2 > payload.len() {
+                        return Err("Neighbors peer address length truncated".to_string());
+                    }
+                    let addr_len =
+                        u16::from_le_bytes(payload[offset..offset + 2].try_into().unwrap())
+                            as usize;
+                    offset += 2;
+
+                    if offset + addr_len > payload.len() {
+                        return Err("Neighbors peer address truncated".to_string());
+                    }
+                    let address =
+                        String::from_utf8_lossy(&payload[offset..offset + addr_len]).to_string();
+                    offset += addr_len;
+
+                    if offset + 2 > payload.len() {
+                        return Err("Neighbors peer port truncated".to_string());
+                    }
+                    let port = u16::from_le_bytes(payload[offset..offset + 2].try_into().unwrap());
+                    offset += 2;
+
+                    if offset + 8 > payload.len() {
+                        return Err("Neighbors peer last_seen truncated".to_string());
+                    }
+                    let last_seen =
+                        u64::from_le_bytes(payload[offset..offset + 8].try_into().unwrap());
+                    offset += 8;
+
+                    peers.push(PeerInfo {
+                        node_id,
+                        address,
+                        port,
+                        last_seen,
+                    });
+                }
+                Ok(NetworkMessage::Neighbors(NeighborsMessage { peers }))
             }
             _ => Err(format!("Unknown message type: {}", msg_type)),
         }

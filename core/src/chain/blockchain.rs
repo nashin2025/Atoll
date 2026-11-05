@@ -3,10 +3,11 @@
 //! Maintains the chain of blocks, handles block validation and insertion,
 //! and tracks the current tip and finalized height.
 
+use crate::chain::genesis::{GenesisConfig, GenesisLoader};
 use crate::consensus::penta::{poh, por, pos_vrf, post, pouw, PentaConsensus, PentaValidation};
 use crate::crypto::morph_hash::MorphHashEngine;
 use crate::primitives::address::Address;
-use crate::primitives::block::{Block, BlockBody, BlockHeader};
+use crate::primitives::block::Block;
 use crate::primitives::hash::Hash512;
 use std::collections::HashMap;
 
@@ -29,15 +30,14 @@ pub struct Blockchain {
 }
 
 impl Blockchain {
-    /// Creates a new blockchain with genesis block
-    pub fn new(genesis: Block) -> Self {
-        let mut morph_hash_engine = MorphHashEngine::new();
-        let genesis_hash =
-            morph_hash_engine.morph_hash(&genesis.serialize_bytes(), &Hash512::zero(), 0);
+    /// Creates a new blockchain with genesis block built from `config`.
+    pub fn new(config: &GenesisConfig) -> Self {
+        let block = GenesisLoader::build_genesis_block(config);
+        let genesis_hash = GenesisLoader::genesis_hash(config);
 
         let mut blocks = HashMap::new();
         let mut blocks_by_height = HashMap::new();
-        blocks.insert(genesis_hash, genesis.clone());
+        blocks.insert(genesis_hash, block.clone());
         blocks_by_height.insert(0, genesis_hash);
 
         Self {
@@ -47,7 +47,7 @@ impl Blockchain {
             tip_height: 0,
             finalized_height: 0,
             state_roots: HashMap::new(),
-            morph_hash_engine,
+            morph_hash_engine: MorphHashEngine::new(),
         }
     }
 
@@ -145,24 +145,7 @@ impl Blockchain {
 
 impl Default for Blockchain {
     fn default() -> Self {
-        // Create a minimal genesis block
-        let genesis = Block {
-            header: BlockHeader {
-                version: 1,
-                height: 0,
-                shard_id: 0,
-                timestamp: 0,
-                prev_hash: Hash512::zero(),
-                state_root: Hash512::zero(),
-                transaction_root: Hash512::zero(),
-                proposer: Address::zero(),
-                difficulty: 1,
-            },
-            body: BlockBody {
-                transactions: Vec::new(),
-            },
-        };
-        Self::new(genesis)
+        Self::new(&GenesisConfig::default())
     }
 }
 
@@ -170,6 +153,7 @@ impl Default for Blockchain {
 mod tests {
     use super::*;
     use crate::consensus::penta::{poh, por, pos_vrf, post, pouw, PentaValidation};
+    use crate::primitives::block::{BlockBody, BlockHeader};
 
     fn valid_validation() -> PentaValidation {
         PentaValidation {
@@ -322,23 +306,8 @@ mod tests {
     fn cached_engine_equivalence_with_fresh_engine() {
         let bc = Blockchain::default();
 
-        // Replicate the genesis block from Default::default()
-        let genesis = Block {
-            header: BlockHeader {
-                version: 1,
-                height: 0,
-                shard_id: 0,
-                timestamp: 0,
-                prev_hash: Hash512::zero(),
-                state_root: Hash512::zero(),
-                transaction_root: Hash512::zero(),
-                proposer: Address::zero(),
-                difficulty: 1,
-            },
-            body: BlockBody {
-                transactions: Vec::new(),
-            },
-        };
+        // Replicate the genesis block from Default::default() via GenesisConfig.
+        let genesis = GenesisLoader::build_genesis_block(&GenesisConfig::default());
 
         // Fresh engine computing the same genesis hash
         let mut fresh_engine = MorphHashEngine::new();

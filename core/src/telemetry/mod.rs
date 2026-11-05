@@ -1,8 +1,9 @@
 //! Telemetry module for the Atoll Protocol.
 //!
-//! Metrics, health monitoring, and self-healing.
+//! Structured logging, metrics, health monitoring, and self-healing.
 
 pub mod health;
+pub mod logging;
 pub mod metrics;
 pub mod self_healing;
 

@@ -37,6 +37,7 @@ hex = "0.4"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 bincode = "2"
 
 # Async runtime
@@ -48,9 +49,21 @@ snow = "0.10"
 # CLI
 clap = { version = "4", features = ["derive"] }
 
+# HTTP server for health / metrics endpoints
+axum = "0.7"
+
+# Prometheus metrics exposition for the `GET /metrics` endpoint
+prometheus = "0.13"
+
 # Logging
 tracing = "0.1"
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+tracing-appender = "0.2"
+
+# TLS for RPC/WebSocket endpoints (Task 8)
+rustls = "0.23"
+rcgen = "0.14"
+tokio-rustls = "0.26"
 
 [dev-dependencies]
 criterion = "0.5"
@@ -60,6 +73,10 @@ quickcheck = "1.0"
 [[bench]]
 name = "hash_benchmarks"
 harness = false
+
+[[bin]]
+name = "atoll-node"
+path = "src/main.rs"
 
 [features]
 default = []

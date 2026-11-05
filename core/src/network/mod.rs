@@ -5,6 +5,7 @@
 //! Uses tokio for async I/O, curve25519-dalek for Diffie-Hellman key exchange,
 //! and chacha20poly1305 for symmetric encryption.
 
+pub mod bootstrap;
 pub mod discovery;
 pub mod encrypted_mempool;
 pub mod gossip;
