@@ -1,42 +1,62 @@
-# Atoll Protocol - Security Baseline
+# Atoll Protocol - Security Policy
 
-## Overview
+## 🔒 Supported Versions
 
-Phase 0 security baseline establishes foundational security practices for the Atoll Protocol. All secrets are kept out of version control, dependencies are audited for known vulnerabilities, and security review processes are defined.
+| Version | Supported          |
+|---------|--------------------|
+| v0.1.x  | :white_check_mark: |
+| < v0.1  | :x:                |
 
-## 1. Secret Management
+## 📋 Reporting a Vulnerability
 
-### .env.example
-All environment variables are documented in `.env.example` with descriptions and safe defaults. No real values are committed.
+We take the security of Atoll Protocol seriously. If you discover a security vulnerability, please follow these steps:
 
-### .gitignore
-The following are excluded from version control:
-- `.env`, `.env.local`, `.env.production`, `.env.development`
-- `*.log`
-- `codebase-memory/`
+### 1. Do NOT Disclose Publicly
 
-### Secret Scanning
-Before any commit, staged files are scanned for:
+Do not create a public GitHub issue or discuss the vulnerability in public forums.
+
+### 2. Report Privately
+
+Send details to [security@atollprotocol.org](mailto:security@atollprotocol.org) with:
+
+- **Title**: Clear description of the vulnerability
+- **Description**: Detailed explanation of the issue
+- **Steps to Reproduce**: Step-by-step instructions
+- **Impact**: Potential impact and affected components
+- **Suggested Fix**: If you have one
+- **Your Contact Information**: For follow-up
+
+### 3. What to Expect
+
+- **Acknowledgment**: Within 24 hours
+- **Initial Assessment**: Within 72 hours
+- **Resolution**: Within 7 days for critical issues, 30 days for others
+- **Credit**: You will be credited in our security advisories (if desired)
+
+## 🛡️ Security Baseline
+
+### 1. Secret Management
+
+All secrets are kept out of version control. Environment variables are documented in `.env.example` with safe defaults.
+
+**Protected patterns:**
 - Hardcoded API keys, passwords, tokens, connection strings
 - Private keys (RSA, EC, Dilithium, SPHINCS+)
 - AWS/Azure/GCP credentials
 - Database connection strings with credentials
 
-If secrets are found:
+**If secrets are found:**
 1. Remove from file
 2. Add to `.gitignore`
 3. Rotate the exposed secret
 4. Warn the security lead
 
-## 2. Dependency Audit
+### 2. Dependency Audit
 
-### cargo-audit
 Rust dependencies are scanned for known vulnerabilities using `cargo-audit` in CI.
 
-### CI Integration
-The `.github/workflows/ci.yml` includes a security-scan job that runs `cargo audit` on every push and pull request.
+**Vulnerability Response:**
 
-### Vulnerability Response
 | Severity | Response Time | Action |
 |----------|--------------|--------|
 | Critical | 24 hours | Patch or dependency update immediately |
@@ -44,44 +64,55 @@ The `.github/workflows/ci.yml` includes a security-scan job that runs `cargo aud
 | Medium | 1 week | Evaluate and patch or accept risk |
 | Low | 1 month | Track in backlog |
 
-## 3. Security Review Process
+### 3. Security Review Process
 
-### Pre-Commit
+#### Pre-Commit
 - Secret scanning on staged files
 - Dependency vulnerability check
 - Code review for security patterns
 
-### Pre-PR
+#### Pre-PR
 - Full security review by Sentinel (Security Guard)
 - SAST scanning on changed files
 - Accessibility audit if frontend changes
 
-### Pre-Merge
+#### Pre-Merge
 - All security findings addressed or formally accepted
 - Audit trail maintained in SECURITY.md
 
-## 4. Security Documentation
+## 📄 Security Documentation
 
 | Document | Purpose | Location |
 |----------|---------|----------|
 | SECURITY.md | Security baseline and policies | Root |
 | SECURITY_AUDIT_PLAN.md | Audit scope and schedule | `audits/` |
 | Threat model | STRIDE analysis | `audits/threat-model.md` |
+| Security advisories | Published vulnerabilities | `docs/security/` |
 
-## 5. Current Status
+## 🔐 Security Features
 
-- [x] `.env.example` created with all environment variables documented
-- [x] `.gitignore` excludes secrets and logs
-- [x] CI/CD pipeline includes `cargo audit` security scan
-- [x] Secret scanning process defined
-- [ ] Initial `cargo audit` run (in progress)
-- [ ] Threat model documentation (Phase 1)
-- [ ] Security audit scheduling (Phase 9)
+- **Post-quantum signatures** (Dilithium2/3/5, SPHINCS+)
+- **Post-quantum KEM** (Kyber512/768/1024)
+- **Hybrid signature engine** (classical + PQ)
+- **Homomorphic encryption** (BFV/CKKS)
+- **zk-STARKs** (zero-knowledge proofs)
+- **Encrypted mempool** (threshold decryption)
+- **Encrypted keystore** (XChaCha20-Poly1305 + argon2id)
+- **Noise Protocol** (Noise_XX_25519_ChaChaPoly_BLAKE2s)
+- **Rate limiting** (per-IP, configurable)
+- **CORS whitelist**
+- **Security headers** (HSTS, CSP, X-Frame-Options)
 
-## 6. Known Vulnerabilities
+## 📞 Contact
 
-None identified at baseline. Dependencies are at latest compatible versions.
+Security issues should be reported to [security@atollprotocol.org](mailto:security@atollprotocol.org).
 
-## 7. Contact
+For non-security issues, please use GitHub Issues or GitHub Discussions.
 
-Security issues should be reported through the bug bounty program (see specification/research/roadmap.md for bounty tiers).
+## 🏆 Security Researchers
+
+We recognize security researchers who responsibly disclose vulnerabilities:
+
+- Listed in our security hall of fame
+- Mentioned in release notes
+- Swag and recognition

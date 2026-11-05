@@ -1,7 +1,7 @@
 # rustfmt configuration
 # https://doc.rust-lang.org/nightly/rustfmt/
 
-edition = "2021"
+edition = "2024"
 max_width = 100
 tab_spaces = 4
 imports_granularity = "Crate"
@@ -20,3 +20,33 @@ sensitive_patches = true
 expression_width = 100
 match_arm_guess_width = true
 wrap_match_arms = true
+format_code_in_comments = true
+format_strings = true
+hard_tabs = false
+indent_style = "Block"
+no_constructors_skip_placeholder = false
+skip_children = false
+parse_lib = false
+parse_mode = "prefer_overflowing_operations"
+unstable = false
+unused = false
+error_on_unknown_options = true
+error_on_line_overflow = false
+overflow_delimiter = "Vertical"
+chain_width = 100
+new_style_where = "Prefer"
+group_imports_keep_placeholders = false
+item_indent_style = "Inline"
+imports_layout = "Vertical"
+blank_lines_upper_bound = 1
+blank_lines_lower_bound = 1
+use_small_heuristics = false
+max_line_length = 100
+reorder_imports = true
+reorder_modules = false
+fn_args_layout = "Vertical"
+fn_ret_width = 0
+fn_crate_layout = "Vertical"
+impl_item_indent_width = 0
+impl_single_line_width = 0
+trailing_comma = "Vertical"

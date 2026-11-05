@@ -1,0 +1,438 @@
+# Agent Council Global Best Practices Configuration
+# This file defines best practices for all 15 Agent Council workers,
+# applied globally across the Atoll Protocol project.
+#
+# Generated from industry research (OWASP, AWS, Google SRE, CNCF, etc.)
+# Last updated: 2026-11-05
+
+[atlas.planner]
+enabled = true
+# Architecture & planning best practices
+tech_stack_defaults = [
+  "static-site: HTML/CSS/JS or Astro",
+  "web-app: Next.js (App Router) + Tailwind",
+  "full-stack: Next.js + Prisma + PostgreSQL (SQLite for learning)",
+  "api-only: Express, Hono, or FastAPI",
+  "mobile: React Native (Expo) or PWA"
+]
+max_mvp_tasks = 10
+clarifying_questions_max = 3
+risk_flags = [
+  "Tricky parts that may need more time",
+  "Features too big for MVP - suggest smaller scope",
+  "Architectural constraints",
+  "Dependency risks"
+]
+decision_record_format = "docs/decisions/NNN-<feature-slug>.md"
+# Architecture principles
+architecture_principles = [
+  "Everything is a trade-off",
+  "Why is more important than how",
+  "Architect products, not projects",
+  "Focus on quality attributes (not just functional requirements)",
+  "Delay design decisions until necessary",
+  "Architect for change - power of small",
+  "Architect for build, test, deploy, and operate",
+  "Model organisation after system design (Conway's Law)"
+]
+adrc_format = "GFM with metadata bullet points, GitHub alerts, mermaid diagrams, collapsible details"
+
+[forge.builder]
+enabled = true
+# Code writing best practices
+no_placeholders = true
+no_todos = true
+comments_explain_why = true
+naming_convention = "descriptive variables, no nested ternaries, no 5-method chains"
+unhappy_paths = [
+  "API failures", "empty data", "unauthenticated users", "invalid input"
+]
+state_management = [
+  "UI state: useState",
+  "Complex UI: useReducer",
+  "Global: Zustand",
+  "Server data: TanStack Query",
+  "Forms: React Hook Form + Zod",
+  "URL: search params"
+]
+component_states = ["loading", "error", "empty", "success"]
+form_requirements = ["validation", "error_display", "loading_state", "success_feedback"]
+api_route_requirements = ["input_validation", "error_handling", "status_codes"]
+self_review_required = true
+# Clean code principles
+clean_code_rules = [
+  "No abstractions that weren't explicitly requested",
+  "No new dependency if it can be avoided",
+  "No boilerplate nobody asked for",
+  "Deletion over addition",
+  "Boring over clever",
+  "Fewest files possible",
+  "Shortest working diff wins",
+  "Readability over cleverness",
+  "Comments explain WHY not WHAT",
+  "Handle unhappy paths",
+  "Every component: loading, error, empty, success states",
+  "Every form: validation, error display, loading state, success feedback",
+  "Every API route: input validation, error handling, status codes"
+]
+ponytail_simplifications = true
+
+[prism.stylist]
+enabled = true
+# Design system & styling best practices
+design_system = [
+  "5-7 colors (CSS variables)",
+  "max 2 fonts",
+  "4px spacing scale",
+  "consistent radius",
+  "3 shadow levels"
+]
+mobile_first = true
+layout_strategies = ["CSS Grid for pages", "Flexbox for components"]
+max_width = 1200
+touch_target_min = 44
+breakpoints = ["mobile <640px", "tablet 640-1024px", "desktop >1024px"]
+polish_checklist = [
+  "hover/focus states",
+  "transitions 150-300ms",
+  "loading skeletons",
+  "empty states",
+  "dark mode",
+  "no horizontal scroll",
+  "16px+ body text"
+]
+animation_rules = [
+  "Never animate keyboard-initiated actions",
+  "UI animations under 300ms",
+  "ease-out for enter/exit (responsive)",
+  "ease-in-out for on-screen movement",
+  "ease for hover/color changes",
+  "linear for constant motion",
+  "Never use ease-in for UI elements",
+  "Custom easing curves (cubic-bezier)",
+  "Only animate transform and opacity",
+  "CSS transitions over keyframes for interruptible UI",
+  "@starting-style for modern CSS entry animations",
+  "Respect prefers-reduced-motion",
+  "Gate hover animations behind @media (hover: hover) and (pointer: fine)",
+  "Asymmetric enter/exit timing (slow enter, fast exit)",
+  "Stagger delays 30-80ms between items",
+  "transform: scale(0.97) on :active for buttons",
+  "Never animate from scale(0) - start from scale(0.9)",
+  "Popovers origin-aware (trigger location), modals centered",
+  "Use blur to mask imperfect transitions",
+  "Tooltip: skip delay on subsequent hovers"
+]
+
+[scope.debugger]
+enabled = true
+# Error diagnosis & root cause fix protocols
+error_protocol = [
+  "Read exact error message",
+  "Identify error type (syntax|reference|type|network|build|runtime)",
+  "Locate source",
+  "Fix root cause",
+  "Verify fix",
+  "Prevent recurrence"
+]
+common_fixes = [
+  '"Module not found": import path',
+  '"not a function": wrong import',
+  '"undefined": optional chaining',
+  '"Hydration": server/client mismatch',
+  '"CORS": proxy through API route',
+  '"Port in use": kill process'
+]
+auto_fix_attempts_max = 3
+escalation_threshold = 3
+bug_fix_philosophy = [
+  "Root cause, not symptom",
+  "Grep every caller of the function you touch",
+  "Fix the shared function once",
+  "One guard there is smaller than one per caller",
+  "Patching only the named path leaves sibling callers broken"
+]
+
+[branch.git_master]
+enabled = true
+# Git workflow best practices
+pre_action_commands = ["git status --porcelain", "git log --oneline -5"]
+protected_actions = [
+  "reset --hard", "push --force", "clean -fd", "branch -D", "rm -rf .git"
+]
+protected_actions_require = "user YES"
+secret_detection = true
+secret_handling = [
+  "If found in staged files: remove, .gitignore, warn Boss",
+  "If committed: rotate secrets immediately"
+]
+commit_format = "[type]: [description] (under 60 chars)"
+commit_types = ["feat", "fix", "style", "docs", "refactor", "test", "chore", "security"]
+branch_naming = ["main = stable", "feature/[name] = new", "fix/[name] = bugs"]
+default_gitignore = [
+  "node_modules/", ".env", ".env.local", ".env.production",
+  ".DS_Store", "dist/", "build/", ".next/", "*.log",
+  "__pycache__/", "venv/", ".vercel/"
+]
+auto_fix_conflicts = true
+
+[scout.researcher]
+enabled = true
+# Web research best practices
+research_priority = [
+  "official docs",
+  "GitHub",
+  "Stack Overflow",
+  "MDN",
+  "blogs",
+  "Reddit"
+]
+cross_check_sources = 2
+never_invent = ["URLs", "packages", "API methods"]
+search_queries = "specific with version numbers and year"
+output_format = ["Quick Answer", "Details", "Watch Out For", "Sources with URLs"]
+save_to = "RESEARCH.md"
+training_data_cutoff_note = "Training data is outdated - ALWAYS search the web"
+
+[vault.db_master]
+enabled = true
+# Database best practices
+db_selection_priority = [
+  "SQLite + Prisma (learning)",
+  "PostgreSQL + Prisma (web)",
+  "MongoDB + Mongoose (flexible)",
+  "Supabase (quick MVP)"
+]
+schema_defaults = [
+  "id (PK), createdAt, updatedAt",
+  "email UNIQUE",
+  "passwords bcrypt (cost 12+)",
+  "foreign keys with ON DELETE",
+  "indexes on queried columns"
+]
+protected_operations = ["DROP", "DELETE without WHERE", "TRUNCATE", "force-reset"]
+protected_operations_require = "user confirmation"
+credential_rules = [
+  "NEVER hardcode credentials",
+  "Always .env",
+  "Always parameterized queries"
+]
+workflow = ["understand", "design (plain English first)", "implement", "seed", "document in DATABASE.md"]
+migration_auto_fix = true
+
+[launch.deployer]
+enabled = true
+# Deployment best practices
+platforms = ["Vercel (Next.js)", "Railway (backend/full-stack)", "Netlify (static)", "Render (Python)", "Fly.io (workers)"]
+pre_flight_checklist = [
+  "works locally",
+  "build succeeds",
+  "no secrets",
+  "env vars",
+  ".gitignore",
+  "start script"
+]
+deploy_steps = [
+  "test build",
+  "choose platform",
+  "explain free tier",
+  "config",
+  "connect GitHub",
+  "env vars",
+  "deploy",
+  "verify"
+]
+post_deploy = ["auto-deploy", "custom domain", "billing alerts"]
+document_in = "DEPLOY.md"
+auto_fix_build_failures = true
+
+[beaker.tester]
+enabled = true
+# Testing best practices
+test_tools = ["Vitest (JS/TS)", "React Testing Library", "Playwright (E2E)", "pytest", "Supertest (API)"]
+test_priority = [
+  "core logic",
+  "API endpoints",
+  "critical flows (E2E)",
+  "edge cases"
+]
+test_structure = "AAA: Arrange → Act → Assert"
+test_naming = "read like sentences"
+test_isolation = ["one thing per test", "independent", "deterministic"]
+test_documentation = "TESTING.md"
+auto_fix_tests = true
+coverage_target = 80
+test_pyramid = ["unit tests (base)", "integration tests", "E2E tests (top)"]
+test_stress = "high-concurrency, high-throughput scenarios"
+test_adversarial = ["invalid inputs", "edge cases", "malformed data"]
+test_fuzzing = "property-based testing (proptest/quickcheck)"
+test_stress_iterations = "high-iteration counts"
+
+[sentinel.security_guard]
+enabled = true
+# Security best practices
+auth_libraries = ["NextAuth", "Clerk", "Supabase Auth", "Firebase Auth"]
+auth_warning = "NEVER roll your own auth"
+password_hashing = "bcrypt cost 12+"
+jwt_config = ["15min access token", "7d refresh token", "httpOnly cookies"]
+input_validation = ["validate ALL server-side (Zod/Joi)", "sanitize HTML", "parameterized queries"]
+secrets_rule = [".env only", "Committed = ROTATE", "Never log"]
+api_security = ["rate limit", "CORS whitelist", "CSRF tokens", "Helmet.js"]
+rbac = ["default deny", "server-side auth checks on EVERY route"]
+audit = ["npm audit", "severity: 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low"]
+document_in = "SECURITY.md"
+security_headers = ["HSTS", "CSP", "X-Frame-Options", "X-Content-Type-Options"]
+cookie_flags = ["HttpOnly", "Secure", "SameSite"]
+error_messages = "Do not leak internal details"
+
+[nexus.integrator]
+enabled = true
+# Integration best practices
+third_party_docs = "Read official docs"
+env_keys = "Env vars for keys"
+error_handling = "Handle errors, retry with backoff, validate webhook signatures"
+stripe_patterns = ["Checkout/Payment Intents", "Test mode", "Idempotency"]
+email_patterns = ["templates", "bounces", "rate limit"]
+upload_rules = ["validate server-side", "presigned URLs", "sanitize filenames"]
+ai_patterns = ["stream", "max_tokens", "rate limit", "cache"]
+oauth_patterns = ["use library", "validate server-side"]
+webhook_patterns = ["verify → 200 fast → async → log → retries"]
+document_in = "INTEGRATIONS.md"
+auto_fix_checks = ["env vars", "endpoint URL", "auth format", "retry"]
+
+[scribe.documenter]
+enabled = true
+# Documentation best practices
+readme_sections = [
+  "name", "description", "demo", "stack", "setup steps",
+  "scripts", "structure", "env reference"
+]
+env_example_rules = ["all vars with descriptions", "NO real values"]
+changelog_categories = ["Added", "Changed", "Fixed", "Removed"]
+api_docs_sections = [
+  "method", "path", "params", "body", "response", "auth", "examples"
+]
+audience = "beginners"
+keep_in_sync = true
+env_example_required = true
+
+[bolt.optimizer]
+enabled = true
+# Performance best practices
+measure_first = true
+measurement_tool = "Lighthouse"
+frontend_optimizations = [
+  "code split", "lazy load", "WebP", "minimize bundle"
+]
+backend_optimizations = [
+  "fix N+1", "indexes", "paginate", "cache"
+]
+infra_optimizations = ["CDN", "cache headers"]
+performance_tracking = "PERFORMANCE.md"
+seo_checklist = [
+  "Unique title + description per page",
+  "OG + Twitter tags",
+  "Semantic HTML",
+  "sitemap.xml",
+  "JSON-LD",
+  "SSR/SSG for public pages"
+]
+accessibility_checklist = [
+  "Semantic HTML",
+  "Alt text",
+  "Labels",
+  "Keyboard nav",
+  "WCAG AA contrast",
+  "ARIA only when needed",
+  "prefers-reduced-motion"
+]
+tracking_files = ["PERFORMANCE.md", "SEO.md", "ACCESSIBILITY.md"]
+lighthouse_target = 90
+
+[clockwork.automator]
+enabled = true
+# Real-time & jobs best practices
+realtime_options = ["Socket.io", "SSE", "Supabase Realtime"]
+realtime_patterns = [
+  "Connect/disconnect/reconnect",
+  "Presence",
+  "Rooms"
+]
+jobs_options = ["Inngest/Trigger.dev", "BullMQ+Redis"]
+job_patterns = ["Delayed", "cron", "Retry 3x", "Dead letter", "Idempotency"]
+notifications = ["in-app", "email", "push", "preference center"]
+document_in = "REALTIME_JOBS.md"
+websocket_auto_fix = "Reconnection logic"
+job_auto_fix = "Payload adjustments for failed jobs"
+real_time_best_practices = [
+  "WebSocket reconnection logic",
+  "Presence tracking",
+  "Room-based messaging",
+  "Heartbeat/ping-pong",
+  "Message validation",
+  "Rate limiting per connection"
+]
+job_best_practices = [
+  "Exponential backoff retries",
+  "Dead letter queue",
+  "Idempotency keys",
+  "Scheduled cron expressions",
+  "Delayed execution",
+  "Payload size limits"
+]
+
+[ledger.advisor]
+enabled = true
+# Legal, costs, billing best practices
+legal_requirements = [
+  "privacy policy", "ToS", "cookie consent",
+  "GDPR (access/delete/export)", "COPPA"
+]
+cost_estimation = "estimate before deploy"
+free_tier_limits = true
+billing_alerts = true
+monetization = ["Stripe Billing", "freemium (server-side gates)", "usage billing", "refunds"]
+i18n_libraries = ["next-intl", "react-i18next"]
+i18n_features = [
+  "JSON namespaces",
+  "locale URL",
+  "RTL support",
+  "Intl formatting"
+]
+migration_patterns = [
+  "framework upgrades (read guide)",
+  "JS→TS (incremental)",
+  "DB (add→migrate→remove)"
+]
+document_in = ["BUSINESS.md", "TECH_DEBT.md"]
+legal_docs = ["privacy policy", "ToS", "cookie consent"]
+cost_tracking = ["free tier limits", "billing alerts", "static > serverless > always-on"]
+
+[universal_rules]
+universal_rules = [
+  "READ BEFORE WRITE. Always read a file before editing.",
+  "ONE STEP AT A TIME. Small changes. Verify each.",
+  "PLAIN ENGLISH. Boss translates everything for the user.",
+  "DEFINE JARGON. First use of technical terms gets a definition.",
+  "ASK BEFORE DESTROYING. No deletes, drops, force-pushes without user YES.",
+  "SECRETS STAY SECRET. .env only. Rotate if exposed. Never commit.",
+  "AUTO-FIX SILENTLY. Workers fix own errors. 3 attempts before escalating.",
+  "ONE REPORT. User gets ONE clean final report, not a play-by-play.",
+  "COMMIT OFTEN. Branch commits after every successful task.",
+  "STAY ON SCOPE. Small request = small change.",
+  "TEACH WHILE BUILDING. User learns something every interaction.",
+  "CELEBRATE WINS. Building is hard. Acknowledge progress.",
+  "MOBILE FIRST. Always consider mobile users."
+]
+
+[production_readiness]
+checklist = {
+  "forge": "Features complete? No TODOs? Error handling?",
+  "sentinel": "Auth? Secrets? Rate limiting? npm audit?",
+  "beaker": "Core logic? APIs? E2E? All passing?",
+  "bolt": "Lighthouse >90? SEO tags? A11y passing?",
+  "launch": "Build succeeds? Env vars? HTTPS? Billing alerts?",
+  "scribe": "README? .env.example? API docs?",
+  "ledger": "Privacy? ToS? Cookies? GDPR?"
+}
+ratings = ["🟢 Ship It", "🟡 Almost (list fixes)", "🔴 Not Ready (blockers)"]

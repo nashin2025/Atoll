@@ -1,4 +1,4 @@
-name: "CodeQL"
+name: "CodeQL Security Analysis"
 
 on:
   push:
@@ -6,12 +6,14 @@ on:
   pull_request:
     branches: [ main ]
   schedule:
-    - cron: '0 8 * * 6'  # Weekly on Saturday
+    - cron: '0 8 * * 6'  # Weekly on Saturday at 08:00 UTC
+  workflow_dispatch:
 
 jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       actions: read
       contents: read
@@ -21,17 +23,13 @@ jobs:
       fail-fast: false
       matrix:
         language: [ 'rust' ]
-        # CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'ruby' ]
-        # Use only 'java' to analyze code written in Java, Kotlin or Scala
-        # Use only 'javascript' to analyze code written in JavaScript, TypeScript or Flow
-        # If you use CodeQL for analyzing compiled languages such as C++, C#, or Java, the language value must be one of those.
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           queries: +security-and-quality
@@ -41,6 +39,7 @@ jobs:
           cargo build --workspace
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{matrix.language}}"
+          upload: true

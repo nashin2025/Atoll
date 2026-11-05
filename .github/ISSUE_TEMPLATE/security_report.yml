@@ -1,0 +1,64 @@
+name: Security Report
+description: Report a security vulnerability
+title: "[Security] "
+labels: ["security", "critical"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## ⚠️ SECURITY WARNING
+
+        **Do not disclose security issues publicly.**
+
+        Please report security vulnerabilities through our private reporting channel:
+        [security@atollprotocol.org](mailto:security@atollprotocol.org)
+
+        If you must use GitHub, please create a **draft** issue and mark it as private.
+  - type: input
+    id: title
+    attributes:
+      label: Vulnerability Title
+      description: A concise title for the security issue.
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the vulnerability.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: What is the potential impact of this vulnerability?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the vulnerability.
+      placeholder: |
+        1. Run '...'
+        2. Navigate to '...'
+        3. Observe vulnerability
+    validations:
+      required: true
+  - type: textarea
+    id: fix
+    attributes:
+      label: Suggested Fix
+      description: If you have a suggested fix, please describe it here.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have NOT disclosed this vulnerability publicly
+          required: true
+        - label: I have read the SECURITY.md guidelines
+          required: true
