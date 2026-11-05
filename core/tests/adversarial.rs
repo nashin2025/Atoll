@@ -41,7 +41,7 @@ use atoll_core::vm::move_vm::MoveExecutor;
 use atoll_core::vm::riscv::RISCVExecutor;
 use atoll_core::vm::wasm::WASMExecutor;
 use atoll_core::vm::zk_vm::ZKVMExecutor;
-use atoll_core::vm::{ExecutionContext, GasMeter, VMRouter, VMError, VMType};
+use atoll_core::vm::{ExecutionContext, GasMeter, VMError, VMRouter, VMType};
 
 // ---------------------------------------------------------------------------
 // Helpers
