@@ -27,7 +27,7 @@ pub fn test_context() -> ExecutionContext {
         gas_limit: DEFAULT_GAS_LIMIT,
         block_number: 0,
         block_timestamp: 0,
-        chain_id: 777777,
+        chain_id: 777_777,
         difficulty: 1,
         is_static: false,
     }
@@ -123,8 +123,6 @@ pub fn test_fuzz<F, G>(
     F: Fn(&[u8]) -> ExecutionResult,
     G: FnMut() -> Vec<u8>,
 {
-    let mut rng = rand::thread_rng();
-
     for i in 0..iterations {
         let input: Vec<u8> = input_gen();
         let result = execute_fn(&input);
