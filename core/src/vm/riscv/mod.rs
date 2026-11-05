@@ -77,10 +77,7 @@ impl RegisterFile {
         Self { regs: [0; 32] }
     }
 
-    fn read(
-        &self,
-        reg: u8,
-    ) -> u64 {
+    fn read(&self, reg: u8) -> u64 {
         if reg == 0 {
             0
         } else {
@@ -88,11 +85,7 @@ impl RegisterFile {
         }
     }
 
-    fn write(
-        &mut self,
-        reg: u8,
-        value: u64,
-    ) {
+    fn write(&mut self, reg: u8, value: u64) {
         if reg != 0 {
             self.regs[reg as usize] = value;
         }
@@ -112,10 +105,7 @@ impl Memory {
         }
     }
 
-    fn read_u64(
-        &self,
-        addr: u64,
-    ) -> Result<u64, VMError> {
+    fn read_u64(&self, addr: u64) -> Result<u64, VMError> {
         let addr = addr as usize;
         if addr + 8 > self.data.len() {
             return Err(VMError::InvalidMemoryAccess);
@@ -127,11 +117,7 @@ impl Memory {
         Ok(result)
     }
 
-    fn write_u64(
-        &mut self,
-        addr: u64,
-        value: u64,
-    ) -> Result<(), VMError> {
+    fn write_u64(&mut self, addr: u64, value: u64) -> Result<(), VMError> {
         let addr = addr as usize;
         if addr + 8 > self.data.len() {
             return Err(VMError::InvalidMemoryAccess);
@@ -142,10 +128,7 @@ impl Memory {
         Ok(())
     }
 
-    fn read_u32(
-        &self,
-        addr: u64,
-    ) -> Result<u32, VMError> {
+    fn read_u32(&self, addr: u64) -> Result<u32, VMError> {
         let addr = addr as usize;
         if addr + 4 > self.data.len() {
             return Err(VMError::InvalidMemoryAccess);
@@ -157,11 +140,7 @@ impl Memory {
         Ok(result)
     }
 
-    fn write_u32(
-        &mut self,
-        addr: u64,
-        value: u32,
-    ) -> Result<(), VMError> {
+    fn write_u32(&mut self, addr: u64, value: u32) -> Result<(), VMError> {
         let addr = addr as usize;
         if addr + 4 > self.data.len() {
             return Err(VMError::InvalidMemoryAccess);
@@ -276,10 +255,7 @@ const EM_RISCV: u16 = 243;
 const MEMORY_SIZE: usize = 64 * 1024;
 
 impl RISCVExecutor {
-    pub fn new(
-        context: ExecutionContext,
-        gas_limit: u64,
-    ) -> Self {
+    pub fn new(context: ExecutionContext, gas_limit: u64) -> Self {
         Self {
             gas_meter: GasMeter::new(gas_limit, context.gas_price),
             context,
@@ -784,10 +760,7 @@ impl RISCVExecutor {
     }
 
     /// Parse and validate ELF64 header
-    fn parse_elf_header(
-        &self,
-        binary: &[u8],
-    ) -> Result<Elf64Header, VMError> {
+    fn parse_elf_header(&self, binary: &[u8]) -> Result<Elf64Header, VMError> {
         if binary.len() < 64 {
             return Err(VMError::InvalidInstruction);
         }

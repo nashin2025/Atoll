@@ -56,10 +56,7 @@ pub struct AIVMExecutor {
 }
 
 impl AIVMExecutor {
-    pub fn new(
-        context: ExecutionContext,
-        gas_limit: u64,
-    ) -> Self {
+    pub fn new(context: ExecutionContext, gas_limit: u64) -> Self {
         Self {
             gas_meter: GasMeter::new(gas_limit, context.gas_price),
             context,
@@ -70,10 +67,7 @@ impl AIVMExecutor {
     }
 
     /// Deploys an AI model on-chain with content-addressable storage
-    pub fn deploy_model(
-        &mut self,
-        model_bytes: &[u8],
-    ) -> Result<ExecutionResult, VMError> {
+    pub fn deploy_model(&mut self, model_bytes: &[u8]) -> Result<ExecutionResult, VMError> {
         // Validate model is non-empty and has minimum ONNX header size
         if model_bytes.len() < 12 {
             return Err(VMError::InvalidInstruction);

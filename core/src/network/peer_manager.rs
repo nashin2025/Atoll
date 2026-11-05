@@ -45,11 +45,7 @@ impl PeerManager {
     }
 
     /// Adds a new peer
-    pub fn add_peer(
-        &mut self,
-        node_id: NodeId,
-        info: PeerInfo,
-    ) -> bool {
+    pub fn add_peer(&mut self, node_id: NodeId, info: PeerInfo) -> bool {
         if self.banned_peers.contains_key(&node_id) {
             return false;
         }
@@ -80,29 +76,19 @@ impl PeerManager {
     }
 
     /// Removes a peer
-    pub fn remove_peer(
-        &mut self,
-        node_id: &NodeId,
-    ) {
+    pub fn remove_peer(&mut self, node_id: &NodeId) {
         self.peers.remove(node_id);
     }
 
     /// Marks a peer as disconnected
-    pub fn disconnect_peer(
-        &mut self,
-        node_id: &NodeId,
-    ) {
+    pub fn disconnect_peer(&mut self, node_id: &NodeId) {
         if let Some(meta) = self.peers.get_mut(node_id) {
             meta.status = PeerStatus::Disconnected;
         }
     }
 
     /// Bans a peer for a given duration (seconds)
-    pub fn ban_peer(
-        &mut self,
-        node_id: NodeId,
-        duration_secs: u64,
-    ) {
+    pub fn ban_peer(&mut self, node_id: NodeId, duration_secs: u64) {
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
@@ -112,10 +98,7 @@ impl PeerManager {
     }
 
     /// Checks if a peer is banned
-    pub fn is_banned(
-        &self,
-        node_id: &NodeId,
-    ) -> bool {
+    pub fn is_banned(&self, node_id: &NodeId) -> bool {
         if let Some(ban_until) = self.banned_peers.get(node_id) {
             let now = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -141,10 +124,7 @@ impl PeerManager {
     }
 
     /// Returns peer info for a node ID
-    pub fn get_peer(
-        &self,
-        node_id: &NodeId,
-    ) -> Option<&PeerMeta> {
+    pub fn get_peer(&self, node_id: &NodeId) -> Option<&PeerMeta> {
         self.peers.get(node_id)
     }
 
@@ -158,32 +138,21 @@ impl PeerManager {
     }
 
     /// Records a message sent to a peer
-    pub fn record_message_sent(
-        &mut self,
-        node_id: &NodeId,
-    ) {
+    pub fn record_message_sent(&mut self, node_id: &NodeId) {
         if let Some(meta) = self.peers.get_mut(node_id) {
             meta.messages_sent += 1;
         }
     }
 
     /// Records a message received from a peer
-    pub fn record_message_received(
-        &mut self,
-        node_id: &NodeId,
-    ) {
+    pub fn record_message_received(&mut self, node_id: &NodeId) {
         if let Some(meta) = self.peers.get_mut(node_id) {
             meta.messages_received += 1;
         }
     }
 
     /// Updates ping/pong timestamps
-    pub fn update_ping_pong(
-        &mut self,
-        node_id: &NodeId,
-        ping: u64,
-        pong: Option<u64>,
-    ) {
+    pub fn update_ping_pong(&mut self, node_id: &NodeId, ping: u64, pong: Option<u64>) {
         if let Some(meta) = self.peers.get_mut(node_id) {
             meta.last_ping = Some(ping);
             meta.last_pong = pong;

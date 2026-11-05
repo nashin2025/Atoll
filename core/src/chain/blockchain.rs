@@ -67,18 +67,12 @@ impl Blockchain {
     }
 
     /// Returns a block by hash
-    pub fn get_block(
-        &self,
-        hash: &Hash512,
-    ) -> Option<&Block> {
+    pub fn get_block(&self, hash: &Hash512) -> Option<&Block> {
         self.blocks.get(hash)
     }
 
     /// Returns a block by height
-    pub fn get_block_by_height(
-        &self,
-        height: u64,
-    ) -> Option<&Block> {
+    pub fn get_block_by_height(&self, height: u64) -> Option<&Block> {
         self.blocks_by_height
             .get(&height)
             .and_then(|h| self.blocks.get(h))
@@ -127,20 +121,14 @@ impl Blockchain {
     }
 
     /// Finalizes blocks up to the given height
-    pub fn finalize(
-        &mut self,
-        height: u64,
-    ) {
+    pub fn finalize(&mut self, height: u64) {
         if height > self.finalized_height {
             self.finalized_height = height;
         }
     }
 
     /// Returns the state root at a given height
-    pub fn state_root_at(
-        &self,
-        height: u64,
-    ) -> Option<&Hash512> {
+    pub fn state_root_at(&self, height: u64) -> Option<&Hash512> {
         self.state_roots.get(&height)
     }
 
@@ -150,10 +138,7 @@ impl Blockchain {
     }
 
     /// Returns the proposer of the block at a given height
-    pub fn proposer_at(
-        &self,
-        height: u64,
-    ) -> Option<&Address> {
+    pub fn proposer_at(&self, height: u64) -> Option<&Address> {
         self.get_block_by_height(height).map(|b| &b.header.proposer)
     }
 
@@ -163,10 +148,7 @@ impl Blockchain {
     /// internal `blocks` map. This is needed by the GraphQL layer to expose
     /// the block hash on the `Block` type, since the `Block` struct itself
     /// does not store its own hash.
-    pub fn get_block_and_hash_by_height(
-        &self,
-        height: u64,
-    ) -> Option<(Hash512, &Block)> {
+    pub fn get_block_and_hash_by_height(&self, height: u64) -> Option<(Hash512, &Block)> {
         self.blocks_by_height
             .get(&height)
             .and_then(|h| self.blocks.get(h).map(|b| (*h, b)))

@@ -53,10 +53,7 @@ pub struct ZKVMExecutor {
 }
 
 impl ZKVMExecutor {
-    pub fn new(
-        context: ExecutionContext,
-        gas_limit: u64,
-    ) -> Self {
+    pub fn new(context: ExecutionContext, gas_limit: u64) -> Self {
         Self {
             gas_meter: GasMeter::new(gas_limit, context.gas_price),
             context,
@@ -66,10 +63,7 @@ impl ZKVMExecutor {
     }
 
     /// Deploys a ZK circuit on-chain with content-addressable storage
-    pub fn deploy_circuit(
-        &mut self,
-        circuit_bytes: &[u8],
-    ) -> Result<ExecutionResult, VMError> {
+    pub fn deploy_circuit(&mut self, circuit_bytes: &[u8]) -> Result<ExecutionResult, VMError> {
         // Validate circuit is non-empty and has minimum size
         if circuit_bytes.is_empty() || circuit_bytes.len() < 12 {
             return Err(VMError::InvalidInstruction);

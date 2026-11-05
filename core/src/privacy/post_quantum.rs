@@ -92,10 +92,7 @@ impl PQSignatureEngine {
     }
 
     /// Generates a PQ key pair
-    pub fn generate_keypair(
-        &self,
-        scheme: PQSignatureScheme,
-    ) -> Result<PQKeyPair, String> {
+    pub fn generate_keypair(&self, scheme: PQSignatureScheme) -> Result<PQKeyPair, String> {
         let (public_key_size, secret_key_size) = self.key_sizes(scheme);
 
         Ok(PQKeyPair {
@@ -106,11 +103,7 @@ impl PQSignatureEngine {
     }
 
     /// Signs a message with a PQ key pair
-    pub fn sign(
-        &self,
-        message: &[u8],
-        keypair: &PQKeyPair,
-    ) -> Result<PQSignature, String> {
+    pub fn sign(&self, message: &[u8], keypair: &PQKeyPair) -> Result<PQSignature, String> {
         if keypair.secret_key.is_empty() {
             return Err("Empty secret key".to_string());
         }
@@ -172,10 +165,7 @@ impl PQSignatureEngine {
     }
 
     /// Returns key sizes for a scheme
-    fn key_sizes(
-        &self,
-        scheme: PQSignatureScheme,
-    ) -> (usize, usize) {
+    fn key_sizes(&self, scheme: PQSignatureScheme) -> (usize, usize) {
         match scheme {
             PQSignatureScheme::Dilithium2 => (1312, 2560),
             PQSignatureScheme::Dilithium3 => (1952, 4032),
@@ -190,10 +180,7 @@ impl PQSignatureEngine {
     }
 
     /// Returns signature size for a scheme
-    fn signature_size(
-        &self,
-        scheme: PQSignatureScheme,
-    ) -> usize {
+    fn signature_size(&self, scheme: PQSignatureScheme) -> usize {
         match scheme {
             PQSignatureScheme::Dilithium2 => 2421,
             PQSignatureScheme::Dilithium3 => 3330,
@@ -218,10 +205,7 @@ impl PQKEMEngine {
     }
 
     /// Generates a KEM key pair
-    pub fn generate_keypair(
-        &self,
-        scheme: PQKEMScheme,
-    ) -> Result<PQKEMKeyPair, String> {
+    pub fn generate_keypair(&self, scheme: PQKEMScheme) -> Result<PQKEMKeyPair, String> {
         let (public_key_size, secret_key_size) = self.key_sizes(scheme);
 
         Ok(PQKEMKeyPair {
@@ -255,11 +239,7 @@ impl PQKEMEngine {
     }
 
     /// Decapsulates a shared secret
-    pub fn decapsulate(
-        &self,
-        ciphertext: &[u8],
-        _secret_key: &[u8],
-    ) -> Result<Vec<u8>, String> {
+    pub fn decapsulate(&self, ciphertext: &[u8], _secret_key: &[u8]) -> Result<Vec<u8>, String> {
         if ciphertext.is_empty() {
             return Err("Empty ciphertext".to_string());
         }
@@ -270,10 +250,7 @@ impl PQKEMEngine {
     }
 
     /// Returns key sizes for a KEM scheme
-    fn key_sizes(
-        &self,
-        scheme: PQKEMScheme,
-    ) -> (usize, usize) {
+    fn key_sizes(&self, scheme: PQKEMScheme) -> (usize, usize) {
         match scheme {
             PQKEMScheme::Kyber512 => (800, 1632),
             PQKEMScheme::Kyber768 => (1184, 2400),
@@ -312,11 +289,7 @@ impl HybridSignatureEngine {
     }
 
     /// Signs with hybrid signature
-    pub fn sign(
-        &self,
-        message: &[u8],
-        keypair: &HybridKeyPair,
-    ) -> Result<HybridSignature, String> {
+    pub fn sign(&self, message: &[u8], keypair: &HybridKeyPair) -> Result<HybridSignature, String> {
         let classical_sig = Hash512::blake3(&[message, &keypair.classical].concat()).0;
 
         let pq_sig = self.pq_engine.sign(

@@ -90,10 +90,7 @@ impl NodeIdentity {
     /// ## Limitation (MVP)
     ///
     /// The key is written in plaintext with no encryption at rest.
-    pub fn save(
-        &self,
-        path: impl AsRef<Path>,
-    ) -> io::Result<()> {
+    pub fn save(&self, path: impl AsRef<Path>) -> io::Result<()> {
         let mut buf = [0u8; IDENTITY_FILE_LEN];
         buf[..SECRET_KEY_LEN].copy_from_slice(&self.secret_key);
         buf[SECRET_KEY_LEN..].copy_from_slice(&self.public_key);
