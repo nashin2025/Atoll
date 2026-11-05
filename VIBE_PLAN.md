@@ -70,8 +70,10 @@ Phase 2: Morph-Hash Production - COMPLETE
 Phase 3: Penta-Consensus Production - COMPLETE
 Phase 4: Sharding Production - COMPLETE
 Phase 5: Privacy & Security - COMPLETE
-
 Phase 6: Testing & Auditing - COMPLETE
+Mainnet Preparation (Docker, CI/CD, health/metrics, genesis, bootstrap, TLS, auth, RC tag) - COMPLETE
+
+RC Tag: v0.1.0-rc.1
 
 ---
 
