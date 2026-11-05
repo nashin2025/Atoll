@@ -1,12 +1,15 @@
+secrets/
+data/
+.env*
 target/
 **/target/
-.git
+*.log
+.git/
 .gitignore
 *.md
 audits/
 bridges/
 docs/
-explorer/
 prototypes/
 scripts/
 specification/

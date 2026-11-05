@@ -48,42 +48,6 @@ services:
     stop_grace_period: 30s
     stop_signal: SIGTERM
 
-  atoll-db:
-    image: postgres:15-alpine
-    container_name: atoll-db
-    environment:
-      - POSTGRES_DB=atoll
-      - POSTGRES_USER=atoll
-      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
-    secrets:
-      - db_password
-    volumes:
-      - atoll-db-data:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U atoll -d atoll"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    read_only: true
-    tmpfs:
-      - /tmp:noexec,nosuid,size=50m
-    user: "999:999"
-    networks:
-      - atoll-network
-    mem_limit: 1g
-    cpus: '0.5'
-    pids_limit: 50
-
-secrets:
-  db_password:
-    file: ./secrets/db_password.txt
-
 networks:
   atoll-network:
     driver: bridge
@@ -98,5 +62,3 @@ volumes:
       type: none
       o: bind
       device: ${ATOLL_DATA_DIR:-./data}
-  atoll-db-data:
-    driver: local

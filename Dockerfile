@@ -21,8 +21,6 @@ COPY Cargo.lock Cargo.toml ./
 COPY core/Cargo.toml core/Cargo.toml
 COPY wallet/cli/Cargo.toml wallet/cli/Cargo.toml
 COPY wallet/gui/src-tauri/Cargo.toml wallet/gui/src-tauri/Cargo.toml
-COPY explorer/frontend/package.json explorer/frontend/package.json
-COPY explorer/frontend/package-lock.json explorer/frontend/package-lock.json
 
 # Download and cache dependencies separately from source compilation.
 RUN cargo fetch --locked
@@ -33,11 +31,17 @@ COPY wallet/cli/src wallet/cli/src
 RUN cargo build --release --locked -p atoll-core
 
 # ---------------------------------------------------------------------------
-# Runtime stage: distroless container with minimal attack surface.
-# Uses distroless/static (no shell) for maximum security.
+# Runtime stage: debian:bookworm-slim container with wget-based healthcheck.
 # ---------------------------------------------------------------------------
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM debian:bookworm-slim
 WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        wget \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -r -s /bin/false nonroot
 
 COPY --from=builder /app/target/release/atoll-core /usr/local/bin/atoll-node
 COPY config/default.config.toml /etc/atoll/config.toml
@@ -46,7 +50,7 @@ EXPOSE 8080/tcp
 EXPOSE 30333/tcp
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD ["/healthcheck"] || exit 1
+    CMD ["wget", "--spider", "-q", "http://localhost:8080/health"] || exit 1
 
-USER nonroot:nonroot
+USER nonroot
 ENTRYPOINT ["/usr/local/bin/atoll-node", "--config", "/etc/atoll/config.toml"]
