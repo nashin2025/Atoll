@@ -51,6 +51,10 @@ clap = { version = "4", features = ["derive"] }
 # HTTP server for health / metrics endpoints
 axum = "0.7"
 
+# GraphQL server (async-graphql + axum integration) — Block Explorer backend
+async-graphql = "7"
+async-graphql-axum = "7"
+
 # Prometheus metrics exposition for the `GET /metrics` endpoint
 prometheus = "0.13"
 

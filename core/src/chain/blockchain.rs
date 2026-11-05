@@ -141,6 +141,18 @@ impl Blockchain {
     pub fn proposer_at(&self, height: u64) -> Option<&Address> {
         self.get_block_by_height(height).map(|b| &b.header.proposer)
     }
+
+    /// Returns a block by height along with its hash.
+    ///
+    /// The hash is the `Hash512` key under which the block is stored in the
+    /// internal `blocks` map. This is needed by the GraphQL layer to expose
+    /// the block hash on the `Block` type, since the `Block` struct itself
+    /// does not store its own hash.
+    pub fn get_block_and_hash_by_height(&self, height: u64) -> Option<(Hash512, &Block)> {
+        self.blocks_by_height
+            .get(&height)
+            .and_then(|h| self.blocks.get(h).map(|b| (*h, b)))
+    }
 }
 
 impl Default for Blockchain {
