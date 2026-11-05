@@ -208,7 +208,7 @@ jobs:
           shared-key: "v1-rust-build"
 
       - name: Build workspace
-        run: cargo build --workspace --release
+        run: cargo build --workspace --release --locked
 
   # ============================================================================
   # BENCHMARKS
