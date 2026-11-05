@@ -211,7 +211,7 @@ mod tests {
 
     #[test]
     fn network_message_get_block_variant() {
-        let msg = NetworkMessage::GetBlock(Hash512::from_bytes(&[5u8; 64]));
+        let msg = NetworkMessage::GetBlock(Hash512::from_bytes(&[5u8; 64]).unwrap());
         assert!(matches!(msg, NetworkMessage::GetBlock(_)));
     }
 
@@ -402,8 +402,8 @@ mod tests {
     fn network_block_header_construction() {
         let header = BlockHeader {
             height: 100,
-            hash: Hash512::from_bytes(&[1u8; 64]),
-            prev_hash: Hash512::from_bytes(&[2u8; 64]),
+            hash: Hash512::from_bytes(&[1u8; 64]).unwrap(),
+            prev_hash: Hash512::from_bytes(&[2u8; 64]).unwrap(),
             timestamp: 1798761600,
         };
         assert_eq!(header.height, 100);
@@ -413,7 +413,7 @@ mod tests {
     #[test]
     fn state_request_construction() {
         let req = StateRequest {
-            state_root: Hash512::from_bytes(&[3u8; 64]),
+            state_root: Hash512::from_bytes(&[3u8; 64]).unwrap(),
         };
         assert_eq!(req.state_root.to_array().len(), 64);
     }

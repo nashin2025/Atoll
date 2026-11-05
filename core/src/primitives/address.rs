@@ -28,12 +28,18 @@ impl Address {
 
     /// Creates an Address from a byte slice.
     ///
-    /// # Panics
-    /// Panics if `bytes` is not exactly 20 bytes long.
-    pub fn from_slice(bytes: &[u8]) -> Self {
+    /// # Errors
+    /// Returns an error if `bytes` is not exactly 20 bytes long.
+    pub fn from_slice(bytes: &[u8]) -> Result<Self, String> {
+        if bytes.len() != 20 {
+            return Err(format!(
+                "Invalid Address length: expected 20 bytes, got {}",
+                bytes.len()
+            ));
+        }
         let mut result = [0u8; 20];
         result.copy_from_slice(bytes);
-        Self(result)
+        Ok(Self(result))
     }
 
     /// Creates an Address from a public key by computing `blake3(public_key)[..20]`.
@@ -45,6 +51,7 @@ impl Address {
         let hash = Hash512::blake3(public_key);
         let bytes = hash.to_bytes();
         Self::from_slice(&bytes[..20])
+            .expect("blake3 output is always 64 bytes; first 20 are valid")
     }
 
     /// Returns the inner byte array.
@@ -143,15 +150,27 @@ mod tests {
     #[test]
     fn from_slice_roundtrip() {
         let data = [7u8; 20];
-        let addr = Address::from_slice(&data);
+        let addr = Address::from_slice(&data).unwrap();
         assert_eq!(addr.to_bytes(), data);
+    }
+
+    #[test]
+    fn from_slice_invalid_length_returns_error() {
+        // from_slice returns an error if not exactly 20 bytes
+        let result = Address::from_slice(&[1u8; 19]);
+        assert!(result.is_err());
+        let result = Address::from_slice(&[1u8; 21]);
+        assert!(result.is_err());
+        // Correct length works
+        let addr = Address::from_slice(&[7u8; 20]).unwrap();
+        assert_eq!(addr.to_bytes(), [7u8; 20]);
     }
 
     #[test]
     fn from_public_key_matches_blake3_truncation() {
         let public_key = [42u8; 32];
         let expected_hash = Hash512::blake3(&public_key);
-        let expected = Address::from_slice(&expected_hash.to_bytes()[..20]);
+        let expected = Address::from_slice(&expected_hash.to_bytes()[..20]).unwrap();
         assert_eq!(Address::from_public_key(&public_key), expected);
     }
 

@@ -60,7 +60,7 @@ fn make_address(bytes: [u8; 20]) -> Address {
 }
 
 fn make_hash(bytes: [u8; 64]) -> Hash512 {
-    Hash512::from_bytes(&bytes)
+    Hash512::from_bytes(&bytes).unwrap()
 }
 
 fn make_valid_pouw() -> pouw::PoUWResult {
@@ -140,11 +140,15 @@ fn hash512_from_hex_with_0x_prefix() {
 }
 
 #[test]
-fn hash512_from_bytes_wrong_length_panics() {
-    // from_bytes panics if not exactly 64 bytes - test that it works with correct length
-    let h = Hash512::from_bytes(&[1u8; 64]);
+fn hash512_from_bytes_wrong_length_returns_error() {
+    // from_bytes returns an error if not exactly 64 bytes
+    let result = Hash512::from_bytes(&[1u8; 63]);
+    assert!(result.is_err());
+    let result = Hash512::from_bytes(&[1u8; 65]);
+    assert!(result.is_err());
+    // Correct length works
+    let h = Hash512::from_bytes(&[1u8; 64]).unwrap();
     assert_eq!(h.0, [1u8; 64]);
-    // from_array is const and always correct length
     let h2 = Hash512::from_array([2u8; 64]);
     assert_eq!(h2.0, [2u8; 64]);
 }
@@ -688,7 +692,7 @@ fn shard_manager_remove_nonexistent_shard() {
     let mut manager = ShardManager::new();
     let result = manager.remove_shard(999);
     assert!(result.is_err());
-    assert_eq!(result.unwrap_err(), "Shard 999 does not exist");
+    assert_eq!(result.unwrap_err(), "Shard does not exist");
 }
 
 #[test]
@@ -732,10 +736,7 @@ fn cross_shard_execute_receipt_twice() {
     let result = xshard_mgr.execute_receipt(&receipt_id, 160);
     assert!(result.is_err());
     // Receipt was removed from pending after first execution, so it's "not found"
-    assert_eq!(
-        result.unwrap_err().as_str(),
-        format!("Receipt {:?} not found", receipt_id).as_str()
-    );
+    assert_eq!(result.unwrap_err(), "Receipt not found");
 }
 
 // ---------------------------------------------------------------------------

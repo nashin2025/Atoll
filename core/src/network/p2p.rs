@@ -69,7 +69,7 @@ impl PeerConnection {
     ) -> Result<Self, String> {
         let tcp = TcpStream::connect(address)
             .await
-            .map_err(|e| format!("Connection failed: {}", e))?;
+            .map_err(|_| "Connection failed".to_string())?;
 
         // tokio sockets are non-blocking; switch to blocking mode so the
         // synchronous Noise handshake (and the blocking IO used by NoiseStream)
@@ -97,10 +97,7 @@ impl PeerConnection {
         // Verify the peer fingerprint matches the expected node id, if known.
         if let Some(expected) = expected_node_id {
             if node_id != expected {
-                return Err(format!(
-                    "Peer fingerprint mismatch: expected {:?}, got {:?}",
-                    expected, node_id
-                ));
+                return Err("Peer fingerprint mismatch".to_string());
             }
         }
 
@@ -148,7 +145,7 @@ impl PeerConnection {
         // Reject unreasonably large payloads to prevent memory exhaustion
         const MAX_MESSAGE_SIZE: usize = 16 * 1024 * 1024; // 16 MB
         if len > MAX_MESSAGE_SIZE {
-            return Err(format!("Message too large: {} bytes", len));
+            return Err("Message too large".to_string());
         }
 
         // Read payload
@@ -328,7 +325,7 @@ impl PeerConnection {
                 }
                 Ok(NetworkMessage::Neighbors(NeighborsMessage { peers }))
             }
-            _ => Err(format!("Unknown message type: {}", msg_type)),
+            _ => Err("Unknown message type".to_string()),
         }
     }
 }
@@ -347,14 +344,14 @@ fn perform_initiator_handshake(
 ) -> Result<TransportState, String> {
     let params: snow::params::NoiseParams = "Noise_XX_25519_ChaChaPoly_BLAKE2s"
         .parse()
-        .map_err(|e| format!("Invalid noise params: {e}"))?;
+        .map_err(|_| "Invalid noise params".to_string())?;
 
     let secret_key = identity.secret_key();
     let mut hs = Builder::new(params)
         .local_private_key(&secret_key)
-        .map_err(|e| format!("Failed to set local static key: {e}"))?
+        .map_err(|_| "Failed to set local static key".to_string())?
         .build_initiator()
-        .map_err(|e| format!("Failed to build initiator handshake state: {e}"))?;
+        .map_err(|_| "Failed to build initiator handshake state".to_string())?;
 
     let mut msg_buf = [0u8; 65535];
     let mut resp_buf = [0u8; 65535];
@@ -362,23 +359,23 @@ fn perform_initiator_handshake(
     // 1. -> e (initiator's first message: empty payload, ephemeral key only)
     let len = hs
         .write_message(&[], &mut msg_buf)
-        .map_err(|e| format!("Handshake write (msg 1) failed: {e}"))?;
-    send_frame(tcp, &msg_buf[..len]).map_err(|e| format!("Handshake send (msg 1) failed: {e}"))?;
+        .map_err(|_| "Handshake write (msg 1) failed".to_string())?;
+    send_frame(tcp, &msg_buf[..len]).map_err(|_| "Handshake send (msg 1) failed".to_string())?;
 
     // 2. <- e, ee, s, es (responder's response; authenticates their static key)
-    let resp = recv_frame(tcp, &mut resp_buf)
-        .map_err(|e| format!("Handshake recv (msg 2) failed: {e}"))?;
+    let resp =
+        recv_frame(tcp, &mut resp_buf).map_err(|_| "Handshake recv (msg 2) failed".to_string())?;
     hs.read_message(resp, &mut msg_buf)
-        .map_err(|e| format!("Handshake read (msg 2) failed: {e}"))?;
+        .map_err(|_| "Handshake read (msg 2) failed".to_string())?;
 
     // 3. -> s, se (our static key, encrypted)
     let len = hs
         .write_message(&[], &mut msg_buf)
-        .map_err(|e| format!("Handshake write (msg 3) failed: {e}"))?;
-    send_frame(tcp, &msg_buf[..len]).map_err(|e| format!("Handshake send (msg 3) failed: {e}"))?;
+        .map_err(|_| "Handshake write (msg 3) failed".to_string())?;
+    send_frame(tcp, &msg_buf[..len]).map_err(|_| "Handshake send (msg 3) failed".to_string())?;
 
     hs.into_transport_mode()
-        .map_err(|e| format!("Handshake finalize (into transport mode) failed: {e}"))
+        .map_err(|_| "Handshake finalize (into transport mode) failed".to_string())
 }
 
 /// Send a single Noise message framed with a 4-byte little-endian length prefix.
@@ -640,38 +637,38 @@ fn perform_responder_handshake(
 ) -> Result<TransportState, String> {
     let params: snow::params::NoiseParams = "Noise_XX_25519_ChaChaPoly_BLAKE2s"
         .parse()
-        .map_err(|e| format!("Invalid noise params: {e}"))?;
+        .map_err(|_| "Invalid noise params".to_string())?;
 
     let secret_key = identity.secret_key();
     let mut hs = Builder::new(params)
         .local_private_key(&secret_key)
-        .map_err(|e| format!("Failed to set local static key: {e}"))?
+        .map_err(|_| "Failed to set local static key".to_string())?
         .build_responder()
-        .map_err(|e| format!("Failed to build responder handshake state: {e}"))?;
+        .map_err(|_| "Failed to build responder handshake state".to_string())?;
 
     let mut msg_buf = [0u8; 65535];
     let mut resp_buf = [0u8; 65535];
 
     // 1. <- e (initiator's first message: ephemeral key only)
     let init_msg =
-        recv_frame(tcp, &mut msg_buf).map_err(|e| format!("Handshake recv (msg 1) failed: {e}"))?;
+        recv_frame(tcp, &mut msg_buf).map_err(|_| "Handshake recv (msg 1) failed".to_string())?;
     hs.read_message(init_msg, &mut resp_buf)
-        .map_err(|e| format!("Handshake read (msg 1) failed: {e}"))?;
+        .map_err(|_| "Handshake read (msg 1) failed".to_string())?;
 
     // 2. -> e, ee, s, es (our response; authenticates our static key)
     let len = hs
         .write_message(&[], &mut msg_buf)
-        .map_err(|e| format!("Handshake write (msg 2) failed: {e}"))?;
-    send_frame(tcp, &msg_buf[..len]).map_err(|e| format!("Handshake send (msg 2) failed: {e}"))?;
+        .map_err(|_| "Handshake write (msg 2) failed".to_string())?;
+    send_frame(tcp, &msg_buf[..len]).map_err(|_| "Handshake send (msg 2) failed".to_string())?;
 
     // 3. <- s, se (initiator's third message; authenticates their static key)
-    let resp = recv_frame(tcp, &mut resp_buf)
-        .map_err(|e| format!("Handshake recv (msg 3) failed: {e}"))?;
+    let resp =
+        recv_frame(tcp, &mut resp_buf).map_err(|_| "Handshake recv (msg 3) failed".to_string())?;
     hs.read_message(resp, &mut msg_buf)
-        .map_err(|e| format!("Handshake read (msg 3) failed: {e}"))?;
+        .map_err(|_| "Handshake read (msg 3) failed".to_string())?;
 
     hs.into_transport_mode()
-        .map_err(|e| format!("Handshake finalize (into transport mode) failed: {e}"))
+        .map_err(|_| "Handshake finalize (into transport mode) failed".to_string())
 }
 
 #[cfg(test)]

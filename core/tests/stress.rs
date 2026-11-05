@@ -44,7 +44,7 @@ fn make_address(bytes: [u8; 20]) -> Address {
 }
 
 fn make_hash(bytes: [u8; 64]) -> Hash512 {
-    Hash512::from_bytes(&bytes)
+    Hash512::from_bytes(&bytes).unwrap()
 }
 
 fn make_valid_pouw() -> pouw::PoUWResult {
@@ -147,7 +147,7 @@ fn morph_hash_concurrent_engines() {
     let all_hashes: Vec<Vec<Hash512>> = (0..num_engines)
         .map(|engine_id| {
             let mut engine = MorphHashEngine::new();
-            let prev_hash = Hash512::from_bytes(&[engine_id as u8; 64]);
+            let prev_hash = Hash512::from_bytes(&[engine_id as u8; 64]).unwrap();
             (0..hashes_per_engine)
                 .map(|i| {
                     engine.morph_hash(
@@ -218,7 +218,11 @@ fn blockchain_rejects_out_of_order_blocks() {
     let hash1 = bc.insert_block(block1, &validation).unwrap();
 
     // Try to insert block with wrong prev_hash
-    let block2_wrong = make_block(Hash512::from_bytes(&[9u8; 64]), 2, make_address([3u8; 20]));
+    let block2_wrong = make_block(
+        Hash512::from_bytes(&[9u8; 64]).unwrap(),
+        2,
+        make_address([3u8; 20]),
+    );
     let result = bc.insert_block(block2_wrong, &validation);
     assert!(result.is_err());
 

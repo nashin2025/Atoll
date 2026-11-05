@@ -54,7 +54,7 @@ fn make_address(bytes: [u8; 20]) -> Address {
 }
 
 fn make_hash(bytes: [u8; 64]) -> Hash512 {
-    Hash512::from_bytes(&bytes)
+    Hash512::from_bytes(&bytes).unwrap()
 }
 
 fn make_valid_pouw() -> pouw::PoUWResult {

@@ -245,7 +245,7 @@ mod tests {
                 height: 1,
                 shard_id: 0,
                 timestamp: 1000,
-                prev_hash: Hash512::from_bytes(&[1u8; 64]), // Wrong prev hash
+                prev_hash: Hash512::from_bytes(&[1u8; 64]).unwrap(), // Wrong prev hash
                 state_root: Hash512::zero(),
                 transaction_root: Hash512::zero(),
                 proposer: Address::zero(),
@@ -296,7 +296,7 @@ mod tests {
     #[test]
     fn state_root_at() {
         let mut bc = Blockchain::default();
-        let state_root = Hash512::from_bytes(&[42u8; 64]);
+        let state_root = Hash512::from_bytes(&[42u8; 64]).unwrap();
         bc.state_roots.insert(0, state_root);
         assert_eq!(bc.state_root_at(0), Some(&state_root));
         assert_eq!(bc.state_root_at(1), None);

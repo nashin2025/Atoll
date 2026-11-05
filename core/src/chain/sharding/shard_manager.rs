@@ -49,7 +49,7 @@ impl ShardManager {
         }
 
         if self.shards.contains_key(&shard_id) {
-            return Err(format!("Shard {} already exists", shard_id));
+            return Err("Shard already exists".to_string());
         }
 
         let state = ShardState::new(shard_id);
@@ -65,13 +65,13 @@ impl ShardManager {
     /// Removes a shard from the network
     pub fn remove_shard(&mut self, shard_id: ShardId) -> Result<(), String> {
         if !self.shards.contains_key(&shard_id) {
-            return Err(format!("Shard {} does not exist", shard_id));
+            return Err("Shard does not exist".to_string());
         }
 
         // Check if shard has validators
         if let Some(validators) = self.validator_assignments.get(&shard_id) {
             if !validators.is_empty() {
-                return Err(format!("Shard {} has active validators", shard_id));
+                return Err("Shard has active validators".to_string());
             }
         }
 
@@ -90,7 +90,7 @@ impl ShardManager {
         validators: Vec<Address>,
     ) -> Result<(), String> {
         if !self.shards.contains_key(&shard_id) {
-            return Err(format!("Shard {} does not exist", shard_id));
+            return Err("Shard does not exist".to_string());
         }
 
         let config = self.configs.get(&shard_id).unwrap();
@@ -124,7 +124,7 @@ impl ShardManager {
         validators: &[Address],
     ) -> Result<(), String> {
         if !self.shards.contains_key(&shard_id) {
-            return Err(format!("Shard {} does not exist", shard_id));
+            return Err("Shard does not exist".to_string());
         }
 
         let shard_validators = self.validator_assignments.get_mut(&shard_id).unwrap();
@@ -160,7 +160,7 @@ impl ShardManager {
             state.gas_limit = gas_limit;
             Ok(())
         } else {
-            Err(format!("Shard {} does not exist", shard_id))
+            Err("Shard does not exist".to_string())
         }
     }
 
@@ -342,7 +342,7 @@ mod tests {
         let result = manager.update_shard_state(
             0,
             100,
-            Hash512::from_bytes(&[1u8; 64]),
+            Hash512::from_bytes(&[1u8; 64]).unwrap(),
             0.8,
             500,
             1_000_000,

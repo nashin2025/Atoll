@@ -258,7 +258,7 @@ mod tests {
     #[test]
     fn crosslink_creation() {
         let mut bc = BeaconChain::new();
-        let root = Hash512::from_bytes(&[42u8; 64]);
+        let root = Hash512::from_bytes(&[42u8; 64]).unwrap();
 
         bc.create_crosslink(0, root, 5);
         assert_eq!(bc.crosslinks.len(), 1);

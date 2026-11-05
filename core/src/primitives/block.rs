@@ -96,9 +96,9 @@ mod tests {
             height: 42,
             shard_id: 1,
             timestamp: 1798761600,
-            prev_hash: Hash512::from_bytes(&[1u8; 64]),
-            state_root: Hash512::from_bytes(&[2u8; 64]),
-            transaction_root: Hash512::from_bytes(&[3u8; 64]),
+            prev_hash: Hash512::from_bytes(&[1u8; 64]).unwrap(),
+            state_root: Hash512::from_bytes(&[2u8; 64]).unwrap(),
+            transaction_root: Hash512::from_bytes(&[3u8; 64]).unwrap(),
             proposer: Address::from_bytes([4u8; 20]),
             difficulty: 1 << 20,
         };

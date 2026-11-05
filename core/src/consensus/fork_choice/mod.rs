@@ -55,8 +55,8 @@ mod tests {
     #[test]
     fn fork_choice_insert_block_updates_tip() {
         let mut fc = ForkChoice::new();
-        let h1 = Hash512::from_bytes(&[1u8; 64]);
-        let h2 = Hash512::from_bytes(&[2u8; 64]);
+        let h1 = Hash512::from_bytes(&[1u8; 64]).unwrap();
+        let h2 = Hash512::from_bytes(&[2u8; 64]).unwrap();
 
         fc.insert_block(h1, 10);
         assert_eq!(fc.tip(), Some(&h1));
