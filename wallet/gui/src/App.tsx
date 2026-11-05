@@ -44,6 +44,11 @@ export default function App() {
     }));
   }, []);
 
+  /** Clears the passphrase from React state once an operation is finished. */
+  const clearPassphrase = useCallback(() => {
+    setState((prev) => ({ ...prev, passphrase: '' }));
+  }, []);
+
   const selectedAddress = state.selectedAddress;
   const passphrase = state.passphrase;
 
@@ -64,7 +69,12 @@ export default function App() {
       )}
 
       {state.view === 'send' && selectedAddress && (
-        <Send from={selectedAddress} passphrase={passphrase} onBack={handleLock} />
+        <Send
+          from={selectedAddress}
+          passphrase={passphrase}
+          onBack={handleLock}
+          onSendComplete={clearPassphrase}
+        />
       )}
 
       {state.view === 'history' && (

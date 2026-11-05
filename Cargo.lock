@@ -282,6 +282,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "wallet-cli",
+ "zeroize",
 ]
 
 [[package]]

@@ -6,9 +6,10 @@ interface SendProps {
   from: string;
   passphrase: string;
   onBack: () => void;
+  onSendComplete?: () => void;
 }
 
-export function Send({ from, passphrase, onBack }: SendProps) {
+export function Send({ from, passphrase, onBack, onSendComplete }: SendProps) {
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
   const [token, setToken] = useState('ATOLL');
@@ -30,6 +31,8 @@ export function Send({ from, passphrase, onBack }: SendProps) {
         passphrase,
       });
       setSignedTx(response.signed_tx);
+      // The passphrase is no longer needed once the transaction is signed.
+      onSendComplete?.();
     } catch (err) {
       setError(formatInvokeError(err));
     } finally {

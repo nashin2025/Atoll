@@ -20,8 +20,13 @@ use ed25519::signature::{Signer, Verifier};
 use ed25519_dalek::SigningKey;
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::Path;
+use std::sync::{Mutex, OnceLock};
+use std::thread;
+use std::time::Duration;
 use wallet_cli::{derive_address, Keystore};
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::error::GuiError;
 
@@ -135,16 +140,17 @@ fn do_new(keystore_path: &Path, passphrase: &str) -> Result<String, GuiError> {
     let signing_key = SigningKey::generate(&mut OsRng);
     let verifying_key = signing_key.verifying_key();
     let public_key = verifying_key.to_bytes();
-    let secret_key = signing_key.to_bytes().to_vec();
+    let secret_key = Zeroizing::new(signing_key.to_bytes().to_vec());
     let address = derive_address(&public_key);
 
     let mut keystore =
         Keystore::load(keystore_path.to_path_buf(), passphrase).map_err(GuiError::from)?;
-    keystore.add(address, secret_key.clone());
+    keystore.add(address, (*secret_key).clone());
     keystore.save(passphrase).map_err(GuiError::from)?;
 
-    // zeroize the in-memory copy once it is persisted
-    drop(secret_key);
+    // `secret_key` is `Zeroizing<Vec<u8>>`: its bytes are overwritten with
+    // zeros when it drops, so the plaintext secret key does not linger in
+    // memory after the key pair is persisted to the keystore.
     Ok(address.to_hex())
 }
 
@@ -153,7 +159,7 @@ fn do_import(
     secret_key_hex: &str,
     passphrase: &str,
 ) -> Result<String, GuiError> {
-    let secret_bytes = hex::decode(secret_key_hex).map_err(GuiError::from)?;
+    let secret_bytes = Zeroizing::new(hex::decode(secret_key_hex).map_err(GuiError::from)?);
     if secret_bytes.len() != 32 {
         return Err(GuiError::Crypto(
             "secret key must be 32 bytes (64 hexadecimal characters)".to_string(),
@@ -169,9 +175,12 @@ fn do_import(
 
     let mut keystore =
         Keystore::load(keystore_path.to_path_buf(), passphrase).map_err(GuiError::from)?;
-    keystore.add(address, secret_bytes);
+    keystore.add(address, (*secret_bytes).clone());
     keystore.save(passphrase).map_err(GuiError::from)?;
 
+    // `secret_bytes` is `Zeroizing<Vec<u8>>`: its bytes are overwritten with
+    // zeros when it drops, so the imported secret key does not linger in
+    // memory after it is persisted to the keystore.
     Ok(address.to_hex())
 }
 
@@ -288,6 +297,49 @@ fn do_derive_address(public_key: &str) -> Result<String, GuiError> {
 }
 
 // ---------------------------------------------------------------------------
+// Rate limiting for `wallet-unlock`
+// ---------------------------------------------------------------------------
+
+/// Maximum failed unlock attempts before a lockout delay is imposed.
+const MAX_FAILED_UNLOCK_ATTEMPTS: u32 = 5;
+/// Seconds to sleep before allowing another unlock attempt after the limit is hit.
+const UNLOCK_LOCKOUT_DELAY_SECS: u64 = 2;
+
+/// In-memory counter of failed unlock attempts per keystore path.
+///
+/// Used solely to throttle offline passphrase brute-forcing against
+/// `wallet-unlock`. The counter resets on a successful unlock.
+static FAILED_UNLOCK_ATTEMPTS: OnceLock<Mutex<HashMap<String, u32>>> = OnceLock::new();
+
+fn unlock_attempts() -> &'static Mutex<HashMap<String, u32>> {
+    FAILED_UNLOCK_ATTEMPTS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn record_failed_unlock(keystore_path: &Path) {
+    let path = keystore_path.to_string_lossy().to_string();
+    let mut attempts = unlock_attempts()
+        .lock()
+        .expect("failed-unlock attempts mutex poisoned");
+    *attempts.entry(path).or_insert(0) += 1;
+}
+
+fn reset_unlock_attempts(keystore_path: &Path) {
+    let path = keystore_path.to_string_lossy().to_string();
+    let mut attempts = unlock_attempts()
+        .lock()
+        .expect("failed-unlock attempts mutex poisoned");
+    attempts.remove(&path);
+}
+
+fn is_unlock_rate_limited(keystore_path: &Path) -> bool {
+    let path = keystore_path.to_string_lossy().to_string();
+    let attempts = unlock_attempts()
+        .lock()
+        .expect("failed-unlock attempts mutex poisoned");
+    attempts.get(&path).copied().unwrap_or(0) >= MAX_FAILED_UNLOCK_ATTEMPTS
+}
+
+// ---------------------------------------------------------------------------
 // Tauri commands
 // ---------------------------------------------------------------------------
 
@@ -295,8 +347,21 @@ fn do_derive_address(public_key: &str) -> Result<String, GuiError> {
 /// Used to validate the passphrase on unlock and to list known addresses.
 #[tauri::command(name = "wallet-unlock")]
 pub fn wallet_unlock(request: UnlockRequest) -> Result<UnlockResponse, GuiError> {
-    let addresses = do_unlock(&default_keystore_path(), &request.passphrase)?;
-    Ok(UnlockResponse { addresses })
+    let keystore_path = default_keystore_path();
+
+    // Throttle repeated unlock attempts to slow offline passphrase brute-forcing.
+    // After MAX_FAILED_UNLOCK_ATTEMPTS failures, each further attempt is delayed.
+    if is_unlock_rate_limited(&keystore_path) {
+        thread::sleep(Duration::from_secs(UNLOCK_LOCKOUT_DELAY_SECS));
+    }
+
+    let result = do_unlock(&keystore_path, &request.passphrase);
+    if result.is_ok() {
+        reset_unlock_attempts(&keystore_path);
+    } else {
+        record_failed_unlock(&keystore_path);
+    }
+    result.map(|addresses| UnlockResponse { addresses })
 }
 
 /// Generates a new Ed25519 key pair, encrypts it to the keystore, and returns
@@ -310,12 +375,14 @@ pub fn wallet_new(request: NewRequest) -> Result<NewResponse, GuiError> {
 /// Imports an Ed25519 secret key from hex (32 bytes / 64 hex characters),
 /// encrypts it to the keystore, and returns the derived address.
 #[tauri::command(name = "wallet-import")]
-pub fn wallet_import(request: ImportRequest) -> Result<ImportResponse, GuiError> {
+pub fn wallet_import(mut request: ImportRequest) -> Result<ImportResponse, GuiError> {
     let address = do_import(
         &default_keystore_path(),
         &request.secret_key,
         &request.passphrase,
     )?;
+    // Scrub the imported secret key from memory now that do_import has read it.
+    request.secret_key.zeroize();
     Ok(ImportResponse { address })
 }
 
