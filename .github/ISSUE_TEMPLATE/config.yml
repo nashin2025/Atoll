@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Atoll Protocol Website
+    url: https://atollprotocol.org
+    about: Visit the official project website
+  - name: Security Vulnerability
+    url: https://github.com/nashin2025/Atoll/blob/main/SECURITY.md
+    about: Report security vulnerabilities privately
+  - name: GitHub Discussions
+    url: https://github.com/nashin2025/Atoll/discussions
+    about: Ask questions and discuss with the community

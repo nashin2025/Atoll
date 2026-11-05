@@ -1,0 +1,22 @@
+# rustfmt configuration
+# https://doc.rust-lang.org/nightly/rustfmt/
+
+edition = "2021"
+max_width = 100
+tab_spaces = 4
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+reorder_imports = true
+wrap_comments = true
+comment_width = 100
+fn_args_layout = "Vertical"
+struct_field_align_threshold = 40
+collapse_object_liters = true
+collapse_liters = true
+normalize_comments = true
+reorder_modules = false
+imply_clone = false
+sensitive_patches = true
+expression_width = 100
+match_arm_guess_width = true
+wrap_match_arms = true
