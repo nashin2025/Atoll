@@ -14,7 +14,7 @@ use crate::primitives::address::Address as CoreAddress;
 use crate::primitives::block::Block as CoreBlock;
 use crate::primitives::hash::Hash512;
 use crate::primitives::transaction::Transaction as CoreTransaction;
-use async_graphql::*;
+use async_graphql::{Context, EmptyMutation, EmptySubscription, Error, Object, Result, Schema};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -98,7 +98,7 @@ impl GqlBlock {
         let blockchain = app_state
             .blockchain
             .read()
-            .expect("blockchain lock poisoned");
+            .map_err(|e| Error::new(format!("database lock error: {}", e)))?;
 
         let block_hash = Hash512::from_hex(&self.hash)
             .map_err(|e| Error::new(format!("Invalid block hash: {}", e)))?;
@@ -301,7 +301,7 @@ fn core_block_to_gql(block_hash: &Hash512, block: &CoreBlock) -> GqlBlock {
         proposer: core_address_to_gql(&block.header.proposer),
         state_root: block.header.state_root.to_hex(),
         transaction_root: block.header.transaction_root.to_hex(),
-        transaction_count: block.body.transactions.len() as i32,
+        transaction_count: i32::try_from(block.body.transactions.len()).unwrap_or(i32::MAX),
     }
 }
 
@@ -316,9 +316,8 @@ pub struct Query;
 impl Query {
     /// Look up a block by its hash.
     async fn block(&self, ctx: &Context<'_>, hash: Option<String>) -> Result<Option<GqlBlock>> {
-        let hash = match hash {
-            Some(h) => h,
-            None => return Ok(None),
+        let Some(hash) = hash else {
+            return Ok(None);
         };
 
         let block_hash = Hash512::from_hex(&hash)
@@ -328,7 +327,7 @@ impl Query {
         let blockchain = app_state
             .blockchain
             .read()
-            .expect("blockchain lock poisoned");
+            .map_err(|e| Error::new(format!("database lock error: {}", e)))?;
 
         let block = blockchain.get_block(&block_hash);
         Ok(block.map(|b| core_block_to_gql(&block_hash, b)))
@@ -344,7 +343,7 @@ impl Query {
         let blockchain = app_state
             .blockchain
             .read()
-            .expect("blockchain lock poisoned");
+            .map_err(|e| Error::new(format!("database lock error: {}", e)))?;
 
         let (block_hash, block) = blockchain
             .get_block_and_hash_by_height(height)
@@ -364,15 +363,14 @@ impl Query {
         let blockchain = app_state
             .blockchain
             .read()
-            .expect("blockchain lock poisoned");
+            .map_err(|e| Error::new(format!("database lock error: {}", e)))?;
 
         let limit = first
             .and_then(|s| s.parse::<usize>().ok())
             .unwrap_or(20)
-            .max(0)
-            .min(100);
+            .clamp(0, 100);
         let start = offset.and_then(|s| s.parse::<usize>().ok()).unwrap_or(0);
-        let tip_height = blockchain.tip_height() as usize;
+        let tip_height = usize::try_from(blockchain.tip_height()).unwrap_or(usize::MAX);
 
         let mut blocks = Vec::new();
         for height in start..tip_height {
@@ -399,7 +397,7 @@ impl Query {
         let blockchain = app_state
             .blockchain
             .read()
-            .expect("blockchain lock poisoned");
+            .map_err(|e| Error::new(format!("database lock error: {}", e)))?;
 
         let tip_height = blockchain.tip_height();
 
@@ -428,15 +426,14 @@ impl Query {
         let blockchain = app_state
             .blockchain
             .read()
-            .expect("blockchain lock poisoned");
+            .map_err(|e| Error::new(format!("database lock error: {}", e)))?;
 
         let limit = first
             .and_then(|s| s.parse::<usize>().ok())
             .unwrap_or(20)
-            .max(0)
-            .min(100);
+            .clamp(0, 100);
         let start_offset = offset.and_then(|s| s.parse::<usize>().ok()).unwrap_or(0);
-        let tip_height = blockchain.tip_height() as usize;
+        let tip_height = usize::try_from(blockchain.tip_height()).unwrap_or(usize::MAX);
 
         let mut transactions = Vec::new();
         let mut skipped = 0usize;
@@ -471,7 +468,7 @@ impl Query {
         let chain_state = app_state
             .chain_state
             .read()
-            .expect("chain state lock poisoned");
+            .map_err(|e| Error::new(format!("database lock error: {}", e)))?;
 
         let account = chain_state.get_account(&core_address);
         let balance = chain_state.balance(&core_address);
@@ -505,14 +502,13 @@ impl Query {
         let blockchain = app_state
             .blockchain
             .read()
-            .expect("blockchain lock poisoned");
+            .map_err(|e| Error::new(format!("database lock error: {}", e)))?;
 
         let limit = first
             .and_then(|s| s.parse::<usize>().ok())
             .unwrap_or(50)
-            .max(0)
-            .min(500);
-        let tip_height = blockchain.tip_height() as usize;
+            .clamp(0, 500);
+        let tip_height = usize::try_from(blockchain.tip_height()).unwrap_or(usize::MAX);
 
         // Count blocks proposed by each address, tracking the last height.
         let mut proposer_counts: HashMap<CoreAddress, (i32, u64)> = HashMap::new();
@@ -549,15 +545,15 @@ impl Query {
         let blockchain = app_state
             .blockchain
             .read()
-            .expect("blockchain lock poisoned");
+            .map_err(|e| Error::new(format!("database lock error: {}", e)))?;
         let chain_state = app_state
             .chain_state
             .read()
-            .expect("chain state lock poisoned");
+            .map_err(|e| Error::new(format!("database lock error: {}", e)))?;
         let peer_manager = app_state
             .peer_manager
             .read()
-            .expect("peer manager lock poisoned");
+            .map_err(|e| Error::new(format!("database lock error: {}", e)))?;
 
         Ok(GqlNetworkStats {
             block_height: blockchain.tip_height().to_string(),
@@ -586,17 +582,12 @@ pub fn build_schema() -> Schema<Query, EmptyMutation, EmptySubscription> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::api::auth::{AuthConfig, AuthState, RateLimiter};
+    use crate::api::graphql::{build_schema, AppState};
     use crate::chain::blockchain::Blockchain;
     use crate::chain::state::ChainState;
     use crate::network::peer_manager::PeerManager;
-    use crate::primitives::address::Address;
-    use crate::primitives::block::{Block, BlockBody, BlockHeader};
-    use crate::primitives::hash::Hash512;
-    use crate::primitives::signature::Signature;
-    use crate::primitives::transaction::Transaction;
-    use std::sync::RwLock;
+    use std::sync::{Arc, RwLock};
 
     fn test_state() -> Arc<AppState> {
         let blockchain = Arc::new(RwLock::new(Blockchain::default()));

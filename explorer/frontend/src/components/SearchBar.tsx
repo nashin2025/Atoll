@@ -67,7 +67,7 @@ export function SearchBar() {
     } else if (type === 'transaction' && txData?.transaction) {
       navigate(`/transactions/${txData.transaction.hash}`);
     } else if (type === 'address' && addrData?.address) {
-      navigate(`/addresses/${addrData.address.address}`);
+      navigate(`/validators/${addrData.address.address}`);
     }
   };
 
