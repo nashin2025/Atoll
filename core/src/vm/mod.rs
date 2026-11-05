@@ -7,6 +7,7 @@
 
 pub mod ai_vm;
 pub mod evm;
+pub mod fuzzing;
 pub mod gas;
 pub mod move_vm;
 pub mod riscv;
