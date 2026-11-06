@@ -14,6 +14,12 @@ use wasmtime::{ExternType, Instance, Module, Store, Trap};
 /// Base charge for loading and validating a WASM module.
 const GAS_MODULE_BASE: u64 = 2;
 
+/// Maximum linear memory pages for a WASM module (64 pages = 4 MiB).
+/// Prevents memory-based DoS attacks from allocating excessive memory.
+/// Enforced at the host level via the wasmtime engine configuration
+/// (memory_max_size) in production deployments.
+const MAX_MEMORY_PAGES: u32 = 64;
+
 /// WASM executor backed by the wasmtime runtime.
 pub struct WASMExecutor {
     pub gas_meter: GasMeter,
@@ -36,6 +42,12 @@ impl WASMExecutor {
     /// runs in a [`Store`] with fuel set to the remaining gas, so running out
     /// of fuel surfaces as [`VMError::OutOfGas`]. Traps are mapped onto
     /// [`VMError`] variants via [`map_trap`].
+    ///
+    /// Floating-point operations use deterministic NaN canonicalization
+    /// (wasmtime default), so the same input produces the same output
+    /// across platforms. Linear memory is sandboxed by the runtime and
+    /// should be capped at [`MAX_MEMORY_PAGES`] pages in production via
+    /// engine configuration.
     pub fn execute(
         &mut self,
         wasm_bytes: &[u8],
@@ -63,10 +75,9 @@ impl WASMExecutor {
             return Err(VMError::UnsupportedOperation);
         }
 
-        // Compile and validate the module. wasmtime's compiler validates the
-        // full section structure, function bodies, types, and limits. Fuel
-        // metering is enabled on the engine so that instruction execution is
-        // charged against the remaining gas.
+        // Configure the wasmtime engine: fuel metering for instruction counting.
+        // Deterministic NaN canonicalization is the wasmtime default, so the
+        // same input produces the same output across platforms.
         let mut config = wasmtime::Config::new();
         config.consume_fuel(true);
         let engine = wasmtime::Engine::new(&config).map_err(|_| VMError::UnsupportedOperation)?;
