@@ -52,7 +52,10 @@ snow = "0.10"
 clap = { version = "4", features = ["derive"] }
 
 # HTTP server for health / metrics endpoints
-axum = "0.7"
+axum = { version = "0.7", features = ["ws"] }
+
+# HTTP/1.1 connection serving for TLS endpoints (Task 8)
+hyper = { version = "0.14", features = ["server", "http1"] }
 
 # GraphQL server (async-graphql + axum integration) — Block Explorer backend
 async-graphql = "7"
@@ -66,10 +69,17 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 tracing-appender = "0.2"
 
+# Stream extensions for WebSocket handling (Task 8)
+futures-util = "0.3"
+
 # TLS for RPC/WebSocket endpoints (Task 8)
 rustls = "0.23"
 rcgen = "0.14"
 tokio-rustls = "0.26"
+
+# Encryption at rest for node identity (Task 7)
+# Uses argon2id key derivation + blake3-based stream cipher (simpler than chacha20poly1305,
+# upgrade path to XChaCha20-Poly1305 available)
 
 [dev-dependencies]
 criterion = "0.5"
