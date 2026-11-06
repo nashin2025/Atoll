@@ -10,7 +10,9 @@
 use crate::vm::gas::GAS_MEMORY_EXPANSION_PER_WORD;
 use crate::vm::{ExecutionContext, ExecutionResult, GasMeter, Log, VMError, VMType};
 use num_bigint::BigUint;
+use sha2::Sha256;
 use sha3::{Digest, Keccak256};
+use tracing::warn;
 
 /// Width of an EVM word in bytes (256 bits).
 const WORD_BYTES: usize = 32;
@@ -90,7 +92,115 @@ mod opcode {
     pub const GASLIMIT: u8 = 0x45;
 }
 
-/// Gas costs for EVM operations (simplified Ethereum schedule).
+/// EVM precompile contract addresses (EIP-141 / Istanbul).
+///
+/// Precompiles are special contracts at low addresses that execute
+/// natively (not as EVM bytecode). They are invoked via `CALL` to their
+/// address.
+mod precompile {
+    /// ecrecover — recover an Ethereum address from a signature.
+    pub const ECRECOVER: u64 = 1;
+    /// SHA-256 hash.
+    pub const SHA256: u64 = 2;
+    /// RIPEMD-160 hash.
+    pub const RIPEMD160: u64 = 3;
+    /// Identity — copies input to output.
+    pub const IDENTITY: u64 = 4;
+    /// Modular exponentiation.
+    pub const MODEXP: u64 = 5;
+}
+
+/// Result of a precompile execution.
+#[derive(Debug, Clone)]
+pub enum PrecompileResult {
+    Success(Vec<u8>),
+    Revert(Vec<u8>),
+    Error(String),
+}
+
+/// Executes a precompile contract at `address` with `input` data.
+///
+/// Returns the precompile output and gas cost.
+pub fn execute_precompile(address: u64, input: &[u8]) -> PrecompileResult {
+    match address {
+        precompile::IDENTITY => {
+            // Identity: copy input to output, no gas beyond call stipend.
+            PrecompileResult::Success(input.to_vec())
+        }
+        precompile::SHA256 => {
+            // SHA-256: 60 + 12 * ceil(input_len / 32) gas.
+            let mut hasher = Sha256::new();
+            hasher.update(input);
+            let result = hasher.finalize().to_vec();
+            PrecompileResult::Success(result)
+        }
+        precompile::RIPEMD160 => {
+            // RIPEMD-160 not yet implemented in MVP.
+            PrecompileResult::Error("RIPEMD-160 precompile not implemented".to_string())
+        }
+        precompile::ECRECOVER => {
+            // ecrecover not yet implemented in MVP.
+            PrecompileResult::Error("ecrecover precompile not implemented".to_string())
+        }
+        precompile::MODEXP => {
+            // Modexp: (base^exp) mod modulus.
+            // Input layout: [base_len (32 bytes)][exp_len (32 bytes)][mod_len (32 bytes)][base][exp][modulus]
+            if input.len() < 96 {
+                return PrecompileResult::Error("modexp input too short".to_string());
+            }
+            let base_len = usize::from_be_bytes(input[0..32][24..32].try_into().unwrap_or([0; 8]))
+                .min(input.len() - 96);
+            let exp_len = usize::from_be_bytes(input[32..64][24..32].try_into().unwrap_or([0; 8]))
+                .min(input.len() - 96 - base_len);
+            let mod_len = usize::from_be_bytes(input[64..96][24..32].try_into().unwrap_or([0; 8]))
+                .min(input.len() - 96 - base_len - exp_len);
+
+            let base_start = 96;
+            let exp_start = base_start + base_len;
+            let mod_start = exp_start + exp_len;
+
+            if mod_start + mod_len > input.len() {
+                return PrecompileResult::Error("modexp input truncated".to_string());
+            }
+
+            let base = BigUint::from_bytes_be(&input[base_start..base_start + base_len]);
+            let exp = BigUint::from_bytes_be(&input[exp_start..exp_start + exp_len]);
+            let modulus = BigUint::from_bytes_be(&input[mod_start..mod_start + mod_len]);
+
+            if modulus == BigUint::from(0u32) {
+                // Result is 0 when modulus is 0 (output is mod_len zero bytes).
+                return PrecompileResult::Success(vec![0u8; mod_len]);
+            }
+
+            let result = base.modpow(&exp, &modulus);
+            let mut result_bytes = result.to_bytes_be();
+            // Pad or truncate to mod_len bytes.
+            if result_bytes.len() > mod_len {
+                result_bytes.truncate(mod_len);
+            } else {
+                let mut padded = vec![0u8; mod_len - result_bytes.len()];
+                padded.extend_from_slice(&result_bytes);
+                result_bytes = padded;
+            }
+            PrecompileResult::Success(result_bytes)
+        }
+        _ => PrecompileResult::Error(format!("unknown precompile address {address}")),
+    }
+}
+
+/// Gas cost for identity precompile per input byte (rounded up to 32-byte words).
+const GAS_IDENTITY_PER_WORD: u64 = 3;
+
+/// Gas cost for SHA-256 per input byte (rounded up to 32-byte words).
+const GAS_SHA256_PER_WORD: u64 = 12;
+const GAS_SHA256_BASE: u64 = 60;
+
+/// Gas cost for RIPEMD-160 per input byte (rounded up to 32-byte words).
+const GAS_RIPEMD160_PER_WORD: u64 = 120;
+const GAS_RIPEMD160_BASE: u64 = 600;
+
+/// Base gas cost for ecrecover.
+const GAS_ECRECOVER: u64 = 3000;
 const GAS_BASE: u64 = 2;
 const GAS_VERYLOW: u64 = 3;
 const GAS_LOW: u64 = 5;
@@ -932,7 +1042,50 @@ impl EVMExecutor {
             }
             opcode::CALL => {
                 self.charge(GAS_CALL)?;
-                self.stack.push([1u8; WORD_BYTES])?; // placeholder: call succeeded
+
+                // Pop CALL arguments (top of stack first):
+                // out_size, out_offset, in_size, in_offset, value, to, gas
+                let out_size_word = self.stack.pop()?;
+                let out_offset_word = self.stack.pop()?;
+                let in_size_word = self.stack.pop()?;
+                let in_offset_word = self.stack.pop()?;
+                let _value_word = self.stack.pop()?;
+                let to_word = self.stack.pop()?;
+                let _gas_word = self.stack.pop()?;
+
+                let to = word_to_biguint(&to_word);
+                let to_u64 = to.to_u64_digits().first().copied().unwrap_or(0);
+                let out_size = word_to_usize(&out_size_word).unwrap_or(0);
+                let out_offset = word_to_usize(&out_offset_word).unwrap_or(0);
+                let in_size = word_to_usize(&in_size_word).unwrap_or(0);
+                let in_offset = word_to_usize(&in_offset_word).unwrap_or(0);
+
+                // Check if the call target is a precompile address (1-5).
+                if to_u64 >= 1 && to_u64 <= 5 {
+                    let input = self.memory.read_bytes(in_offset, in_size);
+                    let result = execute_precompile(to_u64, &input);
+
+                    match result {
+                        PrecompileResult::Success(output) => {
+                            // Write output to memory at out_offset.
+                            let _ = self.memory.write_bytes(out_offset, &output);
+                            // Push return value (1 = success).
+                            self.stack.push([1u8; WORD_BYTES])?;
+                        }
+                        PrecompileResult::Revert(output) => {
+                            let _ = self.memory.write_bytes(out_offset, &output);
+                            self.stack.push([0u8; WORD_BYTES])?;
+                        }
+                        PrecompileResult::Error(msg) => {
+                            // Precompile failure: push 0 (failure).
+                            self.stack.push([0u8; WORD_BYTES])?;
+                            warn!(target: "atoll::evm::precompile", address = ?to_u64, error = ?msg, "precompile execution failed");
+                        }
+                    }
+                } else {
+                    // Regular call: placeholder (no external state in MVP).
+                    self.stack.push([1u8; WORD_BYTES])?;
+                }
                 Ok(None)
             }
             opcode::CALLCODE => {
