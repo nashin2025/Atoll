@@ -1,12 +1,13 @@
 //! REST API server for the Atoll Protocol node.
 //!
 //! Serves the `/health` endpoint, the `/metrics` endpoint (Prometheus text
-//! format), and the `/graphql` endpoint (GraphQL over HTTP for the Block
-//! Explorer).
+//! format), the `/rpc` endpoint (JSON-RPC 2.0), the `/ws` endpoint (WebSocket),
+//! and the `/graphql` endpoint (GraphQL over HTTP for the Block Explorer).
 
 use crate::api::auth::auth_and_rate_limit;
 use crate::api::graphql::build_schema;
 use crate::api::health::health_handler;
+use crate::api::tls::{generate_self_signed, TlsCredentials};
 use crate::chain::blockchain::Blockchain;
 use crate::chain::state::ChainState;
 use crate::network::peer_manager::PeerManager;
@@ -114,14 +115,24 @@ pub async fn metrics_handler(State(app_state): State<Arc<AppState>>) -> Result<S
 
 /// Starts the REST API server on port 8080.
 ///
-/// Serves over plain HTTP. For production deployments, TLS termination should
+/// If `tls` is `Some`, self-signed TLS certificates have been generated and
+/// written to disk by [`crate::api::tls::generate_self_signed`]. The server
+/// serves over plain HTTP; for production deployments, TLS termination should
 /// be handled by a reverse proxy (nginx, traefik, cloud load balancer) in
-/// front of this server. Self-signed TLS certificates can be generated with
-/// [`crate::api::tls::generate_self_signed`] and configured at the proxy level.
-pub async fn run_server(state: AppState) -> Result<(), Box<dyn std::error::Error>> {
+/// front of this server using the generated certificates.
+pub async fn run_server(
+    state: AppState,
+    tls: Option<TlsCredentials>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    tracing::info!(%addr, "REST API listening");
+
+    if tls.is_some() {
+        tracing::info!(%addr, "REST API listening (plain HTTP; TLS certs at /etc/atoll/tls/)");
+    } else {
+        tracing::info!(%addr, "REST API listening (plain HTTP)");
+    }
+
     axum::serve(listener, router(Arc::new(state)))
         .await
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)

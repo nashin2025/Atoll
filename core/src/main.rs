@@ -9,6 +9,7 @@
 use atoll_core::{
     api::auth::{AuthConfig, AuthState, RateLimiter},
     api::rest::{run_server, AppState},
+    api::tls::generate_self_signed,
     chain::blockchain::Blockchain,
     chain::genesis::{GenesisConfig, GenesisLoader},
     chain::state::ChainState,
@@ -163,6 +164,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rate_limiter = RateLimiter::from_env();
     let auth = Arc::new(AuthState::new(auth_config, rate_limiter));
 
+    // Generate self-signed TLS certificates for HTTPS (Task 8).
+    // Certs are written to /etc/atoll/tls/ and used for the REST API,
+    // including /rpc and /ws endpoints.
+    let tls = match generate_self_signed() {
+        Ok(creds) => {
+            tracing::info!("TLS certificates written to {}", creds.cert_path.display());
+            Some(creds)
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "TLS certificate generation failed; serving plain HTTP");
+            None
+        }
+    };
+
     let state = AppState {
         blockchain,
         chain_state,
@@ -172,7 +187,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         auth,
     };
 
-    run_server(state).await?;
+    run_server(state, tls).await?;
 
     Ok(())
 }

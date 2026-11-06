@@ -78,6 +78,9 @@ serde_yaml = "0.9"
 # Parallel execution for cross-shard receipt processing (low-priority perf)
 rayon = "1.8"
 
+# Tower Service trait for calling axum Router from hyper serve_connection (Task 8 TLS)
+tower = "0.4"
+
 # TLS for RPC/WebSocket endpoints (Task 8)
 rustls = "0.23"
 rcgen = "0.14"
