@@ -6,6 +6,7 @@
 //! inputs and the measured gas value are wrapped in `criterion::black_box` to
 //! prevent the compiler from optimizing the measured work away.
 
+use atoll_core::crypto::morph_hash::MorphHashEngine;
 use atoll_core::primitives::hash::Hash512;
 use atoll_core::vm::ai_vm::AIVMExecutor;
 use atoll_core::vm::evm::EVMExecutor;
@@ -14,7 +15,6 @@ use atoll_core::vm::riscv::RISCVExecutor;
 use atoll_core::vm::wasm::WASMExecutor;
 use atoll_core::vm::zk_vm::ZKVMExecutor;
 use atoll_core::vm::{ExecutionContext, ExecutionResult, VMError, VMRouter};
-use atoll_core::crypto::morph_hash::MorphHashEngine;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::time::Duration;
 
@@ -272,11 +272,7 @@ fn bench_algorithm_chain_cache_hit_rate(c: &mut Criterion) {
             let mut hits = 0u64;
             let mut total = 0u64;
             for _ in 0..100 {
-                let result = engine.morph_hash(
-                    b"benchmark input",
-                    &prev_hash,
-                    42,
-                );
+                let result = engine.morph_hash(b"benchmark input", &prev_hash, 42);
                 black_box(result);
                 total += 1;
                 let (h, _, _) = engine.cache_stats();
@@ -284,7 +280,11 @@ fn bench_algorithm_chain_cache_hit_rate(c: &mut Criterion) {
                     hits = h;
                 }
             }
-            let hit_rate = if total > 0 { hits as f64 / total as f64 * 100.0 } else { 0.0 };
+            let hit_rate = if total > 0 {
+                hits as f64 / total as f64 * 100.0
+            } else {
+                0.0
+            };
             black_box(hit_rate)
         })
     });
