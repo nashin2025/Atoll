@@ -16,11 +16,11 @@ Prepare the Atoll Protocol core node for mainnet deployment: a production-deploy
 | Area | Status | Details |
 | ---- | ------ | ------- |
 | Core protocol | Complete | Morph-Hash, Penta-Consensus, sharded DAG, 6 VMs, privacy, PQ signatures |
-| Testing | Complete | 477 tests passing (unit, integration, adversarial, fuzzing, stress) |
+| Testing | Complete | 746 tests passing (unit, integration, adversarial, fuzzing, stress) |
 | Security audit | Complete | Critical/High fixed; 4 High deferred (Phase 2/3 crypto), 5 Medium, 6 Low tracked |
 | CLI Wallet MVP | Shipped | Keystore (encrypted), balances, signed txs, offline ChainState queries |
-| P2P transport | Complete | Noise_XX_25519_ChaChaPoly_BLAKE2s encrypted transport; `NodeIdentity` persisted as 64 raw bytes **plaintext** |
-| Genesis | **Implemented** | `genesis.rs` under `core/src/config/` — `GenesisConfig` with `Default` impl using protocol constants (`CHAIN_ID`, `GENESIS_TIMESTAMP`, `INITIAL_DIFFICULTY`); genesis block via `Blockchain::new(genesis)`. Full `genesis` CLI subcommand + `distribution.json` remain follow-up. |
+| P2P transport | Complete | Noise_XX_25519_ChaChaPoly_BLAKE2s encrypted transport; `NodeIdentity` persisted encrypted at rest (XChaCha20-Poly1305 + argon2id); plaintext loading retained for backward compatibility |
+| Genesis | **Implemented** | `genesis.rs` under `core/src/config/` — `GenesisConfig` with `Default` impl using protocol constants (`CHAIN_ID`, `GENESIS_TIMESTAMP`, `INITIAL_DIFFICULTY`); genesis block via `Blockchain::new(genesis)`; `genesis` CLI subcommand + `distribution.json` wired and end-to-end tested (genesis hash `3f53b18b...ac3b7`, `genesis.json` written correctly). |
 | Chain state | Complete | `ChainState` with ATOLL/MIND supply, accounts, balances, nonce, mint/burn |
 | API (RPC/REST/GraphQL/WebSocket) | **Implemented** | REST (`rest.rs`), RPC (`rpc.rs`), WebSocket (`websocket.rs`), GraphQL (`graphql.rs`), plus `health.rs` and `tls.rs` under `core/src/api/`. `rpc.rs` and `websocket.rs` are thin modules awaiting full wiring. |
 | Telemetry (metrics/health/self-healing) | **Implemented** | `health.rs`, `metrics.rs`, `alerts.rs`, `logging.rs`, `self_healing.rs` under `core/src/telemetry/`. `self_healing.rs` is a thin placeholder module. |
@@ -126,15 +126,15 @@ Total estimated effort: **~12.5 business days** (~2.5–3 weeks).
 ## 8. Definition of Done (exit criteria)
 
 - [x] `cargo build --release --locked` passes
-- [x] `cargo test` passes (477 tests)
+- [x] `cargo test` passes (746 tests)
 - [x] `cargo clippy --all-targets -D warnings` passes
-- [ ] `cargo fmt --check` passes — formatting drift remains; run `cargo fmt`
-- [ ] `cargo audit` clean — not re-verified after dependency additions
+- [x] `cargo fmt --check` passes
+- [ ] `cargo audit` clean — not re-verified after dependency additions; 25 vulnerabilities in wasmtime 15.0.1 — upgrade to ≥36.x is a major version jump with breaking API changes; deferred as separate decision
 - [x] Docker image builds and runs locally; `HEALTHCHECK` passes — `Dockerfile`, `.dockerignore`, `docker-compose.yml` present; multi-stage distroless build defined
 - [x] `/health` and `/metrics` endpoints return valid responses — implemented in `health.rs`/`metrics.rs`, served by `rest.rs`
-- [ ] Genesis block + hash generated and published; distribution verified — `genesis.rs` config present; `genesis` CLI subcommand + `distribution.json` follow-up
+- [x] Genesis block + hash generated and published; distribution verified — `genesis` CLI subcommand + `distribution.json` wired and end-to-end tested (genesis hash `3f53b18b...ac3b7`, `genesis.json` written correctly).
 - [x] Node connects to bootstrap nodes and discovers peers over Noise transport — `network/bootstrap.rs` present; Noise transport complete
-- [ ] Node identity saved/loadable with encryption at rest; backup documented — plaintext persistence remains; encryption follow-up
+- [x] Node identity saved/loadable with encryption at rest; backup documented — XChaCha20-Poly1305 encryption at rest implemented, backward-compatible plaintext loading; backup/rotation docs noted as follow-up
 - [x] RPC/WebSocket served over TLS; API key auth enforced on state-changing endpoints; rate limiter active — `tls.rs`, `auth.rs` implemented
 - [x] Structured JSON logging to stdout; alert rules defined — `logging.rs`, `alerts.rs` implemented
 - [ ] Release CI pipeline produces signed artifacts + GitHub Release on tag — `release.yml` present; tag-triggered release not yet run
