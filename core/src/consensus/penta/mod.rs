@@ -134,6 +134,7 @@ impl PentaConsensus {
     }
 
     /// Validates a block against all five consensus layers
+    #[allow(clippy::similar_names)]
     pub fn validate_block(
         &self,
         pouw_result: &pouw::PoUWResult,

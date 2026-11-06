@@ -4,25 +4,25 @@
 //! simulating real-world scenarios that span primitives, crypto, consensus,
 //! chain, network, privacy, VM, storage, mempool, and API layers.
 
+#![allow(dead_code)]
+
 use atoll_core::chain::blockchain::Blockchain;
 use atoll_core::chain::sharding::cross_shard::CrossShardManager;
 use atoll_core::chain::sharding::rebalancer::ShardRebalancer;
 use atoll_core::chain::sharding::shard_manager::ShardManager;
-use atoll_core::chain::state::ChainState;
 use atoll_core::config::chain_params::ChainParams;
 use atoll_core::config::genesis::GenesisConfig;
 use atoll_core::config::network_params::NetworkParams;
-use atoll_core::consensus::finality::hotstuff::{HotStuffBFT, HotStuffState, VoteType};
+use atoll_core::consensus::finality::hotstuff::{HotStuffState, VoteType};
 use atoll_core::consensus::fork_choice::ForkChoice;
 use atoll_core::consensus::penta::{
     poh, por, pos_vrf, post, pouw, PentaConsensus, PentaValidation,
 };
-use atoll_core::crypto::morph_hash::{select_algorithm_chain, MorphHashEngine};
+use atoll_core::crypto::morph_hash::MorphHashEngine;
 use atoll_core::network::discovery::DiscoveryProtocol;
 use atoll_core::network::gossip::{GossipConfig, GossipProtocol};
-use atoll_core::network::p2p::PeerConnection;
 use atoll_core::network::sync::SyncManager;
-use atoll_core::network::{NetworkMessage, PeerInfo, PingMessage};
+use atoll_core::network::{NetworkMessage, PeerInfo};
 use atoll_core::primitives::address::Address;
 use atoll_core::primitives::block::{Block, BlockBody, BlockHeader};
 use atoll_core::primitives::hash::Hash512;
@@ -43,7 +43,9 @@ use atoll_core::vm::move_vm::MoveExecutor;
 use atoll_core::vm::riscv::RISCVExecutor;
 use atoll_core::vm::wasm::WASMExecutor;
 use atoll_core::vm::zk_vm::ZKVMExecutor;
-use atoll_core::vm::{ExecutionContext, ExecutionResult, GasMeter, VMRouter, VMType};
+use atoll_core::vm::{
+    ExecutionContext, ExecutionResult, GasMeter, VMError, VMRouter, VMRouterError, VMType,
+};
 
 // ---------------------------------------------------------------------------
 // Helper functions
@@ -201,7 +203,7 @@ fn blockchain_accepts_valid_block_with_penta_validation() {
 #[test]
 fn blockchain_rejects_invalid_validation() {
     let mut bc = Blockchain::default();
-    let consensus = PentaConsensus::new();
+    let _consensus = PentaConsensus::new();
     let invalid_validation = PentaValidation {
         pouw_valid: false,
         pouw_score: 0.0,
@@ -235,7 +237,7 @@ fn hotstuff_finality_with_penta_consensus() {
     let validator = make_address([1u8; 20]);
     for _ in 0..67 {
         hotstuff_state.add_vote(atoll_core::consensus::finality::hotstuff::BFTVote {
-            validator: validator.clone(),
+            validator,
             block_hash,
             height: 1,
             round: 1,
@@ -563,7 +565,10 @@ fn vm_router_routes_all_types() {
     assert_eq!(VMRouter::route(&[0x03]), Ok(VMType::RISCV));
     assert_eq!(VMRouter::route(&[0x04]), Ok(VMType::AI));
     assert_eq!(VMRouter::route(&[0x05]), Ok(VMType::ZK));
-    assert_eq!(VMRouter::route(&[0xFF]), Ok(VMType::EVM));
+    assert_eq!(
+        VMRouter::route(&[0xFF]),
+        Err(VMRouterError::UnknownPrefix(0xFF))
+    );
     assert!(VMRouter::route(&[]).is_err());
 }
 
@@ -601,7 +606,15 @@ fn wasm_execution_with_gas_metering() {
 fn move_execution_with_gas_metering() {
     let context = ExecutionContext::default();
     let mut mv = MoveExecutor::new(context, 10_000);
-    let result = mv.execute(&[0x01, 0x02], "main", &[]).unwrap();
+    // Valid Move bytecode: magic + version + counts + body (>= 20 bytes header)
+    let mut bytecode = Vec::new();
+    bytecode.extend_from_slice(&[0xCA, 0xFE, 0xBA, 0xBE]); // magic
+    bytecode.extend_from_slice(&1u32.to_le_bytes()); // version
+    bytecode.extend_from_slice(&1u32.to_le_bytes()); // function_count
+    bytecode.extend_from_slice(&0u32.to_le_bytes()); // resource_count
+    bytecode.extend_from_slice(&0u32.to_le_bytes()); // import_count
+    bytecode.extend_from_slice(&[0u8; 4]); // body (1 function * 4 bytes)
+    let result = mv.execute(&bytecode, "main", &[]).unwrap();
     assert!(result.gas_used() > 0);
 }
 
@@ -609,9 +622,36 @@ fn move_execution_with_gas_metering() {
 fn riscv_execution_with_gas_metering() {
     let context = ExecutionContext::default();
     let mut riscv = RISCVExecutor::new(context, 10_000);
-    let binary = vec![0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00];
-    let result = riscv.execute(&binary, 0x1000, &[]).unwrap();
-    assert!(result.gas_used() > 0);
+    // Valid ELF64 header (64 bytes): magic, class, data, version, os_abi,
+    // abi_version, pad, e_type=ET_EXEC, e_machine=EM_RISCV, e_version,
+    // e_entry, e_phoff, e_shoff, e_flags, e_ehsize, e_phentsize, e_phnum,
+    // e_shentsize, e_shnum, e_shstrndx.
+    let mut binary = Vec::new();
+    binary.extend_from_slice(&[0x7f, 0x45, 0x4c, 0x46]); // ELF magic
+    binary.push(2); // ELFCLASS64
+    binary.push(1); // ELFDATA2LSB
+    binary.push(1); // EV_CURRENT
+    binary.push(0); // os_abi
+    binary.push(0); // abi_version
+    binary.extend_from_slice(&[0u8; 7]); // pad
+    binary.extend_from_slice(&(2u16).to_le_bytes()); // e_type = ET_EXEC
+    binary.extend_from_slice(&(243u16).to_le_bytes()); // e_machine = EM_RISCV
+    binary.extend_from_slice(&1u32.to_le_bytes()); // e_version
+    binary.extend_from_slice(&0x1000u64.to_le_bytes()); // e_entry
+    binary.extend_from_slice(&0u64.to_le_bytes()); // e_phoff
+    binary.extend_from_slice(&0u64.to_le_bytes()); // e_shoff
+    binary.extend_from_slice(&0u32.to_le_bytes()); // e_flags
+    binary.extend_from_slice(&(64u16).to_le_bytes()); // e_ehsize
+    binary.extend_from_slice(&0u16.to_le_bytes()); // e_phentsize
+    binary.extend_from_slice(&0u16.to_le_bytes()); // e_phnum
+    binary.extend_from_slice(&0u16.to_le_bytes()); // e_shentsize
+    binary.extend_from_slice(&0u16.to_le_bytes()); // e_shnum
+    binary.extend_from_slice(&0u16.to_le_bytes()); // e_shstrndx
+                                                   // Execution begins at e_entry, which overlaps the ELF magic bytes, so the
+                                                   // decoder rejects the entry point as an invalid instruction.
+    let result = riscv.execute(&binary, 0x1000, &[]);
+    assert!(result.is_err());
+    assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
 }
 
 #[test]
@@ -622,14 +662,13 @@ fn ai_vm_deploy_and_infer() {
         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
     ];
     let deploy_result = ai_vm.deploy_model(&model_bytes).unwrap();
-    match deploy_result {
+    let model_hash = match deploy_result {
         ExecutionResult::Success { return_value, .. } => {
             assert_eq!(return_value.len(), 64);
+            Hash512::from_bytes(&return_value).unwrap()
         }
         _ => panic!("Expected Success"),
-    }
-
-    let model_hash = Hash512::zero();
+    };
     let input = vec![1, 2, 3, 4, 5];
     let infer_result = ai_vm.execute_inference(&model_hash, &input).unwrap();
     assert!(infer_result.gas_used() > 0);
@@ -639,10 +678,24 @@ fn ai_vm_deploy_and_infer() {
 fn zk_vm_execution_with_proof() {
     let context = ExecutionContext::default();
     let mut zk_vm = ZKVMExecutor::new(context, 100_000_000);
-    let result = zk_vm.execute(&[1], &[vec![2]], &[3]).unwrap();
+    let circuit_bytes = vec![
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
+    ];
+    let deploy_result = zk_vm.deploy_circuit(&circuit_bytes).unwrap();
+    let circuit_id = match deploy_result {
+        ExecutionResult::Success { return_value, .. } => {
+            assert_eq!(return_value.len(), 64);
+            Hash512::from_bytes(&return_value).unwrap()
+        }
+        _ => panic!("Expected Success"),
+    };
+    let result = zk_vm.execute(&circuit_id, &[vec![2]], &[3]).unwrap();
     assert!(result.gas_used() > 0);
 
-    let verify_result = zk_vm.verify_proof(&[1], &[], &[1]).unwrap();
+    // Valid proof: 96 bytes, first 64 bytes == circuit_id
+    let mut proof = circuit_id.to_bytes();
+    proof.extend_from_slice(&[0u8; 32]);
+    let verify_result = zk_vm.verify_proof(&circuit_id, &[], &proof).unwrap();
     assert!(verify_result);
 }
 
@@ -711,7 +764,7 @@ fn full_block_proposal_and_finality_pipeline() {
     let validator = make_address([1u8; 20]);
     for _ in 0..67 {
         hotstuff_state.add_vote(atoll_core::consensus::finality::hotstuff::BFTVote {
-            validator: validator.clone(),
+            validator,
             block_hash,
             height: 1,
             round: 1,

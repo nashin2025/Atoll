@@ -79,6 +79,7 @@ fn bench_select_algorithm_chain(c: &mut Criterion) {
             atoll_core::crypto::morph_hash::select_algorithm_chain(
                 black_box(&prev_hash),
                 black_box(100),
+                black_box(16),
             )
         })
     });
@@ -170,7 +171,7 @@ fn bench_chain_state_transfer(c: &mut Criterion) {
 fn bench_chain_state_balance(c: &mut Criterion) {
     let mut state = ChainState::new();
     let addr = Address::from_bytes([1u8; 20]);
-    state.set_balance(addr.clone(), 1_000_000_000);
+    state.set_balance(addr, 1_000_000_000);
     c.bench_function("chain_state_balance", |b| {
         b.iter(|| black_box(state.balance(black_box(&addr))))
     });

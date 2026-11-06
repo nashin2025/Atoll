@@ -387,7 +387,7 @@ mod tests {
         zk_vm.deploy_circuit(&circuit_bytes).unwrap();
         let circuit_id = Hash512::blake3(&circuit_bytes);
         let public_inputs = vec![vec![4, 5]];
-        let proof = vec![0x01, 0x02, 0x03];
+        let proof = [0x01, 0x02, 0x03];
         let wrong_proof = vec![0xFF; proof.len()];
         let result = zk_vm.verify_proof(&circuit_id, &public_inputs, &wrong_proof);
         assert!(result.is_ok());

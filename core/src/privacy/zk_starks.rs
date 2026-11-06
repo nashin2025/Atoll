@@ -336,10 +336,10 @@ mod tests {
         let inputs = vec![vec![1]];
 
         let proof_low = prover_low
-            .prove(computation_hash, &inputs, &vec![vec![2]])
+            .prove(computation_hash, &inputs, &[vec![2]])
             .unwrap();
         let proof_high = prover_high
-            .prove(computation_hash, &inputs, &vec![vec![2]])
+            .prove(computation_hash, &inputs, &[vec![2]])
             .unwrap();
 
         assert_eq!(proof_low.queries.len(), 10);

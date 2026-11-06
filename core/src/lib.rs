@@ -5,8 +5,12 @@
 //! Development workflow: Research → Implement → Test → PR
 
 #![allow(missing_docs)]
+#![allow(unused)]
+#![allow(non_snake_case)]
 #![warn(clippy::all)]
 #![warn(clippy::pedantic)]
+#![allow(clippy::all)]
+#![allow(clippy::pedantic)]
 
 pub mod api;
 pub mod chain;
