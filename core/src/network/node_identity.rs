@@ -11,20 +11,24 @@
 //! wraps that API instead.
 //!
 //! ## Limitation (MVP)
-//!
-//! The secret key is persisted to disk in plaintext. Encryption at rest
-//! (password-derived key wrapping, keychain integration, etc.) is deferred
-//! to a later phase of the H4 encrypted transport work.
+//
+//! The secret key is persisted to disk in plaintext by default.
+//! Encryption at rest (passphrase-derived key wrapping with XChaCha20-Poly1305)
+//! is available via [`NodeIdentity::save_with_passphrase`] /
+//! [`NodeIdentity::load_with_passphrase`].
 
 use std::fs;
 use std::io;
 use std::path::Path;
 
-use argon2::password_hash::SaltString;
-use argon2::{Argon2, PasswordHasher};
+use aead::Aead;
+use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version};
 use blake3::Hasher;
+use chacha20poly1305::{KeyInit, XChaCha20Poly1305};
+use hybrid_array::Array;
 use rand::{rngs::OsRng, RngCore};
 use snow::Builder;
+use zeroize::Zeroize;
 
 /// On-disk identity file: 64 raw bytes plaintext, or encrypted format:
 /// `[0x01 || salt(16) || nonce(24) || ciphertext]` where ciphertext is
@@ -112,11 +116,14 @@ impl NodeIdentity {
 
     /// Loads a node identity from disk at `path`.
     ///
-    /// Expects a 64-byte file written by [`NodeIdentity::save`].
+    /// Expects a 64-byte plaintext file written by [`NodeIdentity::save`].
     /// If the file does not exist, a new random identity is generated and
     /// persisted.
-    /// If the file exists but does not contain exactly 64 bytes, an error
-    /// is returned.
+    ///
+    /// The file format is auto-detected: a 64-byte file is treated as plaintext,
+    /// while a file starting with the encrypted format version byte (`0x01`)
+    /// requires a passphrase and must be loaded with [`NodeIdentity::load_with_passphrase`].
+    /// If the file exists but is neither, an error is returned.
     pub fn load(path: impl AsRef<Path>) -> io::Result<Self> {
         let path = path.as_ref();
         if !path.exists() {
@@ -126,37 +133,41 @@ impl NodeIdentity {
         }
 
         let bytes = fs::read(path)?;
-        if bytes.len() != IDENTITY_FILE_LEN {
+
+        // Plaintext file: exactly 64 bytes.
+        if bytes.len() == IDENTITY_FILE_LEN {
+            return Self::load_plaintext(&bytes);
+        }
+
+        // Encrypted format detected ([0x01 || salt(16) || nonce(24) || ciphertext]):
+        // a passphrase is required to decrypt it.
+        if bytes.first() == Some(&ENCRYPTED_FORMAT_VERSION) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!(
-                    "node identity file at {:?} contains {} bytes, expected {}",
-                    path,
-                    bytes.len(),
-                    IDENTITY_FILE_LEN
-                ),
+                "node identity file is encrypted; passphrase required. Use load_with_passphrase",
             ));
         }
 
-        let mut secret_key = [0u8; SECRET_KEY_LEN];
-        let mut public_key = [0u8; SECRET_KEY_LEN];
-        secret_key.copy_from_slice(&bytes[..SECRET_KEY_LEN]);
-        public_key.copy_from_slice(&bytes[SECRET_KEY_LEN..]);
-        let node_id = Self::compute_node_id(&public_key);
-
-        Ok(Self {
-            secret_key,
-            public_key,
-            node_id,
-        })
+        Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "node identity file at {:?} contains {} bytes, expected {} (plaintext)",
+                path,
+                bytes.len(),
+                IDENTITY_FILE_LEN
+            ),
+        ))
     }
 
     /// Persists the static keypair to disk at `path`, encrypted at rest with
     /// a passphrase-derived key.
     ///
-    /// Uses argon2id to derive a 256-bit key from `passphrase`, then XORs
-    /// `[secret_key || public_key]` with a blake3-derived key stream.
-    /// File format: `[0x01 || salt(b64) || \n || nonce(24) || ciphertext]`.
+    /// Uses argon2id to derive a 256-bit key from `passphrase`, then XChaCha20-Poly1305
+    /// to authenticate and encrypt `[secret_key(32) || public_key(32)]`.
+    /// File format: `[0x01 || salt(16) || nonce(24) || ciphertext]` where ciphertext
+    /// is the XChaCha20-Poly1305 encryption of the 64-byte keypair.
+    ///
+    /// The passphrase is zeroized after key derivation so it does not linger in memory.
     ///
     /// # Errors
     ///
@@ -164,66 +175,81 @@ impl NodeIdentity {
     pub fn save_with_passphrase(&self, path: impl AsRef<Path>, passphrase: &str) -> io::Result<()> {
         let path = path.as_ref();
 
-        // Derive encryption key from passphrase using argon2id
-        let salt = SaltString::generate(&mut OsRng);
+        // Derive a 256-bit encryption key from the passphrase using argon2id.
+        let mut salt = [0u8; SALT_LEN];
+        OsRng.fill_bytes(&mut salt);
         let mut key_bytes = [0u8; KEY_LEN];
-        Argon2::default()
-            .hash_password_into(
-                passphrase.as_bytes(),
-                salt.as_str().as_bytes(),
-                &mut key_bytes,
-            )
-            .map_err(|e| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("argon2 key derivation failed: {e}"),
-                )
-            })?;
+        Self::derive_key(passphrase, &salt, &mut key_bytes)?;
 
-        // Build plaintext: [secret_key(32) || public_key(32)]
+        // Plaintext: [secret_key(32) || public_key(32)]
         let mut plaintext = [0u8; IDENTITY_FILE_LEN];
         plaintext[..SECRET_KEY_LEN].copy_from_slice(&self.secret_key);
         plaintext[SECRET_KEY_LEN..].copy_from_slice(&self.public_key);
 
-        // Generate key stream using blake3: blake3(key || counter)[..64]
+        // Random nonce for XChaCha20-Poly1305.
         let mut nonce_bytes = [0u8; NONCE_LEN];
         OsRng.fill_bytes(&mut nonce_bytes);
-        let mut ciphertext = [0u8; IDENTITY_FILE_LEN];
-        for (i, chunk) in plaintext.chunks_exact(32).enumerate() {
-            let mut counter = [0u8; 8];
-            counter[..8].copy_from_slice(&(i as u64).to_le_bytes());
-            let mut hasher = Hasher::new_keyed(&key_bytes);
-            hasher.update(&nonce_bytes);
-            hasher.update(&counter);
-            let keystream = hasher.finalize().as_bytes().to_vec();
-            for (j, byte) in chunk.iter().enumerate() {
-                ciphertext[i * 32 + j] = byte ^ keystream[j];
-            }
-        }
 
-        // Write: [version(1) || salt(b64) || \n || nonce(24) || ciphertext]
-        let mut buf = Vec::with_capacity(1 + salt.len() + 1 + NONCE_LEN + IDENTITY_FILE_LEN);
+        let cipher = XChaCha20Poly1305::new_from_slice(&key_bytes).map_err(|e| {
+            io::Error::new(io::ErrorKind::Other, format!("cipher creation failed: {e}"))
+        })?;
+        let nonce = Array::from(nonce_bytes);
+        let ciphertext = cipher
+            .encrypt(&nonce, plaintext.as_slice())
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("encryption failed: {e}")))?;
+        key_bytes.zeroize();
+
+        // File format: [0x01 || salt(16) || nonce(24) || ciphertext]
+        let mut buf = Vec::with_capacity(1 + SALT_LEN + NONCE_LEN + ciphertext.len());
         buf.push(ENCRYPTED_FORMAT_VERSION);
-        buf.extend_from_slice(salt.as_str().as_bytes());
-        buf.push(b'\n');
+        buf.extend_from_slice(&salt);
         buf.extend_from_slice(&nonce_bytes);
         buf.extend_from_slice(&ciphertext);
         fs::write(path, buf)
+    }
+
+    /// Derives a 256-bit argon2id key from `passphrase` and `salt` into `out`.
+    ///
+    /// `passphrase` is zeroized after derivation.
+    fn derive_key(
+        passphrase: &str,
+        salt: &[u8; SALT_LEN],
+        out: &mut [u8; KEY_LEN],
+    ) -> io::Result<()> {
+        let argon2 = Argon2::new(
+            Algorithm::Argon2id,
+            Version::V0x13,
+            Params::new(ARGON2_MEM_COST, ARGON2_TIME_COST, ARGON2_LANES, None).map_err(|e| {
+                io::Error::new(io::ErrorKind::Other, format!("argon2 params failed: {e}"))
+            })?,
+        );
+        let mut passphrase_bytes: Vec<u8> = passphrase.as_bytes().to_vec();
+        let result = argon2.hash_password_into(&passphrase_bytes, salt, out);
+        passphrase_bytes.zeroize();
+        result.map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                format!("argon2 key derivation failed: {e}"),
+            )
+        })
     }
 
     /// Loads a node identity from disk at `path`, decrypting with `passphrase`
     /// if the file is in encrypted format.
     ///
     /// Supports both plaintext (64 bytes) and encrypted format
-    /// (`[0x01 || salt(b64) || \n || nonce(24) || ciphertext]`). For plaintext files,
+    /// (`[0x01 || salt(16) || nonce(24) || ciphertext]`). For plaintext files,
     /// `passphrase` is ignored.
     ///
-    /// Note: MVP encryption provides confidentiality but not authentication.
-    /// A wrong passphrase will produce garbage data rather than an error.
+    /// Encryption is authenticated (XChaCha20-Poly1305), so a wrong passphrase or
+    /// corrupted file produces an error rather than garbage data.
+    ///
+    /// The passphrase is zeroized after key derivation so it does not linger in memory.
     ///
     /// # Errors
     ///
-    /// Returns an error if the file cannot be read or is corrupted.
+    /// Returns an error if the file cannot be read, is corrupted, or the passphrase
+    /// is wrong (decryption/authentication failure).
     pub fn load_with_passphrase(path: impl AsRef<Path>, passphrase: &str) -> io::Result<Self> {
         let path = path.as_ref();
         let bytes = fs::read(path)?;
@@ -235,12 +261,20 @@ impl NodeIdentity {
             ));
         }
 
-        // Detect format: first byte 0x01 = encrypted, otherwise plaintext
-        if bytes[0] == ENCRYPTED_FORMAT_VERSION {
-            Self::load_encrypted(&bytes, passphrase)
-        } else {
-            Self::load_plaintext(&bytes)
+        // Plaintext: exactly 64 bytes (passphrase ignored for backward compatibility).
+        if bytes.len() == IDENTITY_FILE_LEN {
+            return Self::load_plaintext(&bytes);
         }
+
+        // Encrypted: [0x01 || salt(16) || nonce(24) || ciphertext]
+        if bytes.first() != Some(&ENCRYPTED_FORMAT_VERSION) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "unknown node identity file format",
+            ));
+        }
+
+        Self::load_encrypted(&bytes, passphrase)
     }
 
     /// Loads a plaintext node identity from raw bytes.
@@ -270,78 +304,53 @@ impl NodeIdentity {
     }
 
     /// Loads an encrypted node identity from raw bytes.
+    ///
+    /// Format: [version(1) || salt(16) || nonce(24) || ciphertext]
     fn load_encrypted(bytes: &[u8], passphrase: &str) -> io::Result<Self> {
-        // Format: [version(1) || salt(b64) || \n || nonce(24) || ciphertext]
-        let newline_pos = bytes.iter().position(|&b| b == b'\n').ok_or_else(|| {
-            io::Error::new(io::ErrorKind::InvalidData, "missing salt/nonce separator")
-        })?;
-
-        if newline_pos < 2 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "salt too short"));
-        }
-
-        let salt_str = std::str::from_utf8(&bytes[1..newline_pos]).map_err(|e| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("invalid salt encoding: {e}"),
-            )
-        })?;
-        let salt = SaltString::from_b64(salt_str).map_err(|e| {
-            io::Error::new(io::ErrorKind::InvalidData, format!("invalid salt: {e}"))
-        })?;
-
-        let nonce_start = newline_pos + 1;
-        if bytes.len() < nonce_start + NONCE_LEN {
+        const HEADER_LEN: usize = 1 + SALT_LEN + NONCE_LEN; // 41
+        if bytes.len() < HEADER_LEN {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                "file too short for nonce",
+                "file too short for encrypted header",
             ));
         }
 
-        let nonce_bytes: [u8; NONCE_LEN] =
-            bytes[nonce_start..nonce_start + NONCE_LEN]
-                .try_into()
-                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid nonce length"))?;
-        let ciphertext = &bytes[nonce_start + NONCE_LEN..];
+        let salt = &bytes[1..1 + SALT_LEN];
+        let nonce_bytes: [u8; NONCE_LEN] = bytes[1 + SALT_LEN..HEADER_LEN]
+            .try_into()
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid nonce length"))?;
+        let ciphertext = &bytes[HEADER_LEN..];
 
-        if ciphertext.len() != IDENTITY_FILE_LEN {
+        // Derive key from passphrase.
+        let mut key_bytes = [0u8; KEY_LEN];
+        Self::derive_key(
+            passphrase,
+            salt.try_into()
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid salt length"))?,
+            &mut key_bytes,
+        )?;
+
+        let cipher = XChaCha20Poly1305::new_from_slice(&key_bytes).map_err(|e| {
+            io::Error::new(io::ErrorKind::Other, format!("cipher creation failed: {e}"))
+        })?;
+        let nonce = Array::from(nonce_bytes);
+        let plaintext = cipher.decrypt(&nonce, ciphertext).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("decryption failed (wrong passphrase or corrupted file): {e}"),
+            )
+        })?;
+        key_bytes.zeroize();
+
+        if plaintext.len() != IDENTITY_FILE_LEN {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(
-                    "ciphertext contains {} bytes, expected {}",
-                    ciphertext.len(),
+                    "decrypted plaintext contains {} bytes, expected {}",
+                    plaintext.len(),
                     IDENTITY_FILE_LEN
                 ),
             ));
-        }
-
-        // Derive key from passphrase
-        let mut key_bytes = [0u8; KEY_LEN];
-        Argon2::default()
-            .hash_password_into(
-                passphrase.as_bytes(),
-                salt.as_str().as_bytes(),
-                &mut key_bytes,
-            )
-            .map_err(|e| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("argon2 key derivation failed: {e}"),
-                )
-            })?;
-
-        // Decrypt: XOR with blake3 key stream (same as encryption)
-        let mut plaintext = [0u8; IDENTITY_FILE_LEN];
-        for (i, chunk) in ciphertext.chunks_exact(32).enumerate() {
-            let mut counter = [0u8; 8];
-            counter[..8].copy_from_slice(&(i as u64).to_le_bytes());
-            let mut hasher = Hasher::new_keyed(&key_bytes);
-            hasher.update(&nonce_bytes);
-            hasher.update(&counter);
-            let keystream = hasher.finalize().as_bytes().to_vec();
-            for (j, byte) in chunk.iter().enumerate() {
-                plaintext[i * 32 + j] = byte ^ keystream[j];
-            }
         }
 
         let mut secret_key = [0u8; SECRET_KEY_LEN];
@@ -448,7 +457,7 @@ mod tests {
     }
 
     #[test]
-    fn wrong_passphrase_produces_different_data() {
+    fn wrong_passphrase_returns_error() {
         let path = temp_path("wrong-pass");
         let _ = fs::remove_file(&path);
 
@@ -457,17 +466,60 @@ mod tests {
             .save_with_passphrase(&path, "correct-password")
             .expect("failed to save encrypted identity");
 
-        // Wrong passphrase produces garbage (no authentication in MVP encryption)
+        // XChaCha20-Poly1305 is authenticated: a wrong passphrase must fail.
         let wrong = NodeIdentity::load_with_passphrase(&path, "wrong-password");
         assert!(
-            wrong.is_ok(),
-            "wrong passphrase should produce garbage, not error"
+            wrong.is_err(),
+            "wrong passphrase should fail decryption, not produce garbage"
         );
-        let wrong_identity = wrong.unwrap();
-        assert_ne!(
-            wrong_identity.node_id(),
-            original.node_id(),
-            "wrong passphrase should produce different data"
+
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_rejects_encrypted_file_without_passphrase() {
+        let path = temp_path("encrypted-no-pass");
+        let _ = fs::remove_file(&path);
+
+        let original = NodeIdentity::generate().expect("failed to generate identity");
+        original
+            .save_with_passphrase(&path, "some-password")
+            .expect("failed to save encrypted identity");
+
+        // `load` takes no passphrase and must reject the encrypted file.
+        let result = NodeIdentity::load(&path);
+        assert!(
+            result.is_err(),
+            "loading an encrypted file without a passphrase should fail"
+        );
+
+        // `load_with_passphrase` with the right passphrase still works.
+        let loaded = NodeIdentity::load_with_passphrase(&path, "some-password")
+            .expect("failed to load encrypted identity");
+        assert_eq!(loaded.node_id(), original.node_id());
+
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn encrypted_file_has_expected_format() {
+        let path = temp_path("format");
+        let _ = fs::remove_file(&path);
+
+        let original = NodeIdentity::generate().expect("failed to generate identity");
+        original
+            .save_with_passphrase(&path, "test-pass")
+            .expect("failed to save encrypted identity");
+
+        let bytes = fs::read(&path).expect("failed to read encrypted file");
+        assert_eq!(
+            bytes[0], ENCRYPTED_FORMAT_VERSION,
+            "file should start with version byte"
+        );
+        // [0x01 || salt(16) || nonce(24) || ciphertext(64+16 tag)]
+        assert_eq!(
+            bytes.len(),
+            1 + SALT_LEN + NONCE_LEN + IDENTITY_FILE_LEN + 16
         );
 
         let _ = fs::remove_file(&path);

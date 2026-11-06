@@ -29,6 +29,14 @@ schnorrkel = "0.11"
 argon2 = "0.5"
 scrypt = "0.6"
 
+# Authenticated encryption (XChaCha20-Poly1305) for node identity encryption at rest (Task 7)
+aead = { version = "0.6", features = ["alloc"] }
+chacha20poly1305 = "0.11"
+hybrid-array = "0.4"
+
+# Securely zero sensitive memory (passphrases, key material) after use
+zeroize = "1.6"
+
 # RandomX (CPU-hard)
 # randomx = "0.2"  # TODO: Add when RandomX Rust bindings available
 
@@ -87,8 +95,8 @@ rcgen = "0.14"
 tokio-rustls = "0.26"
 
 # Encryption at rest for node identity (Task 7)
-# Uses argon2id key derivation + blake3-based stream cipher (simpler than chacha20poly1305,
-# upgrade path to XChaCha20-Poly1305 available)
+# Uses argon2id key derivation + XChaCha20-Poly1305 authenticated encryption.
+# File format: [0x01 || salt(16) || nonce(24) || ciphertext].
 
 [dev-dependencies]
 criterion = "0.5"
