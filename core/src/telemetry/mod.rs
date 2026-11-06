@@ -2,6 +2,7 @@
 //!
 //! Structured logging, metrics, health monitoring, and self-healing.
 
+pub mod alerts;
 pub mod health;
 pub mod logging;
 pub mod metrics;

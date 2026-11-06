@@ -1,0 +1,62 @@
+groups:
+  - name: atoll-node
+    rules:
+      # --- Chain health ---
+      - alert: ChainStalled
+        expr: "atoll_block_height < 1"
+        for: "5m"
+        severity: critical
+        annotations:
+          summary: "Chain has stalled"
+          description: "Block height has not advanced above 0 for 5 minutes."
+
+      - alert: BlockHeightNotAdvancing
+        expr: "atoll_block_height == 0"
+        for: "10m"
+        severity: critical
+        annotations:
+          summary: "Block height not advancing"
+          description: "Chain tip height remains at 0 for 10 minutes."
+
+      # --- Network health ---
+      - alert: LowPeerCount
+        expr: "atoll_peers_connected_total < 1"
+        for: "2m"
+        severity: high
+        annotations:
+          summary: "No connected peers"
+          description: "Node has no connected peers for 2 minutes."
+
+      - alert: HighErrorRate
+        expr: "atoll_errors_total > 100"
+        for: "5m"
+        severity: high
+        annotations:
+          summary: "High error rate"
+          description: "Error counter exceeds 100 within 5 minutes."
+
+      # --- Performance ---
+      - alert: HighBlockValidationLatency
+        expr: "atoll_block_validation_ms > 500"
+        for: "5m"
+        severity: medium
+        annotations:
+          summary: "High block validation latency"
+          description: "Block validation p99 latency exceeds 500ms for 5 minutes."
+
+      - alert: HighRPCLatency
+        expr: "atoll_rpc_request_ms > 1000"
+        for: "5m"
+        severity: medium
+        annotations:
+          summary: "High RPC latency"
+          description: "RPC request p99 latency exceeds 1s for 5 minutes."
+
+      # --- Token supply ---
+      - alert: SupplyDeviation
+        expr: "atoll_supply_atoll > 21000000"
+        for: "1m"
+        severity: critical
+        annotations:
+          summary: "ATOLL supply exceeds expected cap"
+          description: "Total ATOLL supply exceeds 21 million tokens."

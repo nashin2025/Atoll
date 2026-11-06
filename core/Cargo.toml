@@ -72,6 +72,9 @@ tracing-appender = "0.2"
 # Stream extensions for WebSocket handling (Task 8)
 futures-util = "0.3"
 
+# YAML parsing for alert rules (Task 10)
+serde_yaml = "0.9"
+
 # TLS for RPC/WebSocket endpoints (Task 8)
 rustls = "0.23"
 rcgen = "0.14"
