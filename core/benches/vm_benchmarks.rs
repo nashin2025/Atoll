@@ -14,6 +14,7 @@ use atoll_core::vm::riscv::RISCVExecutor;
 use atoll_core::vm::wasm::WASMExecutor;
 use atoll_core::vm::zk_vm::ZKVMExecutor;
 use atoll_core::vm::{ExecutionContext, ExecutionResult, VMError, VMRouter};
+use atoll_core::crypto::morph_hash::MorphHashEngine;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::time::Duration;
 
@@ -224,6 +225,71 @@ fn router_benches(c: &mut Criterion) {
     bench_router(c, "router_zk", vec![0x05; 12]);
 }
 
+// ---------------------------------------------------------------------------
+// Algorithm chain cache benchmarks
+// ---------------------------------------------------------------------------
+
+/// Benchmarks morph_hash with a cache miss (fresh engine, new prev_hash+height).
+fn bench_algorithm_chain_cache_miss(c: &mut Criterion) {
+    let prev_hash = Hash512::blake3(b"cache_miss_test");
+    c.bench_function("morph_hash_cache_miss", |b| {
+        b.iter(|| {
+            let mut engine = MorphHashEngine::new();
+            let result = engine.morph_hash(
+                black_box(b"benchmark input"),
+                black_box(&prev_hash),
+                black_box(42),
+            );
+            black_box(result)
+        })
+    });
+}
+
+/// Benchmarks morph_hash with a cache hit (same engine, same prev_hash+height).
+fn bench_algorithm_chain_cache_hit(c: &mut Criterion) {
+    let prev_hash = Hash512::blake3(b"cache_hit_test");
+    let mut engine = MorphHashEngine::new();
+    // Prime the cache
+    engine.morph_hash(b"benchmark input", &prev_hash, 42);
+    c.bench_function("morph_hash_cache_hit", |b| {
+        b.iter(|| {
+            let result = engine.morph_hash(
+                black_box(b"benchmark input"),
+                black_box(&prev_hash),
+                black_box(42),
+            );
+            black_box(result)
+        })
+    });
+}
+
+/// Benchmarks morph_hash cache hit rate over many repeated calls.
+fn bench_algorithm_chain_cache_hit_rate(c: &mut Criterion) {
+    let prev_hash = Hash512::blake3(b"cache_hit_rate_test");
+    let mut engine = MorphHashEngine::new();
+    c.bench_function("morph_hash_cache_hit_rate", |b| {
+        b.iter(|| {
+            let mut hits = 0u64;
+            let mut total = 0u64;
+            for _ in 0..100 {
+                let result = engine.morph_hash(
+                    b"benchmark input",
+                    &prev_hash,
+                    42,
+                );
+                black_box(result);
+                total += 1;
+                let (h, _, _) = engine.cache_stats();
+                if h > hits {
+                    hits = h;
+                }
+            }
+            let hit_rate = if total > 0 { hits as f64 / total as f64 * 100.0 } else { 0.0 };
+            black_box(hit_rate)
+        })
+    });
+}
+
 criterion_group! {
     name = vm_benches;
     config = Criterion::default()
@@ -237,6 +303,9 @@ criterion_group! {
     bench_ai_vm_deploy_and_infer,
     bench_zk_vm_deploy_and_execute,
     router_benches,
+    bench_algorithm_chain_cache_miss,
+    bench_algorithm_chain_cache_hit,
+    bench_algorithm_chain_cache_hit_rate,
 }
 
 criterion_main!(vm_benches);
