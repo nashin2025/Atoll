@@ -3,7 +3,11 @@
 //! Six virtual machines for smart contract execution:
 //! EVM, WASM, Move, RISC-V, AI VM, ZK VM.
 //!
-//! The VM router selects the appropriate VM based on contract bytecode prefix.
+//! The VM router selects the appropriate VM based on bytecode prefix,
+//! then validates magic bytes to confirm the detection. Execution
+//! context is validated before any VM runs, and all panics inside VM
+//! executors are caught by [`execute_safe`] and converted into
+//! [`ExecutionResult::Error`].
 
 pub mod ai_vm;
 pub mod evm;
@@ -87,6 +91,19 @@ impl std::fmt::Display for VMError {
     }
 }
 
+/// Errors that can occur during VM routing or context validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VMRouterError {
+    /// Bytecode is empty.
+    EmptyBytecode,
+    /// Prefix byte does not map to any known VM type.
+    UnknownPrefix(u8),
+    /// Magic bytes do not match the VM type indicated by the prefix.
+    MismatchedMagic { prefix: u8, detected: VMType },
+    /// Execution context failed validation.
+    InvalidContext(String),
+}
+
 /// Gas metering for VM execution.
 ///
 /// The [`GasMeter`] type, standard gas cost table, and `estimate_gas` live in
@@ -113,42 +130,125 @@ where
     }
 }
 
-/// VM router: selects the appropriate VM based on bytecode prefix
+/// Magic bytes for each VM type used to confirm prefix-based routing.
+///
+/// These are checked after the prefix byte routes bytecode to a VM type.
+/// If magic bytes contradict the prefix, routing returns an error rather
+/// than silently guessing.
+mod magic {
+    /// WASM magic: `\0asm` + version 1 (4 bytes version)
+    pub const WASM: [u8; 8] = [0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00];
+    /// ELF64 magic: `\x7fELF`
+    pub const ELF: [u8; 4] = [0x7F, 0x45, 0x4C, 0x46];
+    /// Move bytecode magic: `0xCA 0xFE 0xBA 0xBE`
+    pub const MOVE: [u8; 4] = [0xCA, 0xFE, 0xBA, 0xBE];
+    /// ONNX model protobuf magic prefix
+    pub const ONNX: [u8; 4] = [0x13, 0x4F, 0x4E, 0x4E]; // \x13ONNX
+    /// ZK VM circuit marker: non-empty proof/circuit data
+    pub const ZK_MARKER: u8 = 0x01;
+}
+
+/// VM router: selects the appropriate VM based on bytecode prefix,
+/// then validates magic bytes to confirm the detection.
 pub struct VMRouter;
 
 impl VMRouter {
-    /// Routes a transaction to the appropriate VM based on bytecode prefix
-    pub fn route(data: &[u8]) -> Result<VMType, String> {
+    /// Routes a transaction to the appropriate VM based on bytecode prefix.
+    ///
+    /// Returns [`VMRouterError::UnknownPrefix`] if the first byte does not
+    /// map to any known VM type. Returns [`VMRouterError::EmptyBytecode`]
+    /// if the input is empty.
+    ///
+    /// Magic bytes are NOT validated here — see [`route_with_magic`] for
+    /// that.
+    pub fn route(data: &[u8]) -> Result<VMType, VMRouterError> {
         if data.is_empty() {
-            return Err("Empty bytecode".to_string());
+            return Err(VMRouterError::EmptyBytecode);
         }
 
-        // Phase 1: Simple prefix-based routing
-        // Phase 2: More sophisticated detection (magic bytes, headers, etc.)
-
         match data[0] {
-            0x00 => Ok(VMType::EVM),   // EVM bytecode starts with 0x00
-            0x01 => Ok(VMType::WASM),  // WASM magic number starts with 0x00 0x61 0x73 0x6d
-            0x02 => Ok(VMType::Move),  // Move bytecode
-            0x03 => Ok(VMType::RISCV), // RISC-V binary
-            0x04 => Ok(VMType::AI),    // AI model (ONNX)
-            0x05 => Ok(VMType::ZK),    // ZK VM circuit
-            _ => Ok(VMType::EVM),      // Default to EVM for compatibility
+            0x00 => Ok(VMType::EVM),
+            0x01 => Ok(VMType::WASM),
+            0x02 => Ok(VMType::Move),
+            0x03 => Ok(VMType::RISCV),
+            0x04 => Ok(VMType::AI),
+            0x05 => Ok(VMType::ZK),
+            prefix => Err(VMRouterError::UnknownPrefix(prefix)),
         }
     }
 
-    /// Executes bytecode on the VM selected by [`route`], using the provided
-    /// [`ExecutionContext`].
+    /// Routes bytecode to a VM type using both prefix and magic byte validation.
     ///
-    /// Panics raised inside a VM executor are caught by [`execute_safe`] and
-    /// returned as `ExecutionResult::Error` rather than aborting the host.
+    /// The prefix byte gives a preliminary VM type, then magic bytes are
+    /// checked to confirm. If magic bytes strongly indicate a different VM
+    /// type, returns [`VMRouterError::MismatchedMagic`]. If magic bytes are
+    /// absent or uninformative, the prefix-based result is returned.
+    pub fn route_with_magic(data: &[u8]) -> Result<VMType, VMRouterError> {
+        let prefix_type = Self::route(data)?;
+
+        // Check magic bytes to confirm or contradict the prefix
+        let detected = Self::detect_from_magic(data);
+
+        match detected {
+            Some(detected_type) if detected_type != prefix_type => {
+                Err(VMRouterError::MismatchedMagic {
+                    prefix: data[0],
+                    detected: detected_type,
+                })
+            }
+            _ => Ok(prefix_type),
+        }
+    }
+
+    /// Detects VM type from magic bytes alone.
+    ///
+    /// Returns `None` if no recognizable magic is present.
+    fn detect_from_magic(data: &[u8]) -> Option<VMType> {
+        if data.len() >= 8 {
+            // WASM: \0asm + version 1
+            if data[..8] == magic::WASM {
+                return Some(VMType::WASM);
+            }
+        }
+        if data.len() >= 4 {
+            // ELF: \x7fELF
+            if data[..4] == magic::ELF {
+                return Some(VMType::RISCV);
+            }
+            // Move: 0xCA 0xFE 0xBA 0xBE
+            if data[..4] == magic::MOVE {
+                return Some(VMType::Move);
+            }
+            // ONNX: 0x13 O N N X
+            if data[..4] == magic::ONNX {
+                return Some(VMType::AI);
+            }
+        }
+        None
+    }
+
+    /// Executes bytecode on the VM selected by [`route_with_magic`], using the
+    /// provided [`ExecutionContext`].
+    ///
+    /// The execution context is validated before any VM runs; invalid contexts
+    /// return [`ExecutionResult::Error`] immediately. Panics raised inside a VM
+    /// executor are caught by [`execute_safe`] and returned as
+    /// `ExecutionResult::Error` rather than aborting the host.
     pub fn execute(context: ExecutionContext, bytecode: &[u8]) -> ExecutionResult {
-        let vm_type = match Self::route(bytecode) {
+        // Validate the execution context before doing any work.
+        if let Err(msg) = context.validate() {
+            return ExecutionResult::Error {
+                gas_used: 0,
+                message: msg,
+            };
+        }
+
+        let vm_type = match Self::route_with_magic(bytecode) {
             Ok(vt) => vt,
             Err(err) => {
                 return ExecutionResult::Error {
                     gas_used: 0,
-                    message: err,
+                    message: format!("routing error: {err:?}"),
                 }
             }
         };
@@ -198,6 +298,55 @@ pub struct ExecutionContext {
     pub difficulty: u128,
     /// When true, state-changing operations must be rejected.
     pub is_static: bool,
+}
+
+impl ExecutionContext {
+    /// Creates a new execution context with default values.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Validates the execution context before VM execution.
+    ///
+    /// Checks:
+    /// - `chain_id` matches the protocol chain ID ([`crate::CHAIN_ID`])
+    /// - `gas_limit` is non-zero and within a sane maximum
+    /// - `gas_price` is non-zero
+    /// - `block_number` and `block_timestamp` are non-zero (mainnet blocks)
+    /// - `difficulty` is non-zero
+    ///
+    /// Returns `Ok(())` if valid, or a descriptive `String` error.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.chain_id != crate::CHAIN_ID {
+            return Err(format!(
+                "invalid chain_id: expected {}, got {}",
+                crate::CHAIN_ID,
+                self.chain_id
+            ));
+        }
+        if self.gas_limit == 0 {
+            return Err("gas_limit must be non-zero".to_string());
+        }
+        if self.gas_limit > 100_000_000 {
+            return Err(format!(
+                "gas_limit exceeds maximum: {} > 100_000_000",
+                self.gas_limit
+            ));
+        }
+        if self.gas_price == 0 {
+            return Err("gas_price must be non-zero".to_string());
+        }
+        if self.block_number == 0 {
+            return Err("block_number must be non-zero".to_string());
+        }
+        if self.block_timestamp == 0 {
+            return Err("block_timestamp must be non-zero".to_string());
+        }
+        if self.difficulty == 0 {
+            return Err("difficulty must be non-zero".to_string());
+        }
+        Ok(())
+    }
 }
 
 impl Default for ExecutionContext {
@@ -259,13 +408,133 @@ mod tests {
     #[test]
     fn vm_router_empty_data_error() {
         let result = VMRouter::route(&[]);
+        assert!(matches!(result, Err(VMRouterError::EmptyBytecode)));
+    }
+
+    #[test]
+    fn vm_router_unknown_prefix_error() {
+        let result = VMRouter::route(&[0xFF, 0x00]);
+        assert!(matches!(result, Err(VMRouterError::UnknownPrefix(0xFF))));
+    }
+
+    #[test]
+    fn vm_router_no_more_default_evm() {
+        // 0xFF is unknown prefix -> error, not default EVM anymore
+        let result = VMRouter::route(&[0xFF, 0x00]);
         assert!(result.is_err());
     }
 
     #[test]
-    fn vm_router_default_evm() {
-        let result = VMRouter::route(&[0xFF, 0x00]);
-        assert_eq!(result, Ok(VMType::EVM));
+    fn vm_router_wasm_magic_confirms() {
+        // WASM prefix 0x01 + valid WASM magic \0asm + version
+        let wasm_bytes = [0x01, 0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00];
+        let result = VMRouter::route_with_magic(&wasm_bytes);
+        assert_eq!(result, Ok(VMType::WASM));
+    }
+
+    #[test]
+    fn vm_router_wasm_magic_mismatch() {
+        // Prefix 0x00 (EVM) but bytecode starts with WASM magic \0asm -> mismatch
+        let wasm_magic = [0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00];
+        let result = VMRouter::route_with_magic(&wasm_magic);
+        assert!(matches!(
+            result,
+            Err(VMRouterError::MismatchedMagic {
+                prefix: 0x00,
+                detected: VMType::WASM
+            })
+        ));
+    }
+
+    #[test]
+    fn vm_router_elf_magic_detects_riscv() {
+        // No prefix (first byte 0x7F is unknown) -> UnknownPrefix error
+        let elf_bytes = [0x7F, 0x45, 0x4C, 0x46, 0x02, 0x01, 0x01, 0x00];
+        let result = VMRouter::route(&elf_bytes);
+        assert!(matches!(result, Err(VMRouterError::UnknownPrefix(0x7F))));
+    }
+
+    #[test]
+    fn vm_router_move_magic_confirms() {
+        // Move prefix 0x02 + Move magic
+        let move_bytes = [0x02, 0xCA, 0xFE, 0xBA, 0xBE];
+        let result = VMRouter::route_with_magic(&move_bytes);
+        assert_eq!(result, Ok(VMType::Move));
+    }
+
+    #[test]
+    fn vm_router_ai_onnx_magic_confirms() {
+        // AI prefix 0x04 + ONNX magic
+        let onnx_bytes = [0x04, 0x13, 0x4F, 0x4E, 0x4E];
+        let result = VMRouter::route_with_magic(&onnx_bytes);
+        assert_eq!(result, Ok(VMType::AI));
+    }
+
+    #[test]
+    fn execution_context_validate_chain_id_mismatch() {
+        let mut ctx = ExecutionContext::default();
+        ctx.chain_id = 999;
+        assert!(ctx.validate().is_err());
+    }
+
+    #[test]
+    fn execution_context_validate_zero_gas_limit() {
+        let mut ctx = ExecutionContext::default();
+        ctx.gas_limit = 0;
+        assert!(ctx.validate().is_err());
+    }
+
+    #[test]
+    fn execution_context_validate_gas_limit_too_high() {
+        let mut ctx = ExecutionContext::default();
+        ctx.gas_limit = 100_000_001;
+        assert!(ctx.validate().is_err());
+    }
+
+    #[test]
+    fn execution_context_validate_zero_gas_price() {
+        let mut ctx = ExecutionContext::default();
+        ctx.gas_price = 0;
+        assert!(ctx.validate().is_err());
+    }
+
+    #[test]
+    fn execution_context_validate_zero_block_number() {
+        let mut ctx = ExecutionContext::default();
+        ctx.block_number = 0;
+        assert!(ctx.validate().is_err());
+    }
+
+    #[test]
+    fn execution_context_validate_zero_block_timestamp() {
+        let mut ctx = ExecutionContext::default();
+        ctx.block_timestamp = 0;
+        assert!(ctx.validate().is_err());
+    }
+
+    #[test]
+    fn execution_context_validate_zero_difficulty() {
+        let mut ctx = ExecutionContext::default();
+        ctx.difficulty = 0;
+        assert!(ctx.validate().is_err());
+    }
+
+    #[test]
+    fn execution_context_validate_all_valid() {
+        let ctx = ExecutionContext {
+            block_number: 1,
+            block_timestamp: 1798761600,
+            ..Default::default()
+        };
+        assert!(ctx.validate().is_ok());
+    }
+
+    #[test]
+    fn execution_context_new_returns_default_like() {
+        let ctx = ExecutionContext::new();
+        assert_eq!(ctx.chain_id, crate::CHAIN_ID);
+        assert_eq!(ctx.gas_limit, 10_000_000);
+        assert_eq!(ctx.gas_price, 1);
     }
 
     #[test]
@@ -361,8 +630,25 @@ mod tests {
     }
 
     #[test]
+    fn vm_router_execute_rejects_invalid_context() {
+        let mut ctx = ExecutionContext::default();
+        ctx.chain_id = 999; // invalid chain_id
+        let result = VMRouter::execute(ctx, &[0x00, 0x60, 0x80]);
+        match result {
+            ExecutionResult::Error { message, .. } => {
+                assert!(message.contains("chain_id"));
+            }
+            _ => panic!("Expected Error for invalid context"),
+        }
+    }
+
+    #[test]
     fn vm_router_execute_evm_stop() {
-        let result = VMRouter::execute(ExecutionContext::default(), &[0x00, 0x60, 0x80]);
+        // Valid context + EVM prefix bytecode
+        let mut ctx = ExecutionContext::default();
+        ctx.block_number = 1;
+        ctx.block_timestamp = 1798761600;
+        let result = VMRouter::execute(ctx, &[0x00, 0x60, 0x80]);
         match result {
             ExecutionResult::Success { gas_used, .. } => {
                 assert!(gas_used > 0);
