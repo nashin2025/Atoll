@@ -383,11 +383,20 @@ mod tests {
         metrics.set_block_height(100);
 
         // height < 200 -> true
-        assert!(AlertManager::eval_expr("atoll_block_height < 200", &metrics));
+        assert!(AlertManager::eval_expr(
+            "atoll_block_height < 200",
+            &metrics
+        ));
         // height < 50 -> false
-        assert!(!AlertManager::eval_expr("atoll_block_height < 50", &metrics));
+        assert!(!AlertManager::eval_expr(
+            "atoll_block_height < 50",
+            &metrics
+        ));
         // height == 100 -> true
-        assert!(AlertManager::eval_expr("atoll_block_height == 100", &metrics));
+        assert!(AlertManager::eval_expr(
+            "atoll_block_height == 100",
+            &metrics
+        ));
     }
 
     #[test]

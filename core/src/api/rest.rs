@@ -14,6 +14,7 @@ use crate::primitives::address::Address;
 use crate::telemetry::health::HealthMonitor;
 use crate::telemetry::metrics::Metrics;
 use async_graphql::Request as GraphQLRequest;
+use axum::extract::ws::{Message, WebSocket};
 use axum::{
     body::Body,
     extract::{State, WebSocketUpgrade},
@@ -23,9 +24,8 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use axum::extract::ws::{Message, WebSocket};
-use futures_util::stream::StreamExt;
 use futures_util::sink::SinkExt;
+use futures_util::stream::StreamExt;
 use serde_json::{json, Value};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -139,14 +139,12 @@ pub async fn rpc_handler(
     State(app_state): State<Arc<AppState>>,
     body: String,
 ) -> Result<Response, StatusCode> {
-    let request: Value = serde_json::from_str(&body)
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let request: Value = serde_json::from_str(&body).map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    let method = request.get("method")
-        .and_then(|m| m.as_str())
-        .unwrap_or("");
+    let method = request.get("method").and_then(|m| m.as_str()).unwrap_or("");
 
-    let params = request.get("params")
+    let params = request
+        .get("params")
         .and_then(|p| p.as_array())
         .cloned()
         .unwrap_or(vec![]);
@@ -155,7 +153,9 @@ pub async fn rpc_handler(
 
     let result = match method {
         "atoll.getInfo" => {
-            let blockchain = app_state.blockchain.read()
+            let blockchain = app_state
+                .blockchain
+                .read()
                 .expect("blockchain lock poisoned");
             json!({
                 "chain_id": crate::CHAIN_ID,
@@ -165,12 +165,14 @@ pub async fn rpc_handler(
             })
         }
         "atoll.getBalance" => {
-            let address_hex = params.get(0)
+            let address_hex = params
+                .get(0)
                 .and_then(|p| p.as_str())
                 .ok_or(StatusCode::BAD_REQUEST)?;
-            let address = Address::from_hex(address_hex)
-                .map_err(|_| StatusCode::BAD_REQUEST)?;
-            let chain_state = app_state.chain_state.read()
+            let address = Address::from_hex(address_hex).map_err(|_| StatusCode::BAD_REQUEST)?;
+            let chain_state = app_state
+                .chain_state
+                .read()
                 .expect("chain state lock poisoned");
             json!({
                 "address": address_hex,
@@ -178,7 +180,9 @@ pub async fn rpc_handler(
             })
         }
         "atoll.getPeerCount" => {
-            let peer_manager = app_state.peer_manager.read()
+            let peer_manager = app_state
+                .peer_manager
+                .read()
                 .expect("peer manager lock poisoned");
             json!({
                 "peer_count": peer_manager.connected_count(),
@@ -196,7 +200,9 @@ pub async fn rpc_handler(
             return Ok(Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(serde_json::to_string(&error_response).unwrap_or_default()))
+                .body(Body::from(
+                    serde_json::to_string(&error_response).unwrap_or_default(),
+                ))
                 .unwrap());
         }
     };
@@ -210,7 +216,9 @@ pub async fn rpc_handler(
     Ok(Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/json")
-        .body(Body::from(serde_json::to_string(&response).unwrap_or_default()))
+        .body(Body::from(
+            serde_json::to_string(&response).unwrap_or_default(),
+        ))
         .unwrap())
 }
 
@@ -218,10 +226,7 @@ pub async fn rpc_handler(
 ///
 /// Accepts WebSocket connections and sends a welcome message with node info.
 /// Clients can subscribe to real-time updates (tip height, peer count, etc.).
-pub async fn ws_handler(
-    ws: WebSocketUpgrade,
-    State(app_state): State<Arc<AppState>>,
-) -> Response {
+pub async fn ws_handler(ws: WebSocketUpgrade, State(app_state): State<Arc<AppState>>) -> Response {
     ws.on_upgrade(move |socket: WebSocket| handle_socket(socket, app_state))
 }
 
@@ -249,7 +254,11 @@ async fn handle_socket(socket: WebSocket, app_state: Arc<AppState>) {
                         .map(|b| b.tip_height())
                         .unwrap_or(0),
                 });
-                if sender.send(Message::Text(response.to_string())).await.is_err() {
+                if sender
+                    .send(Message::Text(response.to_string()))
+                    .await
+                    .is_err()
+                {
                     break;
                 }
             }

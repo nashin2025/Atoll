@@ -3,6 +3,8 @@
 //! Supports hybrid signatures: Ed25519 (classical, fast) + Dilithium
 //! (post-quantum). Both must verify for a hybrid signature to be valid.
 
+use serde::de::{self, Visitor};
+use serde::{Deserialize, Deserializer, Serializer};
 use std::fmt;
 
 /// Hybrid signature combining classical and post-quantum algorithms.
@@ -16,6 +18,42 @@ pub struct Signature {
     pub ed25519: [u8; 64],
     /// Post-quantum Dilithium signature (Level 5, ~2500-4600 bytes)
     pub dilithium: Vec<u8>,
+}
+
+impl serde::Serialize for Signature {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("Signature", 2)?;
+        state.serialize_field("ed25519", &hex::encode(&self.ed25519))?;
+        state.serialize_field("dilithium", &hex::encode(&self.dilithium))?;
+        state.end()
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Signature {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct SignatureHelper {
+            ed25519: String,
+            dilithium: String,
+        }
+
+        let helper = SignatureHelper::deserialize(deserializer)?;
+        let ed25519_bytes = hex::decode(&helper.ed25519).map_err(de::Error::custom)?;
+        let byte_len = ed25519_bytes.len();
+        let ed25519: [u8; 64] = ed25519_bytes
+            .try_into()
+            .map_err(|_| de::Error::invalid_length(byte_len, &"expected 64 bytes"))?;
+        let dilithium = hex::decode(&helper.dilithium).map_err(de::Error::custom)?;
+
+        Ok(Signature { ed25519, dilithium })
+    }
 }
 
 impl Signature {

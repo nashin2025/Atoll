@@ -62,7 +62,10 @@ fn default_distribution() -> HashMap<Address, u128> {
     dist
 }
 
-fn run_genesis(output: PathBuf, distribution_path: Option<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
+fn run_genesis(
+    output: PathBuf,
+    distribution_path: Option<PathBuf>,
+) -> Result<(), Box<dyn std::error::Error>> {
     // Load or build genesis config
     let config = if let Some(dist_path) = &distribution_path {
         let content = fs::read_to_string(dist_path)?;
@@ -111,7 +114,10 @@ fn run_genesis(output: PathBuf, distribution_path: Option<PathBuf>) -> Result<()
     println!("  Chain ID: {}", config.chain_id);
     println!("  Timestamp: {}", config.genesis_timestamp);
     println!("  Total supply: {} ATOLL (smallest units)", total_supply);
-    println!("  Distribution entries: {}", config.initial_distribution.len());
+    println!(
+        "  Distribution entries: {}",
+        config.initial_distribution.len()
+    );
 
     Ok(())
 }
@@ -121,7 +127,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     match cli.command {
-        Some(Commands::Genesis { output, distribution }) => {
+        Some(Commands::Genesis {
+            output,
+            distribution,
+        }) => {
             return run_genesis(output, distribution);
         }
         None => {}
