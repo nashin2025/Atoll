@@ -133,7 +133,7 @@ Design principles (Ponytail/YAGNI):
 - [x] `cargo build --release --locked` passes (with and without `production-zk` feature)
 - [x] `cargo test` passes — all existing VM tests + new hardening tests (note: 6 integration test failures were test-side bugs being fixed by Forge)
 - [x] `cargo clippy --all-targets -D warnings` passes
-- [ ] `cargo fmt --check` passes — formatting drift remains in `tests/fuzzing.rs`; run `cargo fmt` to resolve
+- [x] `cargo fmt --check` passes
 - [x] No VM panics on any adversarial input (fuzzing suites pass)
 - [x] Same bytecode → same `state_root` across 100 VM instances (determinism)
 - [x] Gas used never exceeds `gas_limit` for any input (gas safety)
