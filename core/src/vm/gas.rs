@@ -1,9 +1,10 @@
 //! Unified gas metering for the Atoll Protocol.
 //!
 //! Provides a shared [`GasMeter`] used by all six VMs, a standard gas cost
-//! table, refund support, and operation gas estimation.
+//! table, refund support, per-VM calibration factors, and operation gas
+//! estimation.
 
-use crate::vm::VMError;
+use crate::vm::{VMError, VMType};
 
 /// Standard gas costs for common on-chain operations.
 ///
@@ -16,6 +17,59 @@ pub const GAS_MEMORY_EXPANSION_PER_WORD: u64 = 3;
 pub const GAS_SIGNATURE_VERIFY: u64 = 3_000;
 pub const GAS_HASH: u64 = 30;
 pub const GAS_BALANCE_READ: u64 = 100;
+
+/// Calibration multiplier for each VM type.
+///
+/// Different VMs have different instruction costs relative to a common
+/// baseline. Calibration factors adjust the base gas cost so that the
+/// same computational effort costs the same gas regardless of which VM
+/// executes it. Values are applied as multipliers to base costs:
+/// `effective_gas = base_gas * calibration_factor / 1000`.
+///
+/// Default factor is 1000 (1.0x, no adjustment).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VMCalibration {
+    /// EVM calibration factor (default 1000 = 1.0x).
+    pub evm: u16,
+    /// WASM calibration factor (default 950 = 0.95x, slightly cheaper).
+    pub wasm: u16,
+    /// Move calibration factor (default 1050 = 1.05x).
+    pub move_vm: u16,
+    /// RISC-V calibration factor (default 1100 = 1.10x).
+    pub riscv: u16,
+    /// AI VM calibration factor (default 1500 = 1.50x, inference is expensive).
+    pub ai: u16,
+    /// ZK VM calibration factor (default 2000 = 2.00x, proof verification is expensive).
+    pub zk: u16,
+}
+
+impl VMCalibration {
+    /// Returns the calibration factor for the given VM type.
+    pub fn factor_for(&self, vm_type: VMType) -> u16 {
+        match vm_type {
+            VMType::EVM => self.evm,
+            VMType::WASM => self.wasm,
+            VMType::Move => self.move_vm,
+            VMType::RISCV => self.riscv,
+            VMType::AI => self.ai,
+            VMType::ZK => self.zk,
+        }
+    }
+}
+
+/// Default calibration: all VMs at 1.0x (factor 1000).
+impl Default for VMCalibration {
+    fn default() -> Self {
+        Self {
+            evm: 1000,
+            wasm: 950,
+            move_vm: 1050,
+            riscv: 1100,
+            ai: 1500,
+            zk: 2000,
+        }
+    }
+}
 
 /// A gas-chargeable operation used by [`GasMeter::estimate_gas`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,6 +116,23 @@ impl GasMeter {
         Ok(())
     }
 
+    /// Deducts `gas` from the meter, applying a VM-specific calibration
+    /// factor.
+    ///
+    /// The effective gas charged is `gas * calibration_factor / 1000`.
+    /// Returns [`VMError::OutOfGas`] if the calibrated charge would exceed
+    /// the gas limit. No gas is consumed on failure.
+    pub fn charge_calibrated(
+        &mut self,
+        gas: u64,
+        vm_type: VMType,
+        calibration: &VMCalibration,
+    ) -> Result<(), VMError> {
+        let factor = calibration.factor_for(vm_type);
+        let effective = gas.saturating_mul(factor as u64).saturating_div(1000);
+        self.charge(effective)
+    }
+
     /// Refunds `gas` back to the meter, reducing [`gas_used`](Self::gas_used).
     ///
     /// Refunds are clamped to the gas already used, so `gas_used` never
@@ -94,6 +165,14 @@ impl GasMeter {
             GasOp::Hash => GAS_HASH,
             GasOp::BalanceRead => GAS_BALANCE_READ,
         }
+    }
+
+    /// Estimates the gas cost of a common operation with VM calibration
+    /// applied.
+    pub fn estimate_gas_calibrated(op: GasOp, vm_type: VMType, calibration: &VMCalibration) -> u64 {
+        let base = Self::estimate_gas(op);
+        let factor = calibration.factor_for(vm_type);
+        base.saturating_mul(factor as u64).saturating_div(1000)
     }
 }
 
@@ -204,5 +283,117 @@ mod tests {
         assert_eq!(meter.gas_used, 100);
         assert_eq!(meter.remaining(), 0);
         assert!(meter.charge(1).is_err());
+    }
+
+    // --- Cross-VM calibration tests ---
+
+    #[test]
+    fn vm_calibration_default_factors() {
+        let cal = VMCalibration::default();
+        assert_eq!(cal.factor_for(VMType::EVM), 1000);
+        assert_eq!(cal.factor_for(VMType::WASM), 950);
+        assert_eq!(cal.factor_for(VMType::Move), 1050);
+        assert_eq!(cal.factor_for(VMType::RISCV), 1100);
+        assert_eq!(cal.factor_for(VMType::AI), 1500);
+        assert_eq!(cal.factor_for(VMType::ZK), 2000);
+    }
+
+    #[test]
+    fn charge_calibrated_applies_factor() {
+        let cal = VMCalibration::default();
+        // EVM: 1000/1000 = 1.0x, no change
+        let mut m = GasMeter::new(1000, 1);
+        assert!(m.charge_calibrated(100, VMType::EVM, &cal).is_ok());
+        assert_eq!(m.gas_used, 100);
+
+        // WASM: 950/1000 = 0.95x, 100 -> 95
+        let mut m = GasMeter::new(1000, 1);
+        assert!(m.charge_calibrated(100, VMType::WASM, &cal).is_ok());
+        assert_eq!(m.gas_used, 95);
+
+        // ZK: 2000/1000 = 2.0x, 100 -> 200
+        let mut m = GasMeter::new(1000, 1);
+        assert!(m.charge_calibrated(100, VMType::ZK, &cal).is_ok());
+        assert_eq!(m.gas_used, 200);
+    }
+
+    #[test]
+    fn charge_calibrated_out_of_gas_respects_limit() {
+        let cal = VMCalibration::default();
+        // ZK: 60 * 2000/1000 = 120, exceeds limit of 100
+        let mut m = GasMeter::new(100, 1);
+        assert_eq!(
+            m.charge_calibrated(60, VMType::ZK, &cal),
+            Err(VMError::OutOfGas)
+        );
+        assert_eq!(m.gas_used, 0);
+    }
+
+    #[test]
+    fn estimate_gas_calibrated_applies_factor() {
+        let cal = VMCalibration::default();
+        // EVM: 21000 * 1000/1000 = 21000
+        assert_eq!(
+            GasMeter::estimate_gas_calibrated(GasOp::BaseTx, VMType::EVM, &cal),
+            21_000
+        );
+        // WASM: 21000 * 950/1000 = 19950
+        assert_eq!(
+            GasMeter::estimate_gas_calibrated(GasOp::BaseTx, VMType::WASM, &cal),
+            19_950
+        );
+        // ZK: 21000 * 2000/1000 = 42000
+        assert_eq!(
+            GasMeter::estimate_gas_calibrated(GasOp::BaseTx, VMType::ZK, &cal),
+            42_000
+        );
+    }
+
+    #[test]
+    fn cross_vm_consistency_same_base_gas_produces_proportional_costs() {
+        let cal = VMCalibration::default();
+        let base = GasMeter::estimate_gas(GasOp::BaseTx); // 21_000
+
+        let evm_cost = GasMeter::estimate_gas_calibrated(GasOp::BaseTx, VMType::EVM, &cal);
+        let wasm_cost = GasMeter::estimate_gas_calibrated(GasOp::BaseTx, VMType::WASM, &cal);
+        let zk_cost = GasMeter::estimate_gas_calibrated(GasOp::BaseTx, VMType::ZK, &cal);
+
+        // EVM is baseline (1.0x)
+        assert_eq!(evm_cost, base);
+        // WASM is cheaper (0.95x)
+        assert!(wasm_cost < evm_cost);
+        assert_eq!(wasm_cost, base * 950 / 1000);
+        // ZK is more expensive (2.0x)
+        assert!(zk_cost > evm_cost);
+        assert_eq!(zk_cost, base * 2000 / 1000);
+
+        // Same base gas across VM types yields proportional costs
+        // (deterministic cross-VM gas consistency)
+        assert_eq!(
+            evm_cost as f64 / cal.factor_for(VMType::EVM) as f64 * 1000.0,
+            wasm_cost as f64 / cal.factor_for(VMType::WASM) as f64 * 1000.0
+        );
+    }
+
+    #[test]
+    fn calibration_factor_zero_means_free() {
+        let mut cal = VMCalibration::default();
+        cal.evm = 0; // EVM is free
+        let mut m = GasMeter::new(1000, 1);
+        assert!(m.charge_calibrated(10_000, VMType::EVM, &cal).is_ok());
+        assert_eq!(m.gas_used, 0);
+    }
+
+    #[test]
+    fn gas_used_never_exceeds_limit_with_calibration() {
+        let cal = VMCalibration::default();
+        let mut m = GasMeter::new(100, 1);
+
+        // Charge many times with ZK (2.0x) — each charge of 1 costs 2
+        for _ in 0..50 {
+            assert!(m.charge_calibrated(1, VMType::ZK, &cal).is_ok());
+        }
+        assert_eq!(m.gas_used, 100); // exactly at limit
+        assert!(m.charge_calibrated(1, VMType::ZK, &cal).is_err()); // would exceed
     }
 }
