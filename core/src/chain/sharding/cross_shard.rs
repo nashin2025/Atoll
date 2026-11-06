@@ -79,6 +79,50 @@ impl CrossShardManager {
         id
     }
 
+    /// Creates multiple cross-shard requests in a single batch.
+    ///
+    /// This is more efficient than calling [`create_request`] repeatedly
+    /// because it reduces per-call overhead (borrow checker, method dispatch)
+    /// and amortizes Hasher construction costs across requests.
+    ///
+    /// Returns a vector of request IDs in the same order as the input parameters.
+    pub fn create_requests_batch(
+        &mut self,
+        requests: Vec<(u16, u16, Address, Address, u128, Vec<u8>, u64)>,
+    ) -> Vec<Hash512> {
+        let mut ids = Vec::with_capacity(requests.len());
+        for (source_shard, destination_shard, sender, recipient, amount, data, block_height) in
+            requests
+        {
+            let mut hasher = blake3::Hasher::new();
+            hasher.update(&source_shard.to_le_bytes());
+            hasher.update(&destination_shard.to_le_bytes());
+            hasher.update(&sender.0);
+            hasher.update(&recipient.0);
+            hasher.update(&amount.to_le_bytes());
+            hasher.update(&block_height.to_le_bytes());
+            let mut id = [0u8; 64];
+            hasher.finalize_xof().fill(&mut id);
+            let id = Hash512(id);
+
+            let request = CrossShardRequest {
+                id,
+                source_shard,
+                destination_shard,
+                sender,
+                recipient,
+                amount,
+                data,
+                block_height,
+            };
+
+            self.pending_requests.insert(id, request);
+            self.total_cross_shard_tx += 1;
+            ids.push(id);
+        }
+        ids
+    }
+
     /// Converts a request to a receipt for the destination shard
     pub fn request_to_receipt(
         &mut self,
@@ -147,6 +191,33 @@ impl CrossShardManager {
         self.pending_receipts.remove(receipt_id);
 
         Ok(())
+    }
+
+    /// Executes multiple cross-shard receipts in a single batch.
+    ///
+    /// This is more efficient than calling [`execute_receipt`] repeatedly
+    /// because it reduces per-call overhead (borrow checker, method dispatch,
+    /// HashMap lookups).
+    ///
+    /// Each receipt is processed independently. If one receipt fails (e.g.,
+    /// not found, already executed, or expired), its error is returned in
+    /// the corresponding position of the results vector without affecting
+    /// other receipts in the batch.
+    ///
+    /// Returns a vector of `Result<(), String>` in the same order as the
+    /// input `(receipt_id, block_height)` pairs.
+    pub fn execute_receipts_batch(
+        &mut self,
+        receipts: Vec<(&Hash512, u64)>,
+    ) -> Vec<Result<(), String>> {
+        let mut results = Vec::with_capacity(receipts.len());
+
+        for (receipt_id, block_height) in receipts {
+            let result = self.execute_receipt(receipt_id, block_height);
+            results.push(result);
+        }
+
+        results
     }
 
     /// Returns pending receipts for a shard
@@ -402,5 +473,190 @@ mod tests {
         assert!(!manager.is_receipt_executed(&receipt_id));
         manager.execute_receipt(&receipt_id, 150).unwrap();
         assert!(manager.is_receipt_executed(&receipt_id));
+    }
+
+    // --- Batch operation tests ---
+
+    #[test]
+    fn create_requests_batch_creates_all_requests() {
+        let mut manager = CrossShardManager::new();
+
+        let params = vec![
+            (
+                0,
+                1,
+                Address::from_bytes([1u8; 20]),
+                Address::from_bytes([2u8; 20]),
+                100,
+                vec![1],
+                1000,
+            ),
+            (
+                0,
+                1,
+                Address::from_bytes([3u8; 20]),
+                Address::from_bytes([4u8; 20]),
+                200,
+                vec![2],
+                1000,
+            ),
+            (
+                0,
+                2,
+                Address::from_bytes([5u8; 20]),
+                Address::from_bytes([6u8; 20]),
+                300,
+                vec![3],
+                1000,
+            ),
+        ];
+
+        let ids = manager.create_requests_batch(params);
+
+        assert_eq!(ids.len(), 3);
+        assert_eq!(manager.pending_request_count(), 3);
+        assert_eq!(manager.total_cross_shard_tx(), 3);
+
+        // All IDs should be unique
+        let mut unique_ids: std::collections::HashSet<Hash512> = std::collections::HashSet::new();
+        for id in &ids {
+            assert!(unique_ids.insert(*id));
+        }
+    }
+
+    #[test]
+    fn create_requests_batch_empty() {
+        let mut manager = CrossShardManager::new();
+        let ids = manager.create_requests_batch(vec![]);
+        assert!(ids.is_empty());
+        assert_eq!(manager.pending_request_count(), 0);
+    }
+
+    #[test]
+    fn execute_receipts_batch_executes_all() {
+        let mut manager = CrossShardManager::new();
+
+        // Create requests and convert to receipts
+        let mut receipt_ids = Vec::new();
+        for i in 0..5 {
+            let request_id = manager.create_request(
+                0,
+                1,
+                Address::from_bytes([i as u8; 20]),
+                Address::from_bytes([(i + 10) as u8; 20]),
+                100 * (i as u128 + 1),
+                vec![],
+                1000,
+            );
+            let receipt_id = manager.request_to_receipt(&request_id).unwrap().id;
+            receipt_ids.push(receipt_id);
+        }
+
+        // Execute all receipts in a batch
+        let batch: Vec<(&Hash512, u64)> = receipt_ids.iter().map(|id| (id, 1050)).collect();
+        let results = manager.execute_receipts_batch(batch);
+
+        assert_eq!(results.len(), 5);
+        for result in &results {
+            assert!(
+                result.is_ok(),
+                "Receipt execution should succeed: {:?}",
+                result
+            );
+        }
+        assert_eq!(manager.executed_receipt_count(), 5);
+        assert_eq!(manager.pending_receipt_count(), 0);
+    }
+
+    #[test]
+    fn execute_receipts_batch_handles_errors_per_item() {
+        let mut manager = CrossShardManager::new();
+
+        // Create one valid receipt
+        let request_id = manager.create_request(
+            0,
+            1,
+            Address::from_bytes([1u8; 20]),
+            Address::from_bytes([2u8; 20]),
+            100,
+            vec![],
+            1000,
+        );
+        let valid_receipt_id = manager.request_to_receipt(&request_id).unwrap().id;
+
+        // Batch with: valid receipt, non-existent receipt, already-executed receipt
+        let non_existent = Hash512::from_bytes(&[99u8; 64]).unwrap();
+        let batch: Vec<(&Hash512, u64)> = vec![
+            (&valid_receipt_id, 1050), // valid
+            (&non_existent, 1050),     // not found
+            (&valid_receipt_id, 1060), // already executed (after first succeeds)
+        ];
+
+        let results = manager.execute_receipts_batch(batch);
+
+        assert_eq!(results.len(), 3);
+        assert!(results[0].is_ok(), "First receipt should execute");
+        assert!(
+            results[1].is_err(),
+            "Second receipt (not found) should fail"
+        );
+        assert!(
+            results[2].is_err(),
+            "Third receipt (already executed) should fail"
+        );
+        assert_eq!(manager.executed_receipt_count(), 1);
+    }
+
+    #[test]
+    fn execute_receipts_batch_empty() {
+        let mut manager = CrossShardManager::new();
+        let results = manager.execute_receipts_batch(vec![]);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn create_requests_batch_then_execute_batch() {
+        let mut manager = CrossShardManager::new();
+
+        let params: Vec<(u16, u16, Address, Address, u128, Vec<u8>, u64)> = vec![
+            (
+                0,
+                1,
+                Address::from_bytes([1u8; 20]),
+                Address::from_bytes([2u8; 20]),
+                1000,
+                vec![],
+                1000,
+            ),
+            (
+                0,
+                1,
+                Address::from_bytes([3u8; 20]),
+                Address::from_bytes([4u8; 20]),
+                2000,
+                vec![],
+                1000,
+            ),
+        ];
+
+        let ids = manager.create_requests_batch(params);
+        assert_eq!(manager.pending_request_count(), 2);
+
+        // Convert to receipts
+        let receipt_ids: Vec<Hash512> = ids
+            .iter()
+            .map(|id| manager.request_to_receipt(id).unwrap().id)
+            .collect();
+
+        // Execute in batch
+        let batch: Vec<(&Hash512, u64)> = receipt_ids.iter().map(|id| (id, 1050)).collect();
+        let results = manager.execute_receipts_batch(batch);
+
+        assert_eq!(results.len(), 2);
+        for result in &results {
+            assert!(result.is_ok());
+        }
+        assert_eq!(manager.executed_receipt_count(), 2);
+        assert_eq!(manager.pending_receipt_count(), 0);
     }
 }
