@@ -13,6 +13,7 @@ use digest::{Digest, OutputSizeUser};
 use sha2::Sha512;
 use sha3::{Digest as Sha3Digest, Sha3_512};
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 /// Number of algorithms in the rotation pool
@@ -641,6 +642,13 @@ pub struct MorphHashEngine {
     sbox_generation: u64,
     memory_layer: MemoryHardLayer,
     pq_finalizer: PostQuantumFinalizer,
+    /// Cache of algorithm chains keyed by (prev_hash, block_height).
+    /// Avoids recomputing the Fisher-Yates shuffle on every morph_hash call.
+    algorithm_chain_cache: HashMap<(Hash512, u64), Vec<MorphAlgorithm>>,
+    /// Number of cache hits (chain found in cache).
+    cache_hits: u64,
+    /// Number of cache misses (chain had to be computed).
+    cache_misses: u64,
 }
 
 impl Default for MorphHashEngine {
@@ -655,6 +663,9 @@ impl MorphHashEngine {
             sbox_generation: 0,
             memory_layer: MemoryHardLayer::with_buffer_size(4096),
             pq_finalizer: PostQuantumFinalizer::new(),
+            algorithm_chain_cache: HashMap::new(),
+            cache_hits: 0,
+            cache_misses: 0,
         }
     }
 
@@ -663,6 +674,9 @@ impl MorphHashEngine {
             sbox_generation: 0,
             memory_layer: MemoryHardLayer::new(),
             pq_finalizer: PostQuantumFinalizer::new(),
+            algorithm_chain_cache: HashMap::new(),
+            cache_hits: 0,
+            cache_misses: 0,
         }
     }
 
@@ -671,6 +685,9 @@ impl MorphHashEngine {
             sbox_generation: 0,
             memory_layer: MemoryHardLayer::with_buffer_size(buffer_size),
             pq_finalizer: PostQuantumFinalizer::new(),
+            algorithm_chain_cache: HashMap::new(),
+            cache_hits: 0,
+            cache_misses: 0,
         }
     }
 
@@ -682,13 +699,45 @@ impl MorphHashEngine {
         self.sbox_generation = generation;
     }
 
+    /// Returns cache statistics: (hits, misses, hit_rate_percent).
+    pub fn cache_stats(&self) -> (u64, u64, f64) {
+        let total = self.cache_hits + self.cache_misses;
+        let hit_rate = if total > 0 {
+            self.cache_hits as f64 / total as f64 * 100.0
+        } else {
+            0.0
+        };
+        (self.cache_hits, self.cache_misses, hit_rate)
+    }
+
+    /// Returns the number of cached algorithm chains.
+    pub fn cache_size(&self) -> usize {
+        self.algorithm_chain_cache.len()
+    }
+
+    /// Clears the algorithm chain cache.
+    pub fn clear_cache(&mut self) {
+        self.algorithm_chain_cache.clear();
+        self.cache_hits = 0;
+        self.cache_misses = 0;
+    }
+
     pub fn morph_hash(
         &mut self,
         input: &[u8],
         prev_block_hash: &Hash512,
         block_height: u64,
     ) -> Hash512 {
-        let chain = select_algorithm_chain(prev_block_hash, block_height);
+        let cache_key = (*prev_block_hash, block_height);
+        let chain = if let Some(cached) = self.algorithm_chain_cache.get(&cache_key) {
+            self.cache_hits += 1;
+            cached.clone()
+        } else {
+            self.cache_misses += 1;
+            let chain = select_algorithm_chain(prev_block_hash, block_height);
+            self.algorithm_chain_cache.insert(cache_key, chain.clone());
+            chain
+        };
         let memory_buffer = self.memory_layer.init_buffer_in_place(prev_block_hash);
 
         let mut state = input.to_vec();
@@ -909,5 +958,131 @@ mod tests {
     fn atoll_tree_hash_algorithm() {
         let result = apply_algorithm(MorphAlgorithm::AtollTreeHash, b"test");
         assert_eq!(result.len(), 64);
+    }
+
+    // --- Algorithm chain cache tests ---
+
+    #[test]
+    fn algorithm_chain_cache_hit_on_repeat() {
+        let mut engine = MorphHashEngine::new();
+        let prev_hash = Hash512::blake3(b"test_seed");
+        let height = 42;
+
+        // First call: cache miss
+        let h1 = engine.morph_hash(b"test", &prev_hash, height);
+        let (hits, misses, _) = engine.cache_stats();
+        assert_eq!(misses, 1, "First call should be a cache miss");
+        assert_eq!(hits, 0, "First call should have no cache hits");
+
+        // Second call with same inputs: cache hit
+        let h2 = engine.morph_hash(b"test", &prev_hash, height);
+        let (hits, misses, _) = engine.cache_stats();
+        assert_eq!(misses, 1, "Still one cache miss");
+        assert_eq!(hits, 1, "Second call should be a cache hit");
+        assert_eq!(h1, h2, "Cached chain should produce same result");
+    }
+
+    #[test]
+    fn algorithm_chain_cache_different_heights() {
+        let mut engine = MorphHashEngine::new();
+        let prev_hash = Hash512::blake3(b"test_seed");
+
+        let h1 = engine.morph_hash(b"test", &prev_hash, 0);
+        let h2 = engine.morph_hash(b"test", &prev_hash, 1);
+        let (hits, misses, _) = engine.cache_stats();
+        assert_eq!(misses, 2, "Different heights should each be a cache miss");
+        assert_eq!(hits, 0, "No cache hits expected");
+        assert_ne!(h1, h2, "Different heights should produce different results");
+    }
+
+    #[test]
+    fn algorithm_chain_cache_different_prev_hashes() {
+        let mut engine = MorphHashEngine::new();
+        let height = 5;
+
+        let hash1 = Hash512::blake3(b"hash1");
+        let hash2 = Hash512::blake3(b"hash2");
+
+        let h1 = engine.morph_hash(b"test", &hash1, height);
+        let h2 = engine.morph_hash(b"test", &hash2, height);
+        let (hits, misses, _) = engine.cache_stats();
+        assert_eq!(
+            misses, 2,
+            "Different prev_hashes should each be a cache miss"
+        );
+        assert_eq!(hits, 0, "No cache hits expected");
+    }
+
+    #[test]
+    fn algorithm_chain_cache_stats_accurate() {
+        let mut engine = MorphHashEngine::new();
+        let prev_hash = Hash512::zero();
+
+        engine.morph_hash(b"a", &prev_hash, 0);
+        engine.morph_hash(b"a", &prev_hash, 0); // hit
+        engine.morph_hash(b"a", &prev_hash, 0); // hit
+        engine.morph_hash(b"a", &prev_hash, 1); // miss (different height)
+
+        let (hits, misses, hit_rate) = engine.cache_stats();
+        assert_eq!(hits, 2);
+        assert_eq!(misses, 2);
+        assert!(
+            (hit_rate - 50.0).abs() < f64::EPSILON,
+            "Hit rate should be 50%"
+        );
+    }
+
+    #[test]
+    fn algorithm_chain_cache_size() {
+        let mut engine = MorphHashEngine::new();
+        let prev_hash = Hash512::zero();
+
+        assert_eq!(engine.cache_size(), 0);
+
+        engine.morph_hash(b"a", &prev_hash, 0);
+        engine.morph_hash(b"a", &prev_hash, 1);
+        assert_eq!(engine.cache_size(), 2);
+
+        engine.morph_hash(b"a", &prev_hash, 0); // hit, no new entry
+        assert_eq!(engine.cache_size(), 2);
+    }
+
+    #[test]
+    fn algorithm_chain_cache_clear() {
+        let mut engine = MorphHashEngine::new();
+        let prev_hash = Hash512::zero();
+
+        engine.morph_hash(b"a", &prev_hash, 0);
+        engine.morph_hash(b"a", &prev_hash, 0); // hit
+        assert!(engine.cache_stats().0 > 0);
+
+        engine.clear_cache();
+        assert_eq!(engine.cache_stats().0, 0);
+        assert_eq!(engine.cache_stats().1, 0);
+        assert_eq!(engine.cache_size(), 0);
+
+        // After clear, next call is a miss again
+        engine.morph_hash(b"a", &prev_hash, 0);
+        let (hits, misses, _) = engine.cache_stats();
+        assert_eq!(hits, 0);
+        assert_eq!(misses, 1);
+    }
+
+    #[test]
+    fn algorithm_chain_cache_preserves_determinism() {
+        let mut cached_engine = MorphHashEngine::new();
+        let mut fresh_engine = MorphHashEngine::new();
+        let prev_hash = Hash512::blake3(b"determinism_test");
+        let height = 100;
+
+        // Run multiple times through cached engine
+        for _ in 0..10 {
+            cached_engine.morph_hash(b"same_input", &prev_hash, height);
+        }
+
+        // Fresh engine should produce identical results
+        let cached_hash = cached_engine.morph_hash(b"same_input", &prev_hash, height);
+        let fresh_hash = fresh_engine.morph_hash(b"same_input", &prev_hash, height);
+        assert_eq!(cached_hash, fresh_hash);
     }
 }
