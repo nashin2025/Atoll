@@ -21,6 +21,10 @@ use crate::vm::{ExecutionContext, ExecutionResult, GasMeter, VMError, VMType};
 const MAX_MODEL_SIZE: usize = 100 * 1024 * 1024;
 /// Maximum inference gas per request
 const MAX_INFERENCE_GAS: u64 = 10_000_000;
+/// Maximum inference input size: 1 MB
+const MAX_INFERENCE_INPUT_SIZE: usize = 1 * 1024 * 1024;
+/// Maximum deployed models per VM instance
+const MAX_DEPLOYED_MODELS: usize = 10_000;
 /// Minimum proof size for verification
 const MIN_PROOF_SIZE: usize = 32;
 /// Maximum proof size for verification
@@ -53,6 +57,8 @@ pub struct AIVMExecutor {
     model_registry: Vec<DeployedModel>,
     pub max_model_size: usize,
     pub max_inference_gas: u64,
+    pub max_inference_input_size: usize,
+    pub max_deployed_models: usize,
 }
 
 impl AIVMExecutor {
@@ -63,6 +69,8 @@ impl AIVMExecutor {
             model_registry: Vec::new(),
             max_model_size: MAX_MODEL_SIZE,
             max_inference_gas: MAX_INFERENCE_GAS,
+            max_inference_input_size: MAX_INFERENCE_INPUT_SIZE,
+            max_deployed_models: MAX_DEPLOYED_MODELS,
         }
     }
 
@@ -83,6 +91,11 @@ impl AIVMExecutor {
 
         // Check for duplicate deployment
         if self.model_registry.iter().any(|m| m.hash == model_hash) {
+            return Err(VMError::UnsupportedOperation);
+        }
+
+        // Check deployed model count limit
+        if self.model_registry.len() >= self.max_deployed_models {
             return Err(VMError::UnsupportedOperation);
         }
 
@@ -121,6 +134,11 @@ impl AIVMExecutor {
         // Validate input is non-empty
         if input_data.is_empty() {
             return Err(VMError::InvalidInstruction);
+        }
+
+        // Validate input size limit
+        if input_data.len() > self.max_inference_input_size {
+            return Err(VMError::UnsupportedOperation);
         }
 
         // Charge gas for model lookup
@@ -410,5 +428,53 @@ mod tests {
         let result = ai_vm.deploy_model(&model_bytes);
         assert!(result.is_ok());
         assert!(ai_vm.remaining_gas() < 20_000);
+    }
+
+    // --- Model count limit tests ---
+
+    #[test]
+    fn ai_max_deployed_models_limit() {
+        let mut ai_vm = AIVMExecutor::new(ExecutionContext::default(), 100_000_000);
+        ai_vm.max_deployed_models = 2; // Override for test
+
+        let model1 = vec![1u8; 20];
+        let model2 = vec![2u8; 20];
+        let model3 = vec![3u8; 20];
+
+        ai_vm.deploy_model(&model1).unwrap();
+        ai_vm.deploy_model(&model2).unwrap();
+        let result = ai_vm.deploy_model(&model3);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), VMError::UnsupportedOperation);
+        assert_eq!(ai_vm.model_count(), 2);
+    }
+
+    // --- Inference input size limit tests ---
+
+    #[test]
+    fn ai_inference_input_too_large() {
+        let mut ai_vm = AIVMExecutor::default();
+        let model_bytes = make_test_model();
+        ai_vm.deploy_model(&model_bytes).unwrap();
+        let model_hash = Hash512::blake3(&model_bytes);
+
+        // Input exceeds MAX_INFERENCE_INPUT_SIZE (1 MB)
+        let oversized_input = vec![1u8; MAX_INFERENCE_INPUT_SIZE + 1];
+        let result = ai_vm.execute_inference(&model_hash, &oversized_input);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), VMError::UnsupportedOperation);
+    }
+
+    #[test]
+    fn ai_inference_input_at_limit() {
+        let mut ai_vm = AIVMExecutor::default();
+        let model_bytes = make_test_model();
+        ai_vm.deploy_model(&model_bytes).unwrap();
+        let model_hash = Hash512::blake3(&model_bytes);
+
+        // Input exactly at MAX_INFERENCE_INPUT_SIZE (1 MB) should work
+        let max_input = vec![1u8; MAX_INFERENCE_INPUT_SIZE];
+        let result = ai_vm.execute_inference(&model_hash, &max_input);
+        assert!(result.is_ok());
     }
 }
