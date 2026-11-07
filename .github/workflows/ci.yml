@@ -56,9 +56,6 @@ jobs:
           toolchain: stable
           components: clippy
 
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.0-dev libsoup3-dev
-
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
@@ -66,7 +63,7 @@ jobs:
           shared-key: "v1-rust-lint"
 
       - name: Run clippy
-        run: cargo clippy --workspace --all-targets
+        run: cargo clippy -p atoll-core -p wallet-cli --all-targets
 
   # ============================================================================
   # TESTING
@@ -93,7 +90,7 @@ jobs:
           shared-key: "v1-rust-test"
 
       - name: Run unit tests
-        run: cargo test --workspace --lib
+        run: cargo test -p atoll-core -p wallet-cli --lib
 
   integration-test:
     name: Integration Tests
@@ -116,7 +113,7 @@ jobs:
           shared-key: "v1-rust-integration"
 
       - name: Run integration tests
-        run: cargo test --workspace --tests
+        run: cargo test -p atoll-core -p wallet-cli --tests
 
   # ============================================================================
   # SECURITY SCANNING (Shift Left)

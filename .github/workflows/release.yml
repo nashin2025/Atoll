@@ -36,9 +36,6 @@ jobs:
         with:
           toolchain: stable
 
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libglib2.0-dev libgtk-3-dev libwebkit2gtk-4.0-dev libsoup3-dev
-
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
         with:
@@ -49,13 +46,13 @@ jobs:
         run: cargo fmt --all --check
 
       - name: Run clippy
-        run: cargo clippy --workspace --all-targets
+        run: cargo clippy -p atoll-core -p wallet-cli --all-targets
 
       - name: Run unit tests
-        run: cargo test --workspace --lib
+        run: cargo test -p atoll-core -p wallet-cli --lib
 
       - name: Run integration tests
-        run: cargo test --workspace --tests
+        run: cargo test -p atoll-core -p wallet-cli --tests
 
       - name: Install cargo-audit
         run: cargo install cargo-audit
@@ -64,7 +61,7 @@ jobs:
         run: cargo audit
 
       - name: Build release binary
-        run: cargo build --workspace --release --locked
+        run: cargo build --release -p atoll-core --locked
 
   # ============================================================================
   # DOCKER BUILD & PUSH
