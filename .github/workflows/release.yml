@@ -16,7 +16,7 @@ env:
   RUSTUP_TOOLCHAIN: stable
   CARGO_NET_RETRY: 10
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: ${{ toLower(github.repository) }}
 
 jobs:
   # ============================================================================
