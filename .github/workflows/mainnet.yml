@@ -201,7 +201,7 @@ jobs:
           npm run build
           cd src-tauri
           cargo install tauri-cli
-          cargo tauri build --release
+          cargo tauri build
 
       - name: Upload atoll-gui.exe to release
         uses: actions/upload-release-asset@v1
