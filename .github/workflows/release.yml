@@ -54,10 +54,11 @@ jobs:
       - name: Run integration tests
         run: cargo test --workspace --tests
 
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
       - name: Run cargo audit
-        uses: rust-sec/scan-action@v1
-        with:
-          tool: cargo-audit
+        run: cargo audit
 
       - name: Build release binary
         run: cargo build --workspace --release --locked
