@@ -24,12 +24,14 @@ COPY core/Cargo.toml core/Cargo.toml
 # from Cargo.toml so cargo fetch doesn't try to parse their manifests.
 RUN sed -i '/wallet\//d' Cargo.toml
 
+# Copy bench source files so cargo fetch can resolve bench manifest targets
+COPY core/benches core/benches
+
 # Download and cache dependencies separately from source compilation.
 RUN cargo fetch --locked
 
 # Copy sources and build the release binary.
 COPY core/src core/src
-COPY core/benches core/benches
 RUN cargo build --release --locked -p atoll-core
 
 # ---------------------------------------------------------------------------
