@@ -197,6 +197,7 @@ jobs:
       - name: Build GUI (release)
         run: |
           cd wallet/gui
+          rm -f package-lock.json
           npm install
           npm run build
           cd src-tauri
