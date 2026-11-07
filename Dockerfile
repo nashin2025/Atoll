@@ -4,7 +4,7 @@
 # Build stage: compile the atoll-node binary in a Rust container.
 # ---------------------------------------------------------------------------
 FROM rust:1-slim AS builder
-WORKDIR /app
+WORKDIR /app/core
 
 # System packages needed to compile native Rust crates.
 RUN apt-get update \
@@ -15,24 +15,14 @@ RUN apt-get update \
         build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy workspace manifests first so dependency downloads are cached in a
-# separate layer and only re-run when Cargo.lock changes.
-COPY Cargo.lock Cargo.toml ./
-COPY core/Cargo.toml core/Cargo.toml
+# Copy manifest and source files for the core crate only.
+COPY core/Cargo.toml .
+COPY core/src ./src
+COPY core/benches ./benches
 
-# Docker build only needs the core crate; strip GUI/CLI workspace members
-# from Cargo.toml so cargo fetch doesn't try to parse their manifests.
-RUN sed -i '/wallet\//d' Cargo.toml
-
-# Copy bench source files so cargo fetch can resolve bench manifest targets
-COPY core/benches core/benches
-
-# Download and cache dependencies separately from source compilation.
+# Download dependencies and build the release binary.
 RUN cargo fetch
-
-# Copy sources and build the release binary.
-COPY core/src core/src
-RUN cargo build --release --locked -p atoll-core
+RUN cargo build --release -p atoll-core
 
 # ---------------------------------------------------------------------------
 # Runtime stage: debian:bookworm-slim container with wget-based healthcheck.
@@ -47,7 +37,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -r -s /bin/false nonroot
 
-COPY --from=builder /app/target/release/atoll-core /usr/local/bin/atoll-node
+COPY --from=builder /app/core/target/release/atoll-core /usr/local/bin/atoll-node
 COPY config/default.config.toml /etc/atoll/config.toml
 
 EXPOSE 8080/tcp
