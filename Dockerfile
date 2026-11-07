@@ -29,6 +29,7 @@ RUN cargo fetch --locked
 
 # Copy sources and build the release binary.
 COPY core/src core/src
+COPY core/benches core/benches
 RUN cargo build --release --locked -p atoll-core
 
 # ---------------------------------------------------------------------------
