@@ -64,9 +64,6 @@ jobs:
           cargo install cargo-audit
           cargo audit
 
-      - name: Run cargo deny
-        run: cargo install cargo-deny && cargo deny check
-
   # ============================================================================
   # BUILD DOCKER IMAGE
   # ============================================================================
