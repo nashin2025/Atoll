@@ -20,12 +20,9 @@ RUN apt-get update \
 COPY Cargo.lock Cargo.toml ./
 COPY core/Cargo.toml core/Cargo.toml
 
-# Docker build only needs the core crate; strip GUI/CLI workspace members
-# so cargo fetch --locked doesn't try to parse their manifests.
-RUN sed -i 's/    "wallet\\/cli",//; s/    "wallet\\/gui\\/src-tauri",//' Cargo.toml
-
-# Download and cache dependencies separately from source compilation.
-RUN cargo fetch --locked
+# Docker build only needs the core crate; use --manifest-path so cargo fetch
+# doesn't try to parse GUI/CLI workspace member manifests.
+RUN cargo fetch --manifest-path core/Cargo.toml --locked
 
 # Copy sources and build the release binary.
 COPY core/src core/src
