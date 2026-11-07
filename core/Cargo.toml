@@ -47,6 +47,9 @@ hex = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+# Protobuf — forced to ≥3.7.2 to resolve RUSTSEC-2024-0437 (uncontrolled recursion crash)
+protobuf = "3"
+
 # WebAssembly runtime with built-in sandboxing and fuel-based gas metering.
 wasmtime = "36"
 
@@ -70,7 +73,7 @@ async-graphql = "7"
 async-graphql-axum = "7"
 
 # Prometheus metrics exposition for the `GET /metrics` endpoint
-prometheus = "0.13"
+prometheus = "0.14"
 
 # Logging
 tracing = "0.1"

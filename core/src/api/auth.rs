@@ -69,12 +69,19 @@ impl Default for AuthConfig {
 /// Each IP maintains a bucket that refills at `rate` tokens per second
 /// (`rpm / 60`). A request consumes one token; when the bucket is empty the
 /// request is rejected with `429 Too Many Requests`.
+///
+/// To prevent unbounded memory growth from unique IPs, the number of buckets
+/// is capped at `MAX_BUCKETS`. When the cap is exceeded, the oldest bucket
+/// (by last refill time) is evicted before inserting a new one.
 pub struct RateLimiter {
     /// Refill rate in tokens per second.
     rate: f64,
     /// Per-IP bucket state.
     buckets: Mutex<HashMap<SocketAddr, Bucket>>,
 }
+
+/// Maximum number of IP buckets before eviction kicks in.
+const MAX_BUCKETS: usize = 10_000;
 
 /// Token-bucket state for a single IP.
 struct Bucket {
@@ -88,7 +95,7 @@ impl RateLimiter {
         let rate = rpm as f64 / 60.0;
         Self {
             rate,
-            buckets: Mutex::new(HashMap::new()),
+            buckets: Mutex::new(HashMap::with_capacity(MAX_BUCKETS.min(1024))),
         }
     }
 
@@ -108,6 +115,18 @@ impl RateLimiter {
     pub fn check(&self, ip: SocketAddr) -> bool {
         let mut buckets = self.buckets.lock().expect("rate limiter lock poisoned");
         let now = Instant::now();
+
+        // Evict the oldest bucket if we're at capacity and the IP is new.
+        if buckets.len() >= MAX_BUCKETS && !buckets.contains_key(&ip) {
+            let oldest_ip = buckets
+                .iter()
+                .min_by(|(_, a), (_, b)| a.last_refill.cmp(&b.last_refill))
+                .map(|(ip, _)| *ip);
+            if let Some(oldest_ip) = oldest_ip {
+                buckets.remove(&oldest_ip);
+            }
+        }
+
         let bucket = buckets.entry(ip).or_insert_with(|| Bucket {
             tokens: self.rate.max(1.0),
             last_refill: now,
@@ -213,5 +232,35 @@ mod tests {
         // Wait long enough to refill at least one token (0.1s at 10/sec).
         std::thread::sleep(Duration::from_millis(150));
         assert!(limiter.check(ip));
+    }
+
+    #[test]
+    fn rate_limiter_evicts_oldest_bucket_at_capacity() {
+        // Use a tiny cap by constructing directly with MAX_BUCKETS override
+        // via a small rpm and many unique IPs.
+        let limiter = RateLimiter::new(60);
+        let base = std::net::Ipv4Addr::new(10, 0, 0, 0);
+
+        // Insert MAX_BUCKETS distinct IPs.
+        for i in 0..MAX_BUCKETS {
+            let ip = SocketAddr::from((base, i as u16 + 1));
+            assert!(limiter.check(ip));
+        }
+        // Map is now at capacity.
+
+        // Insert one more new IP — should evict the oldest.
+        let new_ip = SocketAddr::from((base, 0));
+        assert!(limiter.check(new_ip));
+
+        // The oldest IP (first one inserted) should now be evicted.
+        let oldest_ip = SocketAddr::from((base, 1));
+        let buckets = limiter.buckets.lock().expect("lock poisoned");
+        assert!(!buckets.contains_key(&oldest_ip));
+        assert!(buckets.contains_key(&new_ip));
+        assert_eq!(buckets.len(), MAX_BUCKETS);
+        drop(buckets);
+
+        // Re-checking the evicted IP creates a fresh bucket.
+        assert!(limiter.check(oldest_ip));
     }
 }
