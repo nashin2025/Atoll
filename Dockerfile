@@ -37,7 +37,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -r -s /bin/false nonroot
 
-COPY --from=builder /app/core/target/release/atoll-core /usr/local/bin/atoll-node
+COPY --from=builder /app/core/target/release/atoll-node /usr/local/bin/atoll-node
 COPY config/default.config.toml /etc/atoll/config.toml
 
 EXPOSE 8080/tcp
