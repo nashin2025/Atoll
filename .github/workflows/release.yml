@@ -52,7 +52,7 @@ jobs:
         run: cargo test -p atoll-core -p wallet-cli --lib
 
       - name: Run integration tests
-        run: cargo test -p atoll-core -p wallet-cli --tests -- --skip stress
+        run: cargo test -p atoll-core -p wallet-cli --test integration
 
       - name: Install cargo-audit
         run: cargo install cargo-audit

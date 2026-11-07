@@ -113,7 +113,7 @@ jobs:
           shared-key: "v1-rust-integration"
 
       - name: Run integration tests
-        run: cargo test -p atoll-core -p wallet-cli --tests -- --skip stress
+        run: cargo test -p atoll-core -p wallet-cli --test integration
 
   # ============================================================================
   # SECURITY SCANNING (Shift Left)
