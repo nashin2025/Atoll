@@ -162,6 +162,57 @@ jobs:
           asset_content_type: application/octet-stream
 
   # ============================================================================
+  # WINDOWS GUI BUILD
+  # ============================================================================
+
+  windows-gui-build:
+    name: Windows GUI Build
+    runs-on: windows-latest
+    timeout-minutes: 60
+    needs: [build-and-test, release]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: ${{ runner.os }}-cargo-gui-${{ hashFiles('wallet/gui/src-tauri/Cargo.lock') }}
+
+      - name: Build GUI (release)
+        run: |
+          cd wallet/gui
+          npm install
+          npm run build
+          cd src-tauri
+          cargo tauri build --release
+
+      - name: Upload atoll-gui.exe to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ needs.release.outputs.upload_url }}
+          asset_path: wallet/gui/src-tauri/target/release/atoll-gui.exe
+          asset_name: atoll-gui.exe
+          asset_content_type: application/octet-stream
+
+  # ============================================================================
   # GENERATE SBOM
   # ============================================================================
 
