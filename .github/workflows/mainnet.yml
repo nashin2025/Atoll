@@ -141,24 +141,24 @@ jobs:
       - name: Run tests
         run: cargo test -p atoll-core -p wallet-cli --lib
 
-      - name: Upload atoll-core.exe to release
+      - name: Upload atoll-node.exe to release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           upload_url: ${{ needs.release.outputs.upload_url }}
-          asset_path: target/release/atoll-core.exe
-          asset_name: atoll-core.exe
+          asset_path: target/release/atoll-node.exe
+          asset_name: atoll-node.exe
           asset_content_type: application/octet-stream
 
-      - name: Upload atoll-wallet-cli.exe to release
+      - name: Upload wallet-cli.exe to release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           upload_url: ${{ needs.release.outputs.upload_url }}
-          asset_path: target/release/atoll-wallet-cli.exe
-          asset_name: atoll-wallet-cli.exe
+          asset_path: target/release/wallet-cli.exe
+          asset_name: wallet-cli.exe
           asset_content_type: application/octet-stream
 
   # ============================================================================
