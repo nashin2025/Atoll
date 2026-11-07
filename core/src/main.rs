@@ -161,6 +161,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // API authentication + per-IP rate limiting.
     let auth_config = AuthConfig::from_env();
+    if !auth_config.has_keys() {
+        tracing::error!("ATOLL_API_KEYS is not set; no API keys configured. Refusing to start.");
+        std::process::exit(1);
+    }
     let rate_limiter = RateLimiter::from_env();
     let auth = Arc::new(AuthState::new(auth_config, rate_limiter));
 

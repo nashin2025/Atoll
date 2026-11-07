@@ -107,6 +107,16 @@ impl NodeIdentity {
     /// ## Limitation (MVP)
     ///
     /// The key is written in plaintext with no encryption at rest.
+    ///
+    /// # Deprecation
+    ///
+    /// Plaintext persistence exposes the secret key on disk. Use
+    /// [`NodeIdentity::save_with_passphrase`] instead, which encrypts at rest
+    /// with a passphrase-derived XChaCha20-Poly1305 key.
+    #[deprecated(
+        since = "1.0.0",
+        note = "plaintext save exposes the secret key; use save_with_passphrase instead"
+    )]
     pub fn save(&self, path: impl AsRef<Path>) -> io::Result<()> {
         let mut buf = [0u8; IDENTITY_FILE_LEN];
         buf[..SECRET_KEY_LEN].copy_from_slice(&self.secret_key);
@@ -399,6 +409,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn save_load_roundtrip_preserves_identity() {
         let path = temp_path("roundtrip");
         let _ = fs::remove_file(&path);
@@ -526,6 +537,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn load_with_passphrase_handles_plaintext_file() {
         let path = temp_path("plaintext-via-passphrase");
         let _ = fs::remove_file(&path);

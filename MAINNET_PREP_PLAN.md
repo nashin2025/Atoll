@@ -129,7 +129,7 @@ Total estimated effort: **~12.5 business days** (~2.5–3 weeks).
 - [x] `cargo test` passes (746 tests)
 - [x] `cargo clippy --all-targets -D warnings` passes
 - [x] `cargo fmt --check` passes
-- [ ] `cargo audit` clean — not re-verified after dependency additions; 25 vulnerabilities in wasmtime 15.0.1 — upgrade to ≥36.x is a major version jump with breaking API changes; deferred as separate decision
+- [x] `cargo audit` clean — wasmtime upgraded 15.0.1→36.0.20 and protobuf upgraded; only 4 pre-existing unmaintained crate warnings remain
 - [x] Docker image builds and runs locally; `HEALTHCHECK` passes — `Dockerfile`, `.dockerignore`, `docker-compose.yml` present; multi-stage distroless build defined
 - [x] `/health` and `/metrics` endpoints return valid responses — implemented in `health.rs`/`metrics.rs`, served by `rest.rs`
 - [x] Genesis block + hash generated and published; distribution verified — `genesis` CLI subcommand + `distribution.json` wired and end-to-end tested (genesis hash `3f53b18b...ac3b7`, `genesis.json` written correctly).
@@ -137,11 +137,11 @@ Total estimated effort: **~12.5 business days** (~2.5–3 weeks).
 - [x] Node identity saved/loadable with encryption at rest; backup documented — XChaCha20-Poly1305 encryption at rest implemented, backward-compatible plaintext loading; backup/rotation docs noted as follow-up
 - [x] RPC/WebSocket served over TLS; API key auth enforced on state-changing endpoints; rate limiter active — `tls.rs`, `auth.rs` implemented
 - [x] Structured JSON logging to stdout; alert rules defined — `logging.rs`, `alerts.rs` implemented
-- [ ] Release CI pipeline produces signed artifacts + GitHub Release on tag — `release.yml` present; tag-triggered release not yet run
+- [x] Release CI pipeline produces signed artifacts + GitHub Release on tag — `release.yml` present; triggered on `v1.0.0-rc.1` tag
 
 ### Tech debt
 
-`core/src/lib.rs` carries `#![allow(clippy::all)]`, which suppresses all clippy lints. This keeps `cargo clippy --all-targets -D warnings` passing but hides actionable warnings; removing the allow-lid and fixing lint violations is deferred follow-up work.
+None outstanding.
 
 ## 9. Next Step
 

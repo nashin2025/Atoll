@@ -27,10 +27,16 @@ use axum::{
 };
 use futures_util::sink::SinkExt;
 use futures_util::stream::StreamExt;
+use hyper::{
+    server::conn::Http, service::service_fn, Body as HyperBody, Request as HttpRequest,
+    Response as HttpResponse,
+};
 use serde_json::{json, Value};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::RwLock;
+use tokio_rustls::TlsAcceptor;
+use tower::Service;
 
 /// Shared application state injected into every request handler.
 pub struct AppState {
@@ -117,25 +123,155 @@ pub async fn metrics_handler(State(app_state): State<Arc<AppState>>) -> Result<S
 ///
 /// If `tls` is `Some`, self-signed TLS certificates have been generated and
 /// written to disk by [`crate::api::tls::generate_self_signed`]. The server
-/// serves over plain HTTP; for production deployments, TLS termination should
-/// be handled by a reverse proxy (nginx, traefik, cloud load balancer) in
-/// front of this server using the generated certificates.
+/// terminates TLS itself via [`tokio_rustls::TlsAcceptor`] and serves each
+/// connection with [`hyper::server::conn::Http::serve_connection`]. When
+/// `tls` is `None`, the server serves plain HTTP via [`axum::serve`].
 pub async fn run_server(
     state: AppState,
     tls: Option<TlsCredentials>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
     let listener = tokio::net::TcpListener::bind(addr).await?;
+    let router = router(Arc::new(state));
 
-    if tls.is_some() {
-        tracing::info!(%addr, "REST API listening (plain HTTP; TLS certs at /etc/atoll/tls/)");
-    } else {
-        tracing::info!(%addr, "REST API listening (plain HTTP)");
+    match tls {
+        Some(creds) => {
+            let acceptor = TlsAcceptor::from(creds.config);
+            tracing::info!(%addr, "REST API listening (TLS)");
+            loop {
+                let (stream, remote_addr) = match listener.accept().await {
+                    Ok(conn) => conn,
+                    Err(e) => {
+                        tracing::warn!(error = %e, "failed to accept connection");
+                        continue;
+                    }
+                };
+                let acceptor = acceptor.clone();
+                let svc_router = router.clone();
+                tokio::spawn(async move {
+                    let tls_stream = match acceptor.accept(stream).await {
+                        Ok(s) => s,
+                        Err(e) => {
+                            tracing::warn!(%remote_addr, error = %e, "TLS accept failed");
+                            return;
+                        }
+                    };
+                    let service = service_fn(move |req: HttpRequest<HyperBody>| {
+                        let mut svc = svc_router.clone();
+                        async move {
+                            // Buffer the hyper (http 0.2) request body. hyper 0.14 and
+                            // axum 0.7 depend on different major versions of the `http`
+                            // crate, so the request must be rebuilt field by field.
+                            let (parts, body) = req.into_parts();
+                            let bytes = match hyper::body::to_bytes(body).await {
+                                Ok(b) => b,
+                                Err(e) => {
+                                    tracing::warn!(error = %e, "failed to read request body");
+                                    return Ok::<_, std::convert::Infallible>(
+                                        HttpResponse::builder()
+                                            .status(hyper::http::StatusCode::BAD_REQUEST)
+                                            .body(HyperBody::empty())
+                                            .unwrap(),
+                                    );
+                                }
+                            };
+                            let mut axum_req = axum::http::Request::builder()
+                                .method(
+                                    axum::http::Method::from_bytes(
+                                        parts.method.as_str().as_bytes(),
+                                    )
+                                    .unwrap_or(axum::http::Method::GET),
+                                )
+                                .uri(
+                                    axum::http::Uri::from_maybe_shared(parts.uri.to_string())
+                                        .unwrap_or(axum::http::Uri::default()),
+                                )
+                                .version(match parts.version {
+                                    hyper::http::Version::HTTP_09 => axum::http::Version::HTTP_09,
+                                    hyper::http::Version::HTTP_10 => axum::http::Version::HTTP_10,
+                                    hyper::http::Version::HTTP_11 => axum::http::Version::HTTP_11,
+                                    _ => axum::http::Version::HTTP_11,
+                                });
+                            for (name, value) in parts.headers.iter() {
+                                let name =
+                                    axum::http::HeaderName::try_from(name.as_str().as_bytes())
+                                        .unwrap_or(axum::http::HeaderName::from_static(
+                                            "x-unknown",
+                                        ));
+                                let value = axum::http::HeaderValue::try_from(value.as_bytes())
+                                    .unwrap_or(axum::http::HeaderValue::from_static(""));
+                                axum_req = axum_req.header(name, value);
+                            }
+                            let axum_req = axum_req
+                                .body(axum::body::Body::from(bytes))
+                                .expect("axum request build failed");
+                            match svc.call(axum_req).await {
+                                Ok(res) => {
+                                    let (parts, body) = res.into_parts();
+                                    let bytes = match axum::body::to_bytes(body, usize::MAX).await {
+                                        Ok(b) => b,
+                                        Err(_) => axum::body::Bytes::new(),
+                                    };
+                                    let mut builder = HttpResponse::builder()
+                                        .status(
+                                            hyper::http::StatusCode::from_u16(
+                                                parts.status.as_u16(),
+                                            )
+                                            .unwrap_or(
+                                                hyper::http::StatusCode::INTERNAL_SERVER_ERROR,
+                                            ),
+                                        )
+                                        .version(match parts.version {
+                                            axum::http::Version::HTTP_09 => {
+                                                hyper::http::Version::HTTP_09
+                                            }
+                                            axum::http::Version::HTTP_10 => {
+                                                hyper::http::Version::HTTP_10
+                                            }
+                                            axum::http::Version::HTTP_11 => {
+                                                hyper::http::Version::HTTP_11
+                                            }
+                                            _ => hyper::http::Version::HTTP_11,
+                                        });
+                                    for (name, value) in parts.headers.iter() {
+                                        let name = hyper::http::HeaderName::try_from(
+                                            name.as_str().as_bytes(),
+                                        )
+                                        .unwrap_or(hyper::http::HeaderName::from_static(
+                                            "x-unknown",
+                                        ));
+                                        let value =
+                                            hyper::http::HeaderValue::try_from(value.as_bytes())
+                                                .unwrap_or(hyper::http::HeaderValue::from_static(
+                                                    "",
+                                                ));
+                                        builder = builder.header(name, value);
+                                    }
+                                    Ok(builder
+                                        .body(HyperBody::from(bytes))
+                                        .expect("hyper response build failed"))
+                                }
+                                Err(_) => Ok(HttpResponse::builder()
+                                    .status(hyper::http::StatusCode::INTERNAL_SERVER_ERROR)
+                                    .body(HyperBody::empty())
+                                    .unwrap()),
+                            }
+                        }
+                    });
+                    if let Err(e) = Http::new().serve_connection(tls_stream, service).await {
+                        tracing::warn!(%remote_addr, error = %e, "TLS connection failed");
+                    }
+                });
+            }
+        }
+        None => {
+            tracing::info!(%addr, "REST API listening (plain HTTP)");
+            axum::serve(listener, router)
+                .await
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        }
     }
-
-    axum::serve(listener, router(Arc::new(state)))
-        .await
-        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+    Ok(())
 }
 
 /// JSON-RPC 2.0 handler for `POST /rpc`.

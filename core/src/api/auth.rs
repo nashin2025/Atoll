@@ -23,9 +23,9 @@ pub type ApiKey = String;
 /// Configuration for API key authentication.
 ///
 /// Keys are loaded from the `ATOLL_API_KEYS` environment variable
-/// (comma-separated). If unset, a single development key is accepted so the
-/// node is usable out of the box; production deployments should set
-/// `ATOLL_API_KEYS`.
+/// (comma-separated). The variable is required: when it is unset no API key is
+/// accepted, and the node must refuse to start. Production deployments must
+/// set `ATOLL_API_KEYS`.
 pub struct AuthConfig {
     api_keys: HashSet<String>,
 }
@@ -38,6 +38,11 @@ impl AuthConfig {
         }
     }
 
+    /// Returns `true` if at least one API key is configured.
+    pub fn has_keys(&self) -> bool {
+        !self.api_keys.is_empty()
+    }
+
     /// Builds config from the `ATOLL_API_KEYS` environment variable.
     pub fn from_env() -> Self {
         let keys = std::env::var("ATOLL_API_KEYS")
@@ -48,7 +53,7 @@ impl AuthConfig {
                     .filter(|k| !k.is_empty())
                     .collect::<Vec<_>>()
             })
-            .unwrap_or_else(|| vec!["atoll-local".to_string()]);
+            .unwrap_or_default();
         Self::new(keys)
     }
 
