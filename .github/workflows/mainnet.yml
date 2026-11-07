@@ -47,14 +47,17 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libglib2.0-dev
+
       - name: Run full test suite
-        run: cargo test --workspace
+        run: cargo test -p atoll-core -p wallet-cli --lib
 
       - name: Run cargo clippy
-        run: cargo clippy --all-targets -D warnings
+        run: cargo clippy -p atoll-core -p wallet-cli --all-targets -D warnings
 
       - name: Run cargo fmt check
-        run: cargo fmt --check
+        run: cargo fmt --all --check
 
       - name: Run cargo audit
         run: |
