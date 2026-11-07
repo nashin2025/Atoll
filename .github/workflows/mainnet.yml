@@ -203,6 +203,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [docker-build, sbom]
+    outputs:
+      upload_url: ${{ steps.create-release.outputs.upload_url }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
