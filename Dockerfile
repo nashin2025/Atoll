@@ -28,7 +28,7 @@ RUN sed -i '/wallet\//d' Cargo.toml
 COPY core/benches core/benches
 
 # Download and cache dependencies separately from source compilation.
-RUN cargo fetch --locked
+RUN cargo fetch
 
 # Copy sources and build the release binary.
 COPY core/src core/src
