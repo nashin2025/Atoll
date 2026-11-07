@@ -19,15 +19,16 @@ RUN apt-get update \
 # separate layer and only re-run when Cargo.lock changes.
 COPY Cargo.lock Cargo.toml ./
 COPY core/Cargo.toml core/Cargo.toml
-COPY wallet/cli/Cargo.toml wallet/cli/Cargo.toml
-COPY wallet/gui/src-tauri/Cargo.toml wallet/gui/src-tauri/Cargo.toml
+
+# Docker build only needs the core crate; strip GUI/CLI workspace members
+# so cargo fetch --locked doesn't try to parse their manifests.
+RUN sed -i 's/    "wallet\\/cli",//; s/    "wallet\\/gui\\/src-tauri",//' Cargo.toml
 
 # Download and cache dependencies separately from source compilation.
 RUN cargo fetch --locked
 
 # Copy sources and build the release binary.
 COPY core/src core/src
-COPY wallet/cli/src wallet/cli/src
 RUN cargo build --release --locked -p atoll-core
 
 # ---------------------------------------------------------------------------
