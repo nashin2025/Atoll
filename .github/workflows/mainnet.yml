@@ -200,7 +200,7 @@ jobs:
           npm install
           npm run build
           cd src-tauri
-          cargo install cargo-tauri --locked
+          cargo install tauri-cli
           cargo tauri build --release
 
       - name: Upload atoll-gui.exe to release
