@@ -198,7 +198,7 @@ jobs:
         run: |
           cd wallet/gui
           Remove-Item -Force package-lock.json -ErrorAction SilentlyContinue
-          npm install
+          npm install --legacy-peer-deps
           npm run build
           cd src-tauri
           cargo install tauri-cli
