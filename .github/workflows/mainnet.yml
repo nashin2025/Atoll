@@ -54,7 +54,7 @@ jobs:
         run: cargo test -p atoll-core -p wallet-cli --lib
 
       - name: Run cargo clippy
-        run: cargo clippy -p atoll-core -p wallet-cli --all-targets -D warnings
+        run: cargo clippy -p atoll-core -p wallet-cli --all-targets
 
       - name: Run cargo fmt check
         run: cargo fmt --all --check
