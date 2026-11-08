@@ -30,16 +30,16 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be80866792576f8620
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
+        uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561
         with:
           toolchain: stable
           profile: minimal
 
       - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
+        uses: swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
         with:
           path: |
             ~/.cargo/registry
@@ -75,10 +75,10 @@ jobs:
     needs: [build-and-test]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be80866792576f8620
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@master
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -108,7 +108,7 @@ jobs:
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/atoll-node:cache,mode=max
 
   # ============================================================================
-  # WINDOWS BUILD
+  # WINDOWS BUILD + CODE SIGNING
   # ============================================================================
 
   windows-build:
@@ -116,18 +116,19 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 40
     needs: [build-and-test, release]
+    environment: release
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be80866792576f8620
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
+        uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561
         with:
           toolchain: stable
           profile: minimal
 
       - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
+        uses: swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
         with:
           path: |
             ~/.cargo/registry
@@ -140,6 +141,47 @@ jobs:
 
       - name: Run tests
         run: cargo test -p atoll-core -p wallet-cli --lib
+
+      # ---- Code signing setup ----
+      - name: Resolve signtool.exe
+        shell: pwsh
+        run: |
+          $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName)[-1].FullName
+          echo "SIGNTOOL=$signtool" >> $env:GITHUB_ENV
+
+      - name: Decode Windows code signing certificate
+        shell: pwsh
+        env:
+          WINDOWS_CODESIGN_CERT: ${{ secrets.WINDOWS_CODESIGN_CERT }}
+          WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
+        if: ${{ env.WINDOWS_CODESIGN_CERT != '' }}
+        run: |
+          $pfxPath = Join-Path $env:RUNNER_TEMP "atoll-codesign.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_CODESIGN_CERT))
+          echo "PFX_PATH=$pfxPath" >> $env:GITHUB_ENV
+          Write-Host "Certificate decoded to $pfxPath"
+
+      - name: Sign Windows executables
+        shell: pwsh
+        env:
+          WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
+          PFX_PATH: ${{ env.PFX_PATH }}
+        if: ${{ env.PFX_PATH != '' }}
+        run: |
+          $files = Get-ChildItem target/release -Filter *.exe -Recurse
+          foreach ($f in $files) {
+            Write-Host "Signing $($f.FullName)"
+            & $env:SIGNTOOL sign /f $env:PFX_PATH /p $env:WINDOWS_CODESIGN_PASSWORD `
+              /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /v $f.FullName
+            Write-Host "Verifying $($f.FullName)"
+            & $env:SIGNTOOL verify /pa /v $f.FullName
+          }
+
+      - name: Clean up certificate
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path $env:PFX_PATH) { Remove-Item -Force $env:PFX_PATH }
 
       - name: Upload atoll-node.exe to release
         uses: actions/upload-release-asset@v1
@@ -162,7 +204,7 @@ jobs:
           asset_content_type: application/octet-stream
 
   # ============================================================================
-  # WINDOWS GUI BUILD
+  # WINDOWS GUI BUILD + CODE SIGNING
   # ============================================================================
 
   windows-gui-build:
@@ -170,9 +212,10 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     needs: [build-and-test, release]
+    environment: release
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be80866792576f8620
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -180,13 +223,13 @@ jobs:
           node-version: '20'
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
+        uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561
         with:
           toolchain: stable
           profile: minimal
 
       - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
+        uses: swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
         with:
           path: |
             ~/.cargo/registry
@@ -204,6 +247,47 @@ jobs:
           cargo install tauri-cli
           cargo tauri build
 
+      # ---- Code signing setup ----
+      - name: Resolve signtool.exe
+        shell: pwsh
+        run: |
+          $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName)[-1].FullName
+          echo "SIGNTOOL=$signtool" >> $env:GITHUB_ENV
+
+      - name: Decode Windows code signing certificate
+        shell: pwsh
+        env:
+          WINDOWS_CODESIGN_CERT: ${{ secrets.WINDOWS_CODESIGN_CERT }}
+          WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
+        if: ${{ env.WINDOWS_CODESIGN_CERT != '' }}
+        run: |
+          $pfxPath = Join-Path $env:RUNNER_TEMP "atoll-codesign.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_CODESIGN_CERT))
+          echo "PFX_PATH=$pfxPath" >> $env:GITHUB_ENV
+          Write-Host "Certificate decoded to $pfxPath"
+
+      - name: Sign Windows GUI executable
+        shell: pwsh
+        env:
+          WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
+          PFX_PATH: ${{ env.PFX_PATH }}
+        if: ${{ env.PFX_PATH != '' }}
+        run: |
+          $files = Get-ChildItem target/release -Filter atoll-gui.exe -Recurse
+          foreach ($f in $files) {
+            Write-Host "Signing $($f.FullName)"
+            & $env:SIGNTOOL sign /f $env:PFX_PATH /p $env:WINDOWS_CODESIGN_PASSWORD `
+              /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /v $f.FullName
+            Write-Host "Verifying $($f.FullName)"
+            & $env:SIGNTOOL verify /pa /v $f.FullName
+          }
+
+      - name: Clean up certificate
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path $env:PFX_PATH) { Remove-Item -Force $env:PFX_PATH }
+
       - name: Upload atoll-gui.exe to release
         uses: actions/upload-release-asset@v1
         env:
@@ -213,6 +297,71 @@ jobs:
           asset_path: target/release/atoll-gui.exe
           asset_name: atoll-gui.exe
           asset_content_type: application/octet-stream
+
+  # ============================================================================
+  # MACOS BUILD (ad-hoc signing - notarization requires paid cert)
+  # ============================================================================
+
+  macos-build:
+    name: macOS Build
+    runs-on: macos-latest
+    timeout-minutes: 60
+    needs: [build-and-test, release]
+    environment: release
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@b4ffde65f46336ab88eb53be80866792576f8620
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Cache dependencies
+        uses: swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: ${{ runner.os }}-cargo-gui-${{ hashFiles('wallet/gui/src-tauri/Cargo.lock') }}
+
+      - name: Build GUI (release)
+        run: |
+          cd wallet/gui
+          Remove-Item -Force package-lock.json -ErrorAction SilentlyContinue || true
+          npm install --legacy-peer-deps
+          npx tsc --noEmit && npx vite build
+          cd src-tauri
+          cargo install tauri-cli
+          cargo tauri build
+
+      - name: Ad-hoc sign macOS app (self-signed cert does not pass notarization)
+        shell: bash
+        if: ${{ env.APPLE_SIGNING_IDENTITY == '' }}
+        run: |
+          APP_PATH=$(find wallet/gui/src-tauri/target/release/bundle -name "*.app" -maxdepth 3 -type d | head -1)
+          if [ -n "$APP_PATH" ]; then
+            codesign --sign - --deep --force "$APP_PATH"
+            codesign --verify --deep --strict "$APP_PATH"
+            echo "Ad-hoc signed: $APP_PATH"
+          fi
+
+      - name: Upload macOS app to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ needs.release.outputs.upload_url }}
+          asset_path: wallet/gui/src-tauri/target/release/bundle/macos/Atoll GUI Wallet.app
+          asset_name: Atoll-GUI-Wallet-macOS.zip
+          asset_content_type: application/zip
 
   # ============================================================================
   # GENERATE SBOM
@@ -225,10 +374,10 @@ jobs:
     needs: [docker-build]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be80866792576f8620
 
-      - name: Generate SBOM
-        uses: anchore/sbom-action@v0
+      - name: Generate Docker image SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
         with:
           image: ghcr.io/${{ github.repository_owner }}/atoll-node:${{ github.ref_name }}
           output-file: sbom.atoll-node.json
@@ -260,7 +409,7 @@ jobs:
       upload_url: ${{ steps.create-release.outputs.upload_url }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab88eb53be80866792576f8620
 
       - name: Download SBOM artifact
         uses: actions/download-artifact@v4
@@ -270,7 +419,7 @@ jobs:
 
       - name: Create Release
         id: create-release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@master
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
@@ -284,7 +433,12 @@ jobs:
             See attached SBOM for vulnerability scanning results.
 
             ### Windows Binaries
-            `atoll-core.exe` and `atoll-wallet-cli.exe` attached as release assets.
+            `atoll-node.exe`, `wallet-cli.exe`, and `atoll-gui.exe` are code-signed
+            with a self-signed certificate. Verify signatures before installing.
+
+            ### macOS
+            Ad-hoc signed (not notarized). Notarization requires a paid Apple
+            Developer ID certificate.
 
           generate_release_notes: true
           draft: false
