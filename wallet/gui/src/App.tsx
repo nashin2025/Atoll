@@ -3,8 +3,9 @@ import { Welcome } from '@/views/Welcome';
 import { Dashboard } from '@/views/Dashboard';
 import { Send } from '@/views/Send';
 import { History } from '@/views/History';
+import { DeriveAddress } from '@/views/DeriveAddress';
 
-type View = 'welcome' | 'dashboard' | 'send' | 'history';
+type View = 'welcome' | 'dashboard' | 'send' | 'history' | 'derive-address';
 
 interface AppState {
   view: View;
@@ -65,6 +66,7 @@ export default function App() {
           onLock={handleLock}
           onSend={() => setState((prev) => ({ ...prev, view: 'send' }))}
           onHistory={() => setState((prev) => ({ ...prev, view: 'history' }))}
+          onDeriveAddress={() => setState((prev) => ({ ...prev, view: 'derive-address' }))}
         />
       )}
 
@@ -79,6 +81,10 @@ export default function App() {
 
       {state.view === 'history' && (
         <History onBack={() => setState((prev) => ({ ...prev, view: 'dashboard' }))} />
+      )}
+
+      {state.view === 'derive-address' && (
+        <DeriveAddress onBack={() => setState((prev) => ({ ...prev, view: 'dashboard' }))} />
       )}
     </div>
   );

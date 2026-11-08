@@ -8,6 +8,7 @@ interface DashboardProps {
   onLock: () => void;
   onSend: () => void;
   onHistory: () => void;
+  onDeriveAddress: () => void;
 }
 
 export function Dashboard({
@@ -124,6 +125,9 @@ export function Dashboard({
           </Button>
           <Button variant="secondary" onClick={onHistory} className="w-full">
             History
+          </Button>
+          <Button variant="secondary" onClick={onDeriveAddress} className="w-full">
+            Derive Address
           </Button>
         </div>
 
