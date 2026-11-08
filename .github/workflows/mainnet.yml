@@ -210,7 +210,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           upload_url: ${{ needs.release.outputs.upload_url }}
-          asset_path: wallet/gui/src-tauri/target/release/atoll-gui.exe
+          asset_path: target/release/atoll-gui.exe
           asset_name: atoll-gui.exe
           asset_content_type: application/octet-stream
 
