@@ -4,13 +4,6 @@
   "description": "Default capability for the Atoll GUI Wallet",
   "windows": ["main"],
   "permissions": [
-    "core:default",
-    "wallet-new",
-    "wallet-unlock",
-    "wallet-import",
-    "wallet-balance",
-    "wallet-send",
-    "wallet-history",
-    "wallet-derive-address"
+    "core:default"
   ]
 }
