@@ -161,8 +161,8 @@ impl NodeIdentity {
         Err(io::Error::new(
             io::ErrorKind::InvalidData,
             format!(
-                "node identity file at {:?} contains {} bytes, expected {} (plaintext)",
-                path,
+                "node identity file at {} contains {} bytes, expected {} (plaintext)",
+                path.display(),
                 bytes.len(),
                 IDENTITY_FILE_LEN
             ),

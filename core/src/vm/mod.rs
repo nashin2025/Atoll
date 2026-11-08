@@ -245,11 +245,11 @@ impl VMRouter {
 
         let vm_type = match Self::route_with_magic(bytecode) {
             Ok(vt) => vt,
-            Err(err) => {
+            Err(_err) => {
                 return ExecutionResult::Error {
                     gas_used: 0,
-                    message: format!("routing error: {err:?}"),
-                }
+                    message: "routing error".to_string(),
+                };
             }
         };
 
