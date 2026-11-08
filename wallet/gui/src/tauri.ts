@@ -63,36 +63,38 @@ export interface DeriveAddressResponse {
 // ---------------------------------------------------------------------------
 // Invoke wrappers (snake-case command names match Rust function names
 // registered via tauri::generate_handler!)
+// Each Rust command takes `request: <RequestType>`, so the invoke payload
+// must be wrapped in a `request` key matching the parameter name.
 // ---------------------------------------------------------------------------
 
 export async function walletUnlock(req: UnlockRequest): Promise<UnlockResponse> {
-  return invoke('wallet_unlock', req as unknown as Record<string, unknown>);
+  return invoke('wallet_unlock', { request: req });
 }
 
 export async function walletNew(req: NewRequest): Promise<NewResponse> {
-  return invoke('wallet_new', req as unknown as Record<string, unknown>);
+  return invoke('wallet_new', { request: req });
 }
 
 export async function walletImport(req: ImportRequest): Promise<ImportResponse> {
-  return invoke('wallet_import', req as unknown as Record<string, unknown>);
+  return invoke('wallet_import', { request: req });
 }
 
 export async function walletBalance(req: BalanceRequest): Promise<BalanceResponse> {
-  return invoke('wallet_balance', req as unknown as Record<string, unknown>);
+  return invoke('wallet_balance', { request: req });
 }
 
 export async function walletSend(req: SendRequest): Promise<SendResponse> {
-  return invoke('wallet_send', req as unknown as Record<string, unknown>);
+  return invoke('wallet_send', { request: req });
 }
 
 export async function walletHistory(req: HistoryRequest): Promise<HistoryResponse> {
-  return invoke('wallet_history', req as unknown as Record<string, unknown>);
+  return invoke('wallet_history', { request: req });
 }
 
 export async function walletDeriveAddress(
   req: DeriveAddressRequest,
 ): Promise<DeriveAddressResponse> {
-  return invoke('wallet_derive_address', req as unknown as Record<string, unknown>);
+  return invoke('wallet_derive_address', { request: req });
 }
 
 // ---------------------------------------------------------------------------
