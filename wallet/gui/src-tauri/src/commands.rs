@@ -19,6 +19,7 @@ use atoll_core::primitives::transaction::Transaction;
 use ed25519::signature::{Signer, Verifier};
 use ed25519_dalek::SigningKey;
 use rand::rngs::OsRng;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
@@ -123,7 +124,233 @@ pub struct DeriveAddressResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Node connection state and RPC proxy types
+// ---------------------------------------------------------------------------
+
+/// Current connection to a local atoll-node RPC endpoint.
+#[derive(Clone)]
+pub struct NodeConnection {
+    pub url: String,
+    pub connected: bool,
+    pub chain_id: Option<String>,
+    pub tip_height: Option<u64>,
+}
+
+static NODE_CONNECTION: OnceLock<Mutex<NodeConnection>> = OnceLock::new();
+
+fn node_conn() -> &'static Mutex<NodeConnection> {
+    NODE_CONNECTION.get_or_init(|| {
+        Mutex::new(NodeConnection {
+            url: String::new(),
+            connected: false,
+            chain_id: None,
+            tip_height: None,
+        })
+    })
+}
+
+/// JSON-RPC 2.0 request to the node.
+#[derive(Serialize)]
+struct JsonRpcRequest<'a> {
+    jsonrpc: &'a str,
+    method: &'a str,
+    params: Vec<serde_json::Value>,
+    id: u64,
+}
+
+/// JSON-RPC 2.0 response from the node.
+#[derive(Deserialize)]
+struct JsonRpcResponse {
+    result: Option<serde_json::Value>,
+    #[allow(dead_code)]
+    error: Option<serde_json::Value>,
+    #[allow(dead_code)]
+    id: u64,
+}
+
+/// Calls a JSON-RPC method on the connected node.
+async fn node_rpc(
+    method: &str,
+    params: Vec<serde_json::Value>,
+) -> Result<serde_json::Value, GuiError> {
+    // Extract connection info while holding the lock, then drop it before awaiting.
+    let url = {
+        let conn = node_conn().lock().map_err(|e| {
+            GuiError::Io(format!("node connection lock poisoned: {e}"))
+        })?;
+        if !conn.connected {
+            return Err(GuiError::Io("not connected to a node".to_string()));
+        }
+        format!("{}/rpc", conn.url.trim_end_matches('/'))
+    };
+
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| GuiError::Io(format!("failed to create HTTP client: {e}")))?;
+
+    let req = JsonRpcRequest {
+        jsonrpc: "2.0",
+        method,
+        params,
+        id: 1,
+    };
+
+    let res: JsonRpcResponse = client
+        .post(&url)
+        .json(&req)
+        .send()
+        .await
+        .map_err(|e| GuiError::Io(format!("node RPC request failed: {e}")))?
+        .json()
+        .await
+        .map_err(|e| GuiError::Io(format!("failed to parse node response: {e}")))?;
+
+    if let Some(err) = res.error {
+        return Err(GuiError::Io(format!(
+            "node RPC error: {err}"
+        )));
+    }
+
+    res.result.ok_or_else(|| {
+        GuiError::Io("node RPC returned no result".to_string())
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Node RPC request / response types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NodeConnectRequest {
+    pub url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NodeConnectResponse {
+    pub connected: bool,
+    pub chain_id: String,
+    pub tip_height: u64,
+    pub version: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NodeDisconnectRequest {}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NodeDisconnectResponse {
+    pub disconnected: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NodeGetBalanceRequest {
+    pub address: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NodeGetBalanceResponse {
+    pub address: String,
+    pub balance: u128,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NodeSendTxRequest {
+    pub signed_tx: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NodeSendTxResponse {
+    pub accepted: bool,
+    pub message: String,
+}
+
+// ---------------------------------------------------------------------------
 // Internal (testable) logic
+// ---------------------------------------------------------------------------
+
+async fn do_node_connect(url: &str) -> Result<NodeConnectResponse, GuiError> {
+    // Test connectivity first (no lock held across the await).
+    let result: serde_json::Value = node_rpc("atoll.getInfo", vec![]).await?;
+    let chain_id = result
+        .get("chain_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let tip_height = result
+        .get("tip_height")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    let version = result
+        .get("version")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    // Update connection state after successful RPC call.
+    let mut conn = node_conn().lock().map_err(|e| {
+        GuiError::Io(format!("node connection lock poisoned: {e}"))
+    })?;
+    conn.url = url.to_string();
+    conn.connected = true;
+    conn.chain_id = Some(chain_id.clone());
+    conn.tip_height = Some(tip_height);
+
+    Ok(NodeConnectResponse {
+        connected: true,
+        chain_id,
+        tip_height,
+        version,
+    })
+}
+
+async fn do_node_disconnect() -> Result<NodeDisconnectResponse, GuiError> {
+    let mut conn = node_conn().lock().map_err(|e| {
+        GuiError::Io(format!("node connection lock poisoned: {e}"))
+    })?;
+    conn.connected = false;
+    conn.url = String::new();
+    conn.chain_id = None;
+    conn.tip_height = None;
+    Ok(NodeDisconnectResponse { disconnected: true })
+}
+
+async fn do_node_get_balance(address: &str) -> Result<NodeGetBalanceResponse, GuiError> {
+    let result: serde_json::Value = node_rpc(
+        "atoll.getBalance",
+        vec![serde_json::Value::String(address.to_string())],
+    )
+    .await?;
+    let balance = result
+        .get("balance")
+        .and_then(|v| v.as_str())
+        .and_then(|s| s.parse::<u128>().ok())
+        .unwrap_or(0);
+    Ok(NodeGetBalanceResponse {
+        address: address.to_string(),
+        balance,
+    })
+}
+
+async fn do_node_send_tx(signed_tx: &str) -> Result<NodeSendTxResponse, GuiError> {
+    let result: serde_json::Value = node_rpc(
+        "atoll.submitTx",
+        vec![serde_json::Value::String(signed_tx.to_string())],
+    )
+    .await?;
+    let accepted = result
+        .get("accepted")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let message = result
+        .get("message")
+        .and_then(|v| v.as_str())
+        .unwrap_or(if accepted { "Transaction accepted" } else { "Transaction rejected" })
+        .to_string();
+    Ok(NodeSendTxResponse { accepted, message })
+}
+
+// ---------------------------------------------------------------------------
+// Rate limiting for `wallet-unlock`
 // ---------------------------------------------------------------------------
 
 fn do_unlock(keystore_path: &Path, passphrase: &str) -> Result<Vec<String>, GuiError> {
@@ -413,6 +640,35 @@ pub fn wallet_derive_address(
 ) -> Result<DeriveAddressResponse, GuiError> {
     let address = do_derive_address(&request.public_key)?;
     Ok(DeriveAddressResponse { address })
+}
+
+/// Tests connectivity to a local atoll-node RPC endpoint by calling
+/// `atoll.getInfo`. Stores the connection info for subsequent RPC calls.
+#[tauri::command(name = "node-connect")]
+pub async fn node_connect(request: NodeConnectRequest) -> Result<NodeConnectResponse, GuiError> {
+    do_node_connect(&request.url).await
+}
+
+/// Disconnects from the currently connected node.
+#[tauri::command(name = "node-disconnect")]
+pub async fn node_disconnect(
+    _request: NodeDisconnectRequest,
+) -> Result<NodeDisconnectResponse, GuiError> {
+    do_node_disconnect().await
+}
+
+/// Queries the ATOLL balance of an address from the connected node.
+#[tauri::command(name = "node-get-balance")]
+pub async fn node_get_balance(
+    request: NodeGetBalanceRequest,
+) -> Result<NodeGetBalanceResponse, GuiError> {
+    do_node_get_balance(&request.address).await
+}
+
+/// Submits a signed transaction hex to the connected node.
+#[tauri::command(name = "node-send-tx")]
+pub async fn node_send_tx(request: NodeSendTxRequest) -> Result<NodeSendTxResponse, GuiError> {
+    do_node_send_tx(&request.signed_tx).await
 }
 
 // ---------------------------------------------------------------------------

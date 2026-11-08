@@ -16,6 +16,10 @@ fn main() {
             commands::wallet_send,
             commands::wallet_history,
             commands::wallet_derive_address,
+            commands::node_connect,
+            commands::node_disconnect,
+            commands::node_get_balance,
+            commands::node_send_tx,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

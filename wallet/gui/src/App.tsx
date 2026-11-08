@@ -4,6 +4,11 @@ import { Dashboard } from '@/views/Dashboard';
 import { Send } from '@/views/Send';
 import { History } from '@/views/History';
 import { DeriveAddress } from '@/views/DeriveAddress';
+import {
+  nodeConnect,
+  nodeDisconnect,
+  NodeConnectResponse,
+} from '@/tauri';
 
 type View = 'welcome' | 'dashboard' | 'send' | 'history' | 'derive-address';
 
@@ -12,6 +17,9 @@ interface AppState {
   addresses: string[];
   selectedAddress: string | null;
   passphrase: string;
+  nodeConnected: boolean;
+  nodeUrl: string;
+  nodeInfo: { chainId: string; tipHeight: number; version: string } | null;
 }
 
 export default function App() {
@@ -20,6 +28,9 @@ export default function App() {
     addresses: [],
     selectedAddress: null,
     passphrase: '',
+    nodeConnected: false,
+    nodeUrl: 'http://localhost:8080',
+    nodeInfo: null,
   });
 
   const handleUnlocked = useCallback(
@@ -45,6 +56,39 @@ export default function App() {
     }));
   }, []);
 
+  const handleConnectNode = useCallback(async () => {
+    try {
+      const result: NodeConnectResponse = await nodeConnect({
+        url: state.nodeUrl,
+      });
+      setState((prev) => ({
+        ...prev,
+        nodeConnected: true,
+        nodeInfo: {
+          chainId: result.chain_id,
+          tipHeight: result.tip_height,
+          version: result.version,
+        },
+      }));
+    } catch (err) {
+      // Connection failure is non-fatal; wallet still works offline.
+      console.error('Node connection failed:', err);
+    }
+  }, [state.nodeUrl]);
+
+  const handleDisconnectNode = useCallback(async () => {
+    try {
+      await nodeDisconnect({});
+    } catch {
+      // Ignore errors on disconnect
+    }
+    setState((prev) => ({
+      ...prev,
+      nodeConnected: false,
+      nodeInfo: null,
+    }));
+  }, []);
+
   /** Clears the passphrase from React state once an operation is finished. */
   const clearPassphrase = useCallback(() => {
     setState((prev) => ({ ...prev, passphrase: '' }));
@@ -67,6 +111,10 @@ export default function App() {
           onSend={() => setState((prev) => ({ ...prev, view: 'send' }))}
           onHistory={() => setState((prev) => ({ ...prev, view: 'history' }))}
           onDeriveAddress={() => setState((prev) => ({ ...prev, view: 'derive-address' }))}
+          nodeConnected={state.nodeConnected}
+          nodeInfo={state.nodeInfo}
+          onConnectNode={handleConnectNode}
+          onDisconnectNode={handleDisconnectNode}
         />
       )}
 
@@ -76,11 +124,15 @@ export default function App() {
           passphrase={passphrase}
           onBack={handleLock}
           onSendComplete={clearPassphrase}
+          nodeConnected={state.nodeConnected}
         />
       )}
 
       {state.view === 'history' && (
-        <History onBack={() => setState((prev) => ({ ...prev, view: 'dashboard' }))} />
+        <History
+          onBack={() => setState((prev) => ({ ...prev, view: 'dashboard' }))}
+          nodeConnected={state.nodeConnected}
+        />
       )}
 
       {state.view === 'derive-address' && (

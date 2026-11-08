@@ -61,6 +61,41 @@ export interface DeriveAddressResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Node RPC request / response types mirroring the Rust command definitions
+// ---------------------------------------------------------------------------
+
+export interface NodeConnectRequest {
+  url: string;
+}
+export interface NodeConnectResponse {
+  connected: boolean;
+  chain_id: string;
+  tip_height: number;
+  version: string;
+}
+
+export interface NodeDisconnectRequest {}
+export interface NodeDisconnectResponse {
+  disconnected: boolean;
+}
+
+export interface NodeGetBalanceRequest {
+  address: string;
+}
+export interface NodeGetBalanceResponse {
+  address: string;
+  balance: number;
+}
+
+export interface NodeSendTxRequest {
+  signed_tx: string;
+}
+export interface NodeSendTxResponse {
+  accepted: boolean;
+  message: string;
+}
+
+// ---------------------------------------------------------------------------
 // Invoke wrappers (snake-case command names match Rust function names
 // registered via tauri::generate_handler!)
 // Each Rust command takes `request: <RequestType>`, so the invoke payload
@@ -95,6 +130,24 @@ export async function walletDeriveAddress(
   req: DeriveAddressRequest,
 ): Promise<DeriveAddressResponse> {
   return invoke('wallet_derive_address', { request: req });
+}
+
+export async function nodeConnect(req: NodeConnectRequest): Promise<NodeConnectResponse> {
+  return invoke('node_connect', { request: req });
+}
+
+export async function nodeDisconnect(_req: NodeDisconnectRequest): Promise<NodeDisconnectResponse> {
+  return invoke('node_disconnect', { request: _req });
+}
+
+export async function nodeGetBalance(
+  req: NodeGetBalanceRequest,
+): Promise<NodeGetBalanceResponse> {
+  return invoke('node_get_balance', { request: req });
+}
+
+export async function nodeSendTx(req: NodeSendTxRequest): Promise<NodeSendTxResponse> {
+  return invoke('node_send_tx', { request: req });
 }
 
 // ---------------------------------------------------------------------------

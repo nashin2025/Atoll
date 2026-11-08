@@ -1,5 +1,9 @@
 import { useState } from 'react';
-import { walletSend, formatInvokeError } from '@/tauri';
+import {
+  walletSend,
+  nodeSendTx,
+  formatInvokeError,
+} from '@/tauri';
 import { Button, ErrorDisplay, Input, AddressDisplay } from '@/components/ui';
 
 interface SendProps {
@@ -7,13 +11,21 @@ interface SendProps {
   passphrase: string;
   onBack: () => void;
   onSendComplete?: () => void;
+  nodeConnected: boolean;
 }
 
-export function Send({ from, passphrase, onBack, onSendComplete }: SendProps) {
+export function Send({
+  from,
+  passphrase,
+  onBack,
+  onSendComplete,
+  nodeConnected,
+}: SendProps) {
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
   const [token, setToken] = useState('ATOLL');
   const [signedTx, setSignedTx] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,6 +34,7 @@ export function Send({ from, passphrase, onBack, onSendComplete }: SendProps) {
     setLoading(true);
     setError(null);
     setSignedTx(null);
+    setSubmitted(false);
     try {
       const response = await walletSend({
         from,
@@ -33,6 +46,23 @@ export function Send({ from, passphrase, onBack, onSendComplete }: SendProps) {
       setSignedTx(response.signed_tx);
       // The passphrase is no longer needed once the transaction is signed.
       onSendComplete?.();
+    } catch (err) {
+      setError(formatInvokeError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitToNode = async () => {
+    if (!signedTx) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await nodeSendTx({ signed_tx: signedTx });
+      setSubmitted(response.accepted);
+      if (!response.accepted) {
+        setError(response.message);
+      }
     } catch (err) {
       setError(formatInvokeError(err));
     } finally {
@@ -85,10 +115,18 @@ export function Send({ from, passphrase, onBack, onSendComplete }: SendProps) {
                 onChange={(e) => setToken(e.target.value)}
               />
             </div>
-            <p className="text-xs text-slate-500 mt-2">
-              Offline signing only — signed transaction hex is produced for manual
-              submission. Balance is validated against the offline ChainState.
-            </p>
+            {!nodeConnected && (
+              <p className="text-xs text-slate-500 mt-2">
+                Offline signing only — signed transaction hex is produced for
+                manual submission. Balance is validated against the offline
+                ChainState.
+              </p>
+            )}
+            {nodeConnected && (
+              <p className="text-xs text-slate-500 mt-2">
+                Sign offline, then submit to the connected node below.
+              </p>
+            )}
             <Button type="submit" variant="primary" disabled={loading || !to || !amount}>
               Sign transaction
             </Button>
@@ -113,9 +151,28 @@ export function Send({ from, passphrase, onBack, onSendComplete }: SendProps) {
                   Copy
                 </Button>
               </div>
-              <p className="text-xs text-slate-500">
-                Submit this hex via a node RPC or block explorer when ready.
-              </p>
+              {nodeConnected && (
+                <div className="space-y-3">
+                  <Button
+                    variant="primary"
+                    onClick={handleSubmitToNode}
+                    disabled={loading || submitted}
+                    className="w-full"
+                  >
+                    {loading ? 'Submitting…' : submitted ? 'Submitted' : 'Submit to node'}
+                  </Button>
+                  {submitted && (
+                    <p className="text-xs text-emerald-400">
+                      Transaction accepted by node.
+                    </p>
+                  )}
+                </div>
+              )}
+              {!nodeConnected && (
+                <p className="text-xs text-slate-500">
+                  Submit this hex via a node RPC or block explorer when ready.
+                </p>
+              )}
             </div>
           )}
         </form>
