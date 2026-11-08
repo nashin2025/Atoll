@@ -30,16 +30,16 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be80866792576f8620
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561
+        uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
           profile: minimal
 
       - name: Cache dependencies
-        uses: swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
+        uses: swatinem/rust-cache@v2
         with:
           path: |
             ~/.cargo/registry
@@ -75,7 +75,7 @@ jobs:
     needs: [build-and-test]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be80866792576f8620
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@master
@@ -119,16 +119,16 @@ jobs:
     environment: release
     steps:
       - name: Checkout repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be80866792576f8620
+        uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561
+        uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
           profile: minimal
 
       - name: Cache dependencies
-        uses: swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
+        uses: swatinem/rust-cache@v2
         with:
           path: |
             ~/.cargo/registry
@@ -215,7 +215,7 @@ jobs:
     environment: release
     steps:
       - name: Checkout repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be80866792576f8620
+        uses: actions/checkout@v4
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -223,13 +223,13 @@ jobs:
           node-version: '20'
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561
+        uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
           profile: minimal
 
       - name: Cache dependencies
-        uses: swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
+        uses: swatinem/rust-cache@v2
         with:
           path: |
             ~/.cargo/registry
@@ -310,7 +310,7 @@ jobs:
     environment: release
     steps:
       - name: Checkout repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be80866792576f8620
+        uses: actions/checkout@v4
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -318,13 +318,13 @@ jobs:
           node-version: '20'
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@f7ccc83f9ed1e5b9c81d8a67d7ad1a747e22a561
+        uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
           profile: minimal
 
       - name: Cache dependencies
-        uses: swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
+        uses: swatinem/rust-cache@v2
         with:
           path: |
             ~/.cargo/registry
@@ -374,10 +374,10 @@ jobs:
     needs: [docker-build]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be80866792576f8620
+        uses: actions/checkout@v4
 
       - name: Generate Docker image SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
+        uses: anchore/sbom-action@v0
         with:
           image: ghcr.io/${{ github.repository_owner }}/atoll-node:${{ github.ref_name }}
           output-file: sbom.atoll-node.json
@@ -409,7 +409,7 @@ jobs:
       upload_url: ${{ steps.create-release.outputs.upload_url }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be80866792576f8620
+        uses: actions/checkout@v4
 
       - name: Download SBOM artifact
         uses: actions/download-artifact@v4
@@ -419,7 +419,7 @@ jobs:
 
       - name: Create Release
         id: create-release
-        uses: softprops/action-gh-release@master
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
