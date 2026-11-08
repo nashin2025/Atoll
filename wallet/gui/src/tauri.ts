@@ -61,37 +61,38 @@ export interface DeriveAddressResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Invoke wrappers (kebab-case command names match the Rust #[tauri::command(name)])
+// Invoke wrappers (snake-case command names match Rust function names
+// registered via tauri::generate_handler!)
 // ---------------------------------------------------------------------------
 
 export async function walletUnlock(req: UnlockRequest): Promise<UnlockResponse> {
-  return invoke('wallet-unlock', req as unknown as Record<string, unknown>);
+  return invoke('wallet_unlock', req as unknown as Record<string, unknown>);
 }
 
 export async function walletNew(req: NewRequest): Promise<NewResponse> {
-  return invoke('wallet-new', req as unknown as Record<string, unknown>);
+  return invoke('wallet_new', req as unknown as Record<string, unknown>);
 }
 
 export async function walletImport(req: ImportRequest): Promise<ImportResponse> {
-  return invoke('wallet-import', req as unknown as Record<string, unknown>);
+  return invoke('wallet_import', req as unknown as Record<string, unknown>);
 }
 
 export async function walletBalance(req: BalanceRequest): Promise<BalanceResponse> {
-  return invoke('wallet-balance', req as unknown as Record<string, unknown>);
+  return invoke('wallet_balance', req as unknown as Record<string, unknown>);
 }
 
 export async function walletSend(req: SendRequest): Promise<SendResponse> {
-  return invoke('wallet-send', req as unknown as Record<string, unknown>);
+  return invoke('wallet_send', req as unknown as Record<string, unknown>);
 }
 
 export async function walletHistory(req: HistoryRequest): Promise<HistoryResponse> {
-  return invoke('wallet-history', req as unknown as Record<string, unknown>);
+  return invoke('wallet_history', req as unknown as Record<string, unknown>);
 }
 
 export async function walletDeriveAddress(
   req: DeriveAddressRequest,
 ): Promise<DeriveAddressResponse> {
-  return invoke('wallet-derive-address', req as unknown as Record<string, unknown>);
+  return invoke('wallet_derive_address', req as unknown as Record<string, unknown>);
 }
 
 // ---------------------------------------------------------------------------
