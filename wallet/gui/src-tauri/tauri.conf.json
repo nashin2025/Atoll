@@ -3,9 +3,6 @@
   "productName": "Atoll GUI Wallet",
   "version": "0.1.0",
   "identifier": "protocol.atoll.gui",
-  "tauri": {
-    "binaryName": "atoll-gui"
-  },
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
