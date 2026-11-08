@@ -91,9 +91,9 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=tag
-            type=raw,value=latest,event=tag
+          tags:
+            - type=ref,event=tag
+            - type=raw,value=latest,event=tag
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -197,6 +197,6 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
-          files: |
-            target/release/atoll-node
-            ./signature/atoll-node.sig
+          files:
+            - target/release/atoll-node
+            - ./signature/atoll-node.sig
