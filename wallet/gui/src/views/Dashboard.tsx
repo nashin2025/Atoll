@@ -59,7 +59,7 @@ export function Dashboard({
         <header className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-            <p className="text-slate-400 text-sm">Atoll Protocol — Offline Wallet</p>
+            <p className="text-slate-400 text-sm">offline wallet</p>
           </div>
           <div className="flex gap-2">
             <Button variant="secondary" onClick={onLock} className="h-9 px-3 text-sm">
