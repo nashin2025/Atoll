@@ -1,4 +1,5 @@
 #![warn(clippy::all)]
+#![windows_subsystem = "windows"]
 
 mod commands;
 mod error;
