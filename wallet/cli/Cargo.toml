@@ -3,6 +3,7 @@ name = "wallet-cli"
 version = "0.1.0"
 edition = "2021"
 description = "Atoll Protocol CLI wallet MVP"
+license = "MIT"
 
 [dependencies]
 atoll-core = { path = "../../core" }
