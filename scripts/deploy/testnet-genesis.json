@@ -1,0 +1,22 @@
+{
+  // Atoll Protocol Testnet Genesis Configuration
+  // Chain ID: 777778 (distinct from mainnet 777777)
+  // Genesis timestamp: 2027-02-01T00:00:00Z
+  
+  "chain_id": 777778,
+  "genesis_timestamp": 1801468800,
+  "initial_difficulty": 1048576,
+  "initial_distribution": {
+    // Testnet faucet address - receives initial distribution for testing
+    "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 1000000000000000000000000,
+    // Test validator addresses
+    "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": 500000000000000000000000,
+    "0xcccccccccccccccccccccccccccccccccccccccc": 500000000000000000000000,
+    "0xdddddddddddddddddddddddddddddddddddddddd": 500000000000000000000000,
+    "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee": 500000000000000000000000,
+    // Development/test addresses
+    "0x1111111111111111111111111111111111111111": 1000000000000000000000,
+    "0x2222222222222222222222222222222222222222": 1000000000000000000000,
+    "0x3333333333333333333333333333333333333333": 1000000000000000000000
+  }
+}

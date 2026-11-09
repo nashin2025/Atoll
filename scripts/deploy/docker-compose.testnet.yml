@@ -1,0 +1,110 @@
+# Atoll Protocol Testnet Deployment (Docker Compose)
+# Deploys a testnet node with RPC, WebSocket, and monitoring
+
+version: "3.8"
+
+services:
+  # Atoll testnet node
+  atoll-node:
+    build:
+      context: ..
+      dockerfile: core/Dockerfile
+    container_name: atoll-testnet-node
+    restart: unless-stopped
+    ports:
+      - "7778:7778"   # P2P
+      - "8081:8081"   # RPC
+      - "8082:8082"   # WebSocket
+      - "9091:9091"   # Metrics
+    volumes:
+      - ./testnet-genesis.json:/etc/atoll/testnet-genesis.json:ro
+      - ./testnet-network.toml:/etc/atoll/testnet-network.toml:ro
+      - atoll-testnet-data:/var/lib/atoll/data
+      - atoll-testnet-logs:/var/log/atoll
+    environment:
+      - ATOLL_CHAIN_ID=777778
+      - ATOLL_GENESIS_FILE=/etc/atoll/testnet-genesis.json
+      - ATOLL_CONFIG_FILE=/etc/atoll/testnet-network.toml
+      - ATOLL_DATA_DIR=/var/lib/atoll/data
+      - ATOLL_LOG_LEVEL=info
+    command: >
+      atoll-node
+      --config /etc/atoll/testnet-network.toml
+      --genesis /etc/atoll/testnet-genesis.json
+      --network testnet
+    healthcheck:
+      test: ["CMD", "atoll-node", "health-check", "--rpc-url", "http://localhost:8081"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - atoll-testnet
+
+  # Testnet faucet (distributes test ATOLL)
+  atoll-faucet:
+    build:
+      context: ..
+      dockerfile: wallet/cli/Dockerfile
+    container_name: atoll-testnet-faucet
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./faucet.toml:/etc/atoll/faucet.toml:ro
+    environment:
+      - ATOLL_FAUCET_CONFIG=/etc/atoll/faucet.toml
+    command: >
+      atoll-faucet
+      --config /etc/atoll/faucet.toml
+    depends_on:
+      atoll-node:
+        condition: service_healthy
+    networks:
+      - atoll-testnet
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: atoll-testnet-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - atoll-testnet-prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - atoll-testnet
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: atoll-testnet-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=atoll-testnet
+    volumes:
+      - atoll-testnet-grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - atoll-testnet
+
+volumes:
+  atoll-testnet-data:
+  atoll-testnet-logs:
+  atoll-testnet-prometheus-data:
+  atoll-testnet-grafana-data:
+
+networks:
+  atoll-testnet:
+    driver: bridge

@@ -1,0 +1,30 @@
+# Prometheus configuration for Atoll testnet monitoring
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'atoll-node'
+    static_configs:
+      - targets: ['atoll-node:9091']
+    metrics_path: /metrics
+    scrape_timeout: 10s
+
+  - job_name: 'atoll-faucet'
+    static_configs:
+      - targets: ['atoll-faucet:8083']
+    metrics_path: /metrics
+    scrape_timeout: 10s
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+rule_files:
+  - 'alerts.yml'

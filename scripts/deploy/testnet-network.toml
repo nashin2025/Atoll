@@ -1,0 +1,97 @@
+# Atoll Protocol Testnet Network Configuration
+# Distinct from mainnet configuration
+
+[network]
+# Testnet chain ID (must match genesis.json)
+chain_id = 777778
+
+# Network listen port (different from mainnet 7777)
+listen_port = 7778
+
+# RPC listen port (different from mainnet 8080)
+rpc_port = 8081
+
+# WebSocket listen port (different from mainnet 8081)
+ws_port = 8082
+
+# P2P bootstrap peers (testnet seed nodes)
+bootstrap_peers = [
+  "/dns4/testnet-seed-1.atoll.network/tcp/7778",
+  "/dns4/testnet-seed-2.atoll.network/tcp/7778",
+  "/dns4/testnet-seed-3.atoll.network/tcp/7778"
+]
+
+# Maximum number of peers
+max_peers = 50
+
+# Connection timeout in seconds
+connection_timeout = 30
+
+# Enable UPnP for automatic port forwarding
+enable_upnp = false
+
+# Enable NAT traversal
+enable_nat_traversal = false
+
+# Data directory for chain data
+data_dir = "./data/testnet"
+
+# Enable metrics endpoint
+enable_metrics = true
+
+# Metrics port
+metrics_port = 9091
+
+# Logging level (trace, debug, info, warn, error)
+log_level = "info"
+
+# Log file path
+log_file = "./logs/testnet.log"
+
+# Enable console logging
+log_to_console = true
+
+# Consensus configuration
+[consensus]
+# Target block time in seconds
+target_block_time = 1
+
+# Maximum block size in bytes
+max_block_size = 1000000
+
+# Maximum transactions per block
+max_transactions_per_block = 1000
+
+# Gas limit per block
+gas_limit_per_block = 10000000
+
+# Mempool configuration
+[mempool]
+# Maximum transactions in mempool
+max_transactions = 10000
+
+# Maximum mempool size in bytes
+max_size = 10000000
+
+# Transaction expiration time in seconds
+tx_expiration = 3600
+
+# Minimum gas price
+min_gas_price = 1
+
+# Privacy configuration
+[privacy]
+# Enable encrypted mempool
+enable_encrypted_mempool = true
+
+# Threshold for encrypted mempool (number of nodes required to decrypt)
+threshold = 3
+
+# Total nodes in threshold group
+total_nodes = 5
+
+# Enable zk-STARKs
+enable_zk_starks = true
+
+# Enable homomorphic encryption
+enable_homomorphic_encryption = false
