@@ -50,50 +50,32 @@ pub fn award_proof_valid_block(state: &mut ChainState, address: Address) -> Resu
 }
 
 /// Awards PROOF for solving useful work
-pub fn award_proof_useful_work(
-    state: &mut ChainState,
-    address: Address,
-) -> Result<(), String> {
+pub fn award_proof_useful_work(state: &mut ChainState, address: Address) -> Result<(), String> {
     award_proof(state, address, PROOF_USEFUL_WORK)
 }
 
 /// Awards PROOF for governance vote
-pub fn award_proof_governance(
-    state: &mut ChainState,
-    address: Address,
-) -> Result<(), String> {
+pub fn award_proof_governance(state: &mut ChainState, address: Address) -> Result<(), String> {
     award_proof(state, address, PROOF_GOVERNANCE_VOTE)
 }
 
 /// Awards PROOF for storage contribution (per block)
-pub fn award_proof_storage(
-    state: &mut ChainState,
-    address: Address,
-) -> Result<(), String> {
+pub fn award_proof_storage(state: &mut ChainState, address: Address) -> Result<(), String> {
     award_proof(state, address, PROOF_STORAGE_PER_BLOCK)
 }
 
 /// Awards PROOF for humanity verification (one-time)
-pub fn award_proof_humanity(
-    state: &mut ChainState,
-    address: Address,
-) -> Result<(), String> {
+pub fn award_proof_humanity(state: &mut ChainState, address: Address) -> Result<(), String> {
     award_proof(state, address, PROOF_HUMANITY_VERIFIED)
 }
 
 /// Awards PROOF for bug bounty
-pub fn award_proof_bug_bounty(
-    state: &mut ChainState,
-    address: Address,
-) -> Result<(), String> {
+pub fn award_proof_bug_bounty(state: &mut ChainState, address: Address) -> Result<(), String> {
     award_proof(state, address, PROOF_BUG_BOUNTY)
 }
 
 /// Awards PROOF for community contribution
-pub fn award_proof_community(
-    state: &mut ChainState,
-    address: Address,
-) -> Result<(), String> {
+pub fn award_proof_community(state: &mut ChainState, address: Address) -> Result<(), String> {
     award_proof(state, address, PROOF_COMMUNITY)
 }
 

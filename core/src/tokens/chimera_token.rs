@@ -52,10 +52,7 @@ pub struct GenesisAllocationEntry {
 
 /// Total genesis ATOLL (2.1M = 10% of 21M supply)
 pub fn genesis_atoll_total() -> u128 {
-    default_genesis_allocation()
-        .iter()
-        .map(|e| e.atoll)
-        .sum()
+    default_genesis_allocation().iter().map(|e| e.atoll).sum()
 }
 
 /// Returns the default genesis allocation.
@@ -119,7 +116,7 @@ pub fn apply_block_rewards(
     let reward = block_reward_at_height(block_height);
     let distribution = distribute_block_rewards(reward, &DEFAULT_REWARD_DISTRIBUTION);
 
-        // Pay block proposer (30%)
+    // Pay block proposer (30%)
     if let Some(amount) = distribution.get("block_proposer") {
         if *amount > 0 {
             state.mint_atoll(proposer, *amount)?;

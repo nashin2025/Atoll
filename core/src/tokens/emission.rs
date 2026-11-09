@@ -56,18 +56,9 @@ mod tests {
 
     #[test]
     fn block_reward_halving() {
-        assert_eq!(
-            block_reward_at_height(210_000),
-            INITIAL_BLOCK_REWARD / 2
-        );
-        assert_eq!(
-            block_reward_at_height(420_000),
-            INITIAL_BLOCK_REWARD / 4
-        );
-        assert_eq!(
-            block_reward_at_height(630_000),
-            INITIAL_BLOCK_REWARD / 8
-        );
+        assert_eq!(block_reward_at_height(210_000), INITIAL_BLOCK_REWARD / 2);
+        assert_eq!(block_reward_at_height(420_000), INITIAL_BLOCK_REWARD / 4);
+        assert_eq!(block_reward_at_height(630_000), INITIAL_BLOCK_REWARD / 8);
     }
 
     #[test]

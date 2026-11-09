@@ -55,8 +55,8 @@ mod tests {
     #[test]
     fn quadratic_weight_sublinear() {
         // Doubling stake should less than double weight
-        let w1 = quadratic_weight(100);   // sqrt(100) = 10
-        let w2 = quadratic_weight(400);   // sqrt(400) = 20
+        let w1 = quadratic_weight(100); // sqrt(100) = 10
+        let w2 = quadratic_weight(400); // sqrt(400) = 20
         assert_eq!(w1, 10);
         assert_eq!(w2, 20);
         // 4x stake = 2x weight (not 4x)
@@ -74,7 +74,12 @@ mod tests {
         for i in 1..1000 {
             let w1 = quadratic_weight(i);
             let w2 = quadratic_weight(i + 1);
-            assert!(w2 >= w1, "weight should be non-decreasing: {} -> {}", w1, w2);
+            assert!(
+                w2 >= w1,
+                "weight should be non-decreasing: {} -> {}",
+                w1,
+                w2
+            );
         }
     }
 }

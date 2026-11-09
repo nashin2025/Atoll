@@ -24,27 +24,27 @@ impl ProposalType {
     /// Returns the voting period in blocks (1-second blocks).
     pub fn voting_period_blocks(self) -> u64 {
         match self {
-            ProposalType::Standard => 7 * 24 * 60 * 60,    // 7 days
+            ProposalType::Standard => 7 * 24 * 60 * 60, // 7 days
             ProposalType::Constitutional => 30 * 24 * 60 * 60, // 30 days
-            ProposalType::Emergency => 1 * 24 * 60 * 60,   // 1 day
+            ProposalType::Emergency => 1 * 24 * 60 * 60, // 1 day
         }
     }
 
     /// Returns the timelock in blocks before execution.
     pub fn timelock_blocks(self) -> u64 {
         match self {
-            ProposalType::Standard => 30 * 24 * 60 * 60,   // 30 days
+            ProposalType::Standard => 30 * 24 * 60 * 60, // 30 days
             ProposalType::Constitutional => 60 * 24 * 60 * 60, // 60 days
-            ProposalType::Emergency => 1 * 24 * 60 * 60,   // 1 day
+            ProposalType::Emergency => 1 * 24 * 60 * 60, // 1 day
         }
     }
 
     /// Returns the approval threshold in basis points (1/100 of 1%).
     pub fn approval_threshold_bps(self) -> u16 {
         match self {
-            ProposalType::Standard => 5100,   // 51%
+            ProposalType::Standard => 5100,       // 51%
             ProposalType::Constitutional => 7500, // 75%
-            ProposalType::Emergency => 5100,  // 51%
+            ProposalType::Emergency => 5100,      // 51%
         }
     }
 }
@@ -112,12 +112,18 @@ mod tests {
 
     #[test]
     fn proposal_type_voting_periods() {
-        assert_eq!(ProposalType::Standard.voting_period_blocks(), 7 * 24 * 60 * 60);
+        assert_eq!(
+            ProposalType::Standard.voting_period_blocks(),
+            7 * 24 * 60 * 60
+        );
         assert_eq!(
             ProposalType::Constitutional.voting_period_blocks(),
             30 * 24 * 60 * 60
         );
-        assert_eq!(ProposalType::Emergency.voting_period_blocks(), 1 * 24 * 60 * 60);
+        assert_eq!(
+            ProposalType::Emergency.voting_period_blocks(),
+            1 * 24 * 60 * 60
+        );
     }
 
     #[test]

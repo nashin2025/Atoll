@@ -266,8 +266,7 @@ impl ChainState {
 
         for account in self.accounts.values_mut() {
             if account.proof_balance > 0 {
-                account.proof_balance =
-                    (account.proof_balance as f64 * decay_factor) as u128;
+                account.proof_balance = (account.proof_balance as f64 * decay_factor) as u128;
             }
         }
 
@@ -282,7 +281,10 @@ impl ChainState {
     /// Returns the number of accounts with non-zero PROOF balance
     /// (used for quorum calculation in governance).
     pub fn proof_holder_count(&self) -> u64 {
-        self.accounts.values().filter(|a| a.proof_balance > 0).count() as u64
+        self.accounts
+            .values()
+            .filter(|a| a.proof_balance > 0)
+            .count() as u64
     }
 }
 

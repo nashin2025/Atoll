@@ -49,8 +49,8 @@ pub struct Proposal {
     pub created_at_block: u64,
     pub voting_ends_at_block: u64,
     pub timelock_ends_at_block: Option<u64>,
-    pub yes_votes: u128,    // quadratic-weighted yes votes
-    pub no_votes: u128,     // quadratic-weighted no votes
+    pub yes_votes: u128, // quadratic-weighted yes votes
+    pub no_votes: u128,  // quadratic-weighted no votes
     pub yes_voters: HashSet<Address>,
     pub no_voters: HashSet<Address>,
 }
@@ -61,7 +61,7 @@ pub struct Vote {
     pub proposal_id: u64,
     pub voter: Address,
     pub support: bool, // true = yes, false = no
-    pub weight: u128,   // quadratic-weighted
+    pub weight: u128,  // quadratic-weighted
     pub voted_at_block: u64,
 }
 
@@ -251,8 +251,7 @@ impl GovernanceEngine {
             proposal.timelock_ends_at_block = Some(timelock_end);
 
             // Add to timelock queue
-            self.timelock_queue
-                .add(proposal_id, timelock_end);
+            self.timelock_queue.add(proposal_id, timelock_end);
 
             Ok(ProposalState::Passed)
         } else {
@@ -264,11 +263,7 @@ impl GovernanceEngine {
     }
 
     /// Execute a passed proposal after timelock has elapsed.
-    pub fn execute_proposal(
-        &mut self,
-        proposal_id: u64,
-        current_block: u64,
-    ) -> Result<(), String> {
+    pub fn execute_proposal(&mut self, proposal_id: u64, current_block: u64) -> Result<(), String> {
         let proposal = self
             .proposals
             .get(&proposal_id)
@@ -346,7 +341,7 @@ mod tests {
         state.mint_atoll(charlie, 1000 * 10_u128.pow(8)).unwrap();
 
         state.award_proof(alice, 10000).unwrap(); // sqrt = 100 weight
-        state.award_proof(bob, 2500).unwrap();    // sqrt = 50 weight
+        state.award_proof(bob, 2500).unwrap(); // sqrt = 50 weight
         state.award_proof(charlie, 100).unwrap(); // sqrt = 10 weight
 
         state
@@ -419,9 +414,7 @@ mod tests {
             .unwrap();
 
         // Alice votes yes (10000 PROOF -> weight 100)
-        engine
-            .vote(&state, proposal_id, alice, true, 0)
-            .unwrap();
+        engine.vote(&state, proposal_id, alice, true, 0).unwrap();
 
         // Bob votes no (2500 PROOF -> weight 50)
         let bob = Address::from_bytes([2u8; 20]);
@@ -513,7 +506,9 @@ mod tests {
 
         // Finalize at end of voting period
         let voting_end = ProposalType::Standard.voting_period_blocks();
-        let state_after = engine.finalize_voting(&mut state, proposal_id, voting_end).unwrap();
+        let state_after = engine
+            .finalize_voting(&mut state, proposal_id, voting_end)
+            .unwrap();
         assert_eq!(state_after, ProposalState::Passed);
 
         let proposal = engine.get_proposal(proposal_id).unwrap();
@@ -551,7 +546,9 @@ mod tests {
         engine.vote(&state, proposal_id, bob, false, 0).unwrap();
 
         let voting_end = ProposalType::Standard.voting_period_blocks();
-        let state_after = engine.finalize_voting(&mut state, proposal_id, voting_end).unwrap();
+        let state_after = engine
+            .finalize_voting(&mut state, proposal_id, voting_end)
+            .unwrap();
         assert_eq!(state_after, ProposalState::Passed);
     }
 
@@ -578,7 +575,9 @@ mod tests {
         engine.vote(&state, proposal_id, alice, true, 0).unwrap();
 
         let voting_end = ProposalType::Standard.voting_period_blocks();
-        let state_after = engine.finalize_voting(&mut state, proposal_id, voting_end).unwrap();
+        let state_after = engine
+            .finalize_voting(&mut state, proposal_id, voting_end)
+            .unwrap();
         // 1 voter, quorum = max(1, 10% of 1) = 1, so quorum met
         // Yes = 100, No = 0, ratio = 10000 > 5100, so passes
         assert_eq!(state_after, ProposalState::Passed);
@@ -608,7 +607,9 @@ mod tests {
         engine.vote(&state, proposal_id, charlie, false, 0).unwrap();
 
         let voting_end = ProposalType::Standard.voting_period_blocks();
-        engine.finalize_voting(&mut state, proposal_id, voting_end).unwrap();
+        engine
+            .finalize_voting(&mut state, proposal_id, voting_end)
+            .unwrap();
 
         // Timelock end = voting_end + 30 days
         let timelock_end = voting_end + ProposalType::Standard.timelock_blocks();
@@ -650,8 +651,9 @@ mod tests {
         engine.vote(&state, proposal_id, bob, false, 0).unwrap();
 
         let voting_end = ProposalType::Constitutional.voting_period_blocks();
-        let state_after =
-            engine.finalize_voting(&mut state, proposal_id, voting_end).unwrap();
+        let state_after = engine
+            .finalize_voting(&mut state, proposal_id, voting_end)
+            .unwrap();
         assert_eq!(state_after, ProposalState::Rejected);
     }
 }

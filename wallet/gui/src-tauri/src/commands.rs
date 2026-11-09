@@ -175,9 +175,9 @@ async fn node_rpc(
 ) -> Result<serde_json::Value, GuiError> {
     // Extract connection info while holding the lock, then drop it before awaiting.
     let url = {
-        let conn = node_conn().lock().map_err(|e| {
-            GuiError::Io(format!("node connection lock poisoned: {e}"))
-        })?;
+        let conn = node_conn()
+            .lock()
+            .map_err(|e| GuiError::Io(format!("node connection lock poisoned: {e}")))?;
         if !conn.connected {
             return Err(GuiError::Io("not connected to a node".to_string()));
         }
@@ -207,14 +207,11 @@ async fn node_rpc(
         .map_err(|e| GuiError::Io(format!("failed to parse node response: {e}")))?;
 
     if let Some(err) = res.error {
-        return Err(GuiError::Io(format!(
-            "node RPC error: {err}"
-        )));
+        return Err(GuiError::Io(format!("node RPC error: {err}")));
     }
 
-    res.result.ok_or_else(|| {
-        GuiError::Io("node RPC returned no result".to_string())
-    })
+    res.result
+        .ok_or_else(|| GuiError::Io("node RPC returned no result".to_string()))
 }
 
 // ---------------------------------------------------------------------------
@@ -287,9 +284,9 @@ async fn do_node_connect(url: &str) -> Result<NodeConnectResponse, GuiError> {
         .to_string();
 
     // Update connection state after successful RPC call.
-    let mut conn = node_conn().lock().map_err(|e| {
-        GuiError::Io(format!("node connection lock poisoned: {e}"))
-    })?;
+    let mut conn = node_conn()
+        .lock()
+        .map_err(|e| GuiError::Io(format!("node connection lock poisoned: {e}")))?;
     conn.url = url.to_string();
     conn.connected = true;
     conn.chain_id = Some(chain_id.clone());
@@ -304,9 +301,9 @@ async fn do_node_connect(url: &str) -> Result<NodeConnectResponse, GuiError> {
 }
 
 async fn do_node_disconnect() -> Result<NodeDisconnectResponse, GuiError> {
-    let mut conn = node_conn().lock().map_err(|e| {
-        GuiError::Io(format!("node connection lock poisoned: {e}"))
-    })?;
+    let mut conn = node_conn()
+        .lock()
+        .map_err(|e| GuiError::Io(format!("node connection lock poisoned: {e}")))?;
     conn.connected = false;
     conn.url = String::new();
     conn.chain_id = None;
@@ -344,7 +341,11 @@ async fn do_node_send_tx(signed_tx: &str) -> Result<NodeSendTxResponse, GuiError
     let message = result
         .get("message")
         .and_then(|v| v.as_str())
-        .unwrap_or(if accepted { "Transaction accepted" } else { "Transaction rejected" })
+        .unwrap_or(if accepted {
+            "Transaction accepted"
+        } else {
+            "Transaction rejected"
+        })
         .to_string();
     Ok(NodeSendTxResponse { accepted, message })
 }

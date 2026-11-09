@@ -19,7 +19,7 @@ pub use emission::{
 pub use mind_token::{burn_mind_fees, mint_mind, MIND_MINT_PER_BLOCK};
 pub use proof_token::{
     award_proof, award_proof_community, award_proof_governance, award_proof_humanity,
-    award_proof_storage, award_proof_useful_work, decay_proof, proof_balance,
-    PROOF_BUG_BOUNTY, PROOF_COMMUNITY, PROOF_GOVERNANCE_VOTE, PROOF_HUMANITY_VERIFIED,
-    PROOF_STORAGE_PER_BLOCK, PROOF_USEFUL_WORK, PROOF_VALID_BLOCK,
+    award_proof_storage, award_proof_useful_work, decay_proof, proof_balance, PROOF_BUG_BOUNTY,
+    PROOF_COMMUNITY, PROOF_GOVERNANCE_VOTE, PROOF_HUMANITY_VERIFIED, PROOF_STORAGE_PER_BLOCK,
+    PROOF_USEFUL_WORK, PROOF_VALID_BLOCK,
 };
