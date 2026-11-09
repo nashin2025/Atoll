@@ -1,118 +1,69 @@
-# Atoll Protocol - Security Policy
+# Atoll Protocol — Security Policy
 
-## 🔒 Supported Versions
+## Supported Versions
+
+The following versions of Atoll Protocol are currently supported with security updates:
 
 | Version | Supported          |
 |---------|--------------------|
-| v0.1.x  | :white_check_mark: |
-| < v0.1  | :x:                |
+| 1.0.x   | :white_check_mark: |
+| < 1.0   | :x:                |
 
-## 📋 Reporting a Vulnerability
+## Reporting a Vulnerability
 
-We take the security of Atoll Protocol seriously. If you discover a security vulnerability, please follow these steps:
+We take the security of Atoll Protocol seriously. Thank you for responsibly disclosing vulnerabilities to us.
 
-### 1. Do NOT Disclose Publicly
+### How to Report
 
-Do not create a public GitHub issue or discuss the vulnerability in public forums.
+**Please do not report security vulnerabilities through public GitHub issues.**
 
-### 2. Report Privately
+Instead, please send details to the maintainer via one of these channels:
 
-Send details to [security@atollprotocol.org](mailto:security@atollprotocol.org) with:
+- **GitHub Security Advisories**: [Report a vulnerability](https://github.com/nashin2025/Atoll/security/advisories/new) (preferred — private by default)
+- **Email**: Contact the repository owner directly
 
-- **Title**: Clear description of the vulnerability
-- **Description**: Detailed explanation of the issue
-- **Steps to Reproduce**: Step-by-step instructions
-- **Impact**: Potential impact and affected components
-- **Suggested Fix**: If you have one
-- **Your Contact Information**: For follow-up
+### What to Include
 
-### 3. What to Expect
+Please include as much of the following as possible:
 
-- **Acknowledgment**: Within 24 hours
-- **Initial Assessment**: Within 72 hours
-- **Resolution**: Within 7 days for critical issues, 30 days for others
-- **Credit**: You will be credited in our security advisories (if desired)
+- **Type of issue** (e.g., buffer overflow, SQL injection, cross-site scripting, etc.)
+- **Full paths** of source file(s) related to the manifestation of the issue
+- **The location** of the affected source code (tag/branch/commit or direct URL)
+- **Any special configuration** required to reproduce the issue
+- **Step-by-step steps** to reproduce the issue
+- **Proof-of-concept or exploit code** (if possible)
+- **Impact** of the issue, including how an attacker might exploit it
 
-## 🛡️ Security Baseline
+This information will help us triage your report more quickly.
 
-### 1. Secret Management
+## Response Timeline
 
-All secrets are kept out of version control. Environment variables are documented in `.env.example` with safe defaults.
+- **Acknowledgment**: You should receive an acknowledgment within 5 business days
+- **Initial assessment**: Within 10 business days we will assess the severity and provide an estimated timeline for resolution
+- **Updates**: We will provide status updates at least every 7 days until the issue is resolved
+- **Resolution**: We will work with you to develop and test a fix, then coordinate public disclosure
 
-**Protected patterns:**
-- Hardcoded API keys, passwords, tokens, connection strings
-- Private keys (RSA, EC, Dilithium, SPHINCS+)
-- AWS/Azure/GCP credentials
-- Database connection strings with credentials
+## Disclosure Policy
 
-**If secrets are found:**
-1. Remove from file
-2. Add to `.gitignore`
-3. Rotate the exposed secret
-4. Warn the security lead
+We follow coordinated vulnerability disclosure:
 
-### 2. Dependency Audit
+1. You report the vulnerability privately
+2. We investigate and confirm the issue
+3. We develop and test a fix
+4. We coordinate a disclosure timeline with you
+5. We publish a security advisory and credit you (if you wish)
 
-Rust dependencies are scanned for known vulnerabilities using `cargo-audit` in CI.
+We ask that you do not publicly disclose the vulnerability before we have had a reasonable time to address it.
 
-**Vulnerability Response:**
+## Security Best Practices for Contributors
 
-| Severity | Response Time | Action |
-|----------|--------------|--------|
-| Critical | 24 hours | Patch or dependency update immediately |
-| High | 72 hours | Patch or dependency update within 3 days |
-| Medium | 1 week | Evaluate and patch or accept risk |
-| Low | 1 month | Track in backlog |
+- **Never** commit secrets, API keys, or credentials to the repository
+- Use environment variables or `.env` files (which are gitignored)
+- All user inputs must be validated and sanitized
+- Error messages must not leak internal details
+- Use parameterized queries for database operations
+- Follow the principle of least privilege
 
-### 3. Security Review Process
+## Credits
 
-#### Pre-Commit
-- Secret scanning on staged files
-- Dependency vulnerability check
-- Code review for security patterns
-
-#### Pre-PR
-- Full security review by Sentinel (Security Guard)
-- SAST scanning on changed files
-- Accessibility audit if frontend changes
-
-#### Pre-Merge
-- All security findings addressed or formally accepted
-- Audit trail maintained in SECURITY.md
-
-## 📄 Security Documentation
-
-| Document | Purpose | Location |
-|----------|---------|----------|
-| SECURITY.md | Security baseline and policies | Root |
-| SECURITY_AUDIT_PLAN.md | Audit scope and schedule | `audits/` |
-| Threat model | STRIDE analysis | `audits/threat-model.md` |
-| Security advisories | Published vulnerabilities | `docs/security/` |
-
-## 🔐 Security Features
-
-- **Post-quantum signatures** (Dilithium2/3/5, SPHINCS+)
-- **Post-quantum KEM** (Kyber512/768/1024)
-- **Hybrid signature engine** (classical + PQ)
-- **Homomorphic encryption** (BFV/CKKS)
-- **zk-STARKs** (zero-knowledge proofs)
-- **Encrypted mempool** (threshold decryption)
-- **Encrypted keystore** (XChaCha20-Poly1305 + argon2id)
-- **Noise Protocol** (Noise_XX_25519_ChaChaPoly_BLAKE2s)
-- **Rate limiting** (per-IP, configurable)
-- **CORS whitelist**
-- **Security headers** (HSTS, CSP, X-Frame-Options)
-
-## 📞 Contact
-
-Security issues should be reported to [security@atollprotocol.org](mailto:security@atollprotocol.org).
-
-For non-security issues, please use GitHub Issues or GitHub Discussions.
-
-## 🏆 Security Researchers
-
-We recognize security researchers who responsibly disclose vulnerabilities:
-
-- Listed in our security hall of fame
-- Mentioned in release notes
-- Swag and recognition
+We appreciate the efforts of all security researchers who help make Atoll Protocol safer.

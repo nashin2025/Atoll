@@ -1,0 +1,24 @@
+# Atoll Protocol CODEOWNERS
+# Follows GitHub CODEOWNERS syntax for automatic PR review assignment
+
+# Core protocol team - owns everything by default
+*                                                   @nashin2025
+
+# Core protocol layer
+/core/                                              @nashin2025
+/specification/                                     @nashin2025
+
+# CLI wallet
+/wallet/cli/                                        @nashin2025
+
+# GUI wallet
+/wallet/gui/                                        @nashin2025
+
+# Block explorer
+/explorer/                                          @nashin2025
+
+# CI/CD and infrastructure
+.github/                                            @nashin2025
+
+# Documentation
+*.md                                                @nashin2025
