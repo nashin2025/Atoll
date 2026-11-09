@@ -1,11 +1,5 @@
 # cargo-deny configuration for Atoll Project
-# Licenses that are allowed but not in the default set
-
-[[license]]
-name = "Unicode-3.0"
-
-[[license]]
-name = "BSD-3-Clause"
+# Advisory allowlist for unmaintained crates with no safe upgrade available
 
 [[advisories]]
 crate = "fxhash"
