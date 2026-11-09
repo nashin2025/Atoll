@@ -10,10 +10,12 @@
 
 pub mod ai_advisory;
 pub mod futarchy;
+pub mod multisig_treasury;
 pub mod proposals;
 pub mod quadratic_voting;
 pub mod timelock;
 
+pub use multisig_treasury::{MultiSigTreasury, MultiSigTransaction, TxStatus};
 pub use proposals::{GovernanceEngine, Proposal, ProposalState, PROPOSAL_DEPOSIT, QUORUM_PERCENT};
 pub use quadratic_voting::{quadratic_weight, voting_weight};
 pub use timelock::{ProposalType, TimelockEntry, TimelockQueue};
