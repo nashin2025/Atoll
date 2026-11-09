@@ -1,0 +1,38 @@
+# Atoll Protocol Prometheus Configuration
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'atoll-monitor'
+    environment: 'production'
+
+scrape_configs:
+  # Atoll node metrics
+  - job_name: 'atoll-node'
+    static_configs:
+      - targets: ['atoll-node:9091']
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    honor_labels: true
+
+  # Block Explorer API metrics
+  - job_name: 'atoll-explorer-api'
+    static_configs:
+      - targets: ['atoll-explorer-api:8080']
+    metrics_path: /metrics
+    scrape_timeout: 10s
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+rule_files:
+  - 'alerts.yml'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093

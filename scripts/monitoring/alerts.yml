@@ -1,0 +1,99 @@
+# Atoll Protocol Alerting Rules
+# Based on security best practices for blockchain monitoring
+
+groups:
+  - name: atoll-node
+    rules:
+      # Node is down
+      - alert: AtollNodeDown
+        expr: up{job="atoll-node"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Atoll node is down"
+          description: "The Atoll node at {{ $labels.instance }} has been down for more than 1 minute."
+
+      # Node not syncing (block lag)
+      - alert: AtollNodeNotSyncing
+        expr: atoll_block_height < (max(atoll_block_height) by (job) - 5)
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Atoll node is not syncing"
+          description: "The Atoll node at {{ $labels.instance }} is {{ $value }} blocks behind the network tip."
+
+      # Low peer count
+      - alert: AtollLowPeerCount
+        expr: atoll_peer_count < 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Atoll node has low peer count"
+          description: "The Atoll node at {{ $labels.instance }} has only {{ $value }} peers."
+
+      # High error rate
+      - alert: AtollHighErrorRate
+        expr: rate(atoll_request_errors_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Atoll node has high error rate"
+          description: "The Atoll node at {{ $labels.instance }} has a {{ $value | humanizePercentage }} error rate over the last 5 minutes."
+
+      # High latency
+      - alert: AtollHighLatency
+        expr: histogram_quantile(0.99, rate(atoll_request_duration_seconds_bucket[5m])) > 2
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Atoll node has high latency"
+          description: "The Atoll node at {{ $labels.instance }} has a 99th percentile latency of {{ $value }}s over the last 5 minutes."
+
+  - name: atoll-explorer
+    rules:
+      # Explorer API down
+      - alert: AtollExplorerDown
+        expr: up{job="atoll-explorer-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Atoll Explorer API is down"
+          description: "The Atoll Explorer API at {{ $labels.instance }} has been down for more than 1 minute."
+
+      # High API error rate
+      - alert: AtollExplorerHighErrorRate
+        expr: rate(explorer_api_errors_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Atoll Explorer API has high error rate"
+          description: "The Atoll Explorer API at {{ $labels.instance }} has a {{ $value | humanizePercentage }} error rate over the last 5 minutes."
+
+  - name: atoll-security
+    rules:
+      # Unusual transaction volume (potential attack)
+      - alert: AtollUnusualTxVolume
+        expr: rate(atoll_transactions_total[5m]) > 100
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusual transaction volume detected"
+          description: "The Atoll network is processing {{ $value }} transactions per second, which is unusually high."
+
+      # Large value transfer
+      - alert: AtollLargeValueTransfer
+        expr: atoll_transaction_value > 1000000000000000000000
+        for: 0m
+        labels:
+          severity: info
+        annotations:
+          summary: "Large value transfer detected"
+          description: "A transfer of {{ $value }} ATOLL was detected on the Atoll network."
