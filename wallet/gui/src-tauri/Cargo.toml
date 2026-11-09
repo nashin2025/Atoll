@@ -3,6 +3,7 @@ name = "atoll-gui"
 version = "0.1.0"
 edition = "2021"
 description = "Atoll Protocol GUI Wallet backend (Tauri v2)"
+license = "MIT"
 
 [dependencies]
 tauri = { version = "2.7.4" }
