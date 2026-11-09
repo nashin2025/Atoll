@@ -161,6 +161,7 @@ jobs:
           WINDOWS_CODESIGN_CERT: ${{ secrets.WINDOWS_CODESIGN_CERT }}
           WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
         if: ${{ env.WINDOWS_CODESIGN_CERT != '' }}
+        continue-on-error: true
         run: |
           $pfxPath = Join-Path $env:RUNNER_TEMP "atoll-codesign.pfx"
           [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_CODESIGN_CERT))
@@ -173,6 +174,7 @@ jobs:
           WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
           PFX_PATH: ${{ env.PFX_PATH }}
         if: ${{ env.PFX_PATH != '' }}
+        continue-on-error: true
         run: |
           $files = Get-ChildItem target/release -Filter *.exe -Recurse
           foreach ($f in $files) {
@@ -248,7 +250,6 @@ jobs:
       - name: Build GUI (release)
         run: |
           cd wallet/gui
-          Remove-Item -Force package-lock.json -ErrorAction SilentlyContinue
           npm install --legacy-peer-deps
           npx tsc --noEmit && npx vite build
           cd src-tauri
@@ -268,6 +269,7 @@ jobs:
           WINDOWS_CODESIGN_CERT: ${{ secrets.WINDOWS_CODESIGN_CERT }}
           WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
         if: ${{ env.WINDOWS_CODESIGN_CERT != '' }}
+        continue-on-error: true
         run: |
           $pfxPath = Join-Path $env:RUNNER_TEMP "atoll-codesign.pfx"
           [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_CODESIGN_CERT))
@@ -280,6 +282,7 @@ jobs:
           WINDOWS_CODESIGN_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
           PFX_PATH: ${{ env.PFX_PATH }}
         if: ${{ env.PFX_PATH != '' }}
+        continue-on-error: true
         run: |
           $files = Get-ChildItem target/release -Filter atoll-gui.exe -Recurse
           foreach ($f in $files) {
@@ -345,7 +348,6 @@ jobs:
       - name: Build GUI (release)
         run: |
           cd wallet/gui
-          Remove-Item -Force package-lock.json -ErrorAction SilentlyContinue || true
           npm install --legacy-peer-deps
           npx tsc --noEmit && npx vite build
           cd src-tauri
