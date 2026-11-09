@@ -61,22 +61,31 @@ export interface DeriveAddressResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Node RPC request / response types mirroring the Rust command definitions
+// Embedded node request / response types mirroring the Rust command definitions
 // ---------------------------------------------------------------------------
 
-export interface NodeConnectRequest {
-  url: string;
-}
-export interface NodeConnectResponse {
-  connected: boolean;
-  chain_id: string;
+export interface NodeStartRequest {}
+export interface NodeStartResponse {
+  started: boolean;
+  chain_id: number;
   tip_height: number;
   version: string;
 }
 
-export interface NodeDisconnectRequest {}
-export interface NodeDisconnectResponse {
-  disconnected: boolean;
+export interface NodeStopRequest {}
+export interface NodeStopResponse {
+  stopped: boolean;
+}
+
+export interface NodeStatusResponse {
+  running: boolean;
+  chain_id: number;
+  tip_height: number;
+  finalized_height: number;
+  block_count: number;
+  peer_count: number;
+  syncing: boolean;
+  version: string;
 }
 
 export interface NodeGetBalanceRequest {
@@ -132,12 +141,16 @@ export async function walletDeriveAddress(
   return invoke('wallet_derive_address', { request: req });
 }
 
-export async function nodeConnect(req: NodeConnectRequest): Promise<NodeConnectResponse> {
-  return invoke('node_connect', { request: req });
+export async function nodeStart(_req: NodeStartRequest): Promise<NodeStartResponse> {
+  return invoke('node_start', { request: _req });
 }
 
-export async function nodeDisconnect(_req: NodeDisconnectRequest): Promise<NodeDisconnectResponse> {
-  return invoke('node_disconnect', { request: _req });
+export async function nodeStop(_req: NodeStopRequest): Promise<NodeStopResponse> {
+  return invoke('node_stop', { request: _req });
+}
+
+export async function nodeStatus(_req: NodeStopRequest): Promise<NodeStatusResponse> {
+  return invoke('node_status', { request: _req });
 }
 
 export async function nodeGetBalance(

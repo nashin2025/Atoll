@@ -16,8 +16,5 @@ hex = "0.4"
 rand = "0.8"
 zeroize = "1"
 
-# HTTP client for proxying RPC calls to a local atoll-node (bypasses CORS)
-reqwest = { version = "0.12", features = ["json"] }
-
 [build-dependencies]
 tauri-build = { version = "2.7.4" }

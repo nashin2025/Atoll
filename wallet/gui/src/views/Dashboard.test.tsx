@@ -23,8 +23,9 @@ const defaultProps = {
   onDeriveAddress: vi.fn(),
   nodeConnected: false,
   nodeInfo: null,
-  onConnectNode: vi.fn(),
-  onDisconnectNode: vi.fn(),
+  onStartNode: vi.fn(),
+  onStopNode: vi.fn(),
+  onRefreshNodeStatus: vi.fn(),
 };
 
 describe('Dashboard', () => {
@@ -42,7 +43,7 @@ describe('Dashboard', () => {
     vi.mocked(walletBalance).mockResolvedValue({ address: '0xabc123', balance: 0 });
     render(<Dashboard {...defaultProps} />);
     await waitFor(() => {
-      expect(screen.getByText(/offline chainstate/i)).toBeInTheDocument();
+      expect(screen.getByText(/start the embedded node/i)).toBeInTheDocument();
     });
   });
 
@@ -63,10 +64,18 @@ describe('Dashboard', () => {
 
   it('shows node connection info when connected', async () => {
     vi.mocked(nodeGetBalance).mockResolvedValue({ address: '0xabc123', balance: 999 });
-    render(<Dashboard {...defaultProps} nodeConnected={true} nodeInfo={{ chainId: 'atoll-mainnet', tipHeight: 42, version: '1.0.0' }} />);
+    render(<Dashboard {...defaultProps} nodeConnected={true} nodeInfo={{
+      chainId: 777777,
+      tipHeight: 42,
+      finalizedHeight: 40,
+      blockCount: 43,
+      peerCount: 3,
+      syncing: false,
+      version: '1.0.0',
+    }} />);
     await waitFor(() => {
       expect(screen.getByText(/999/)).toBeInTheDocument();
     });
-    expect(screen.getByText(/atoll-mainnet/i)).toBeInTheDocument();
+    expect(screen.getByText(/777777/i)).toBeInTheDocument();
   });
 });

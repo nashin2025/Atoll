@@ -14,9 +14,18 @@ interface DashboardProps {
   onHistory: () => void;
   onDeriveAddress: () => void;
   nodeConnected: boolean;
-  nodeInfo: { chainId: string; tipHeight: number; version: string } | null;
-  onConnectNode: () => void;
-  onDisconnectNode: () => void;
+  nodeInfo: {
+    chainId: number;
+    tipHeight: number;
+    finalizedHeight: number;
+    blockCount: number;
+    peerCount: number;
+    syncing: boolean;
+    version: string;
+  } | null;
+  onStartNode: () => void;
+  onStopNode: () => void;
+  onRefreshNodeStatus: () => void;
 }
 
 export function Dashboard({
@@ -28,8 +37,9 @@ export function Dashboard({
   onDeriveAddress,
   nodeConnected,
   nodeInfo,
-  onConnectNode,
-  onDisconnectNode,
+  onStartNode,
+  onStopNode,
+  onRefreshNodeStatus,
 }: DashboardProps) {
   const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -66,27 +76,34 @@ export function Dashboard({
           <div>
             <h1 className="text-2xl font-bold text-white">Dashboard</h1>
             <p className="text-slate-400 text-sm">
-              {nodeConnected ? 'live node' : 'offline wallet'}
+              {nodeConnected ? 'embedded node running' : 'offline wallet'}
             </p>
           </div>
           <div className="flex gap-2">
             {nodeConnected ? (
               <Button
                 variant="secondary"
-                onClick={onDisconnectNode}
+                onClick={onStopNode}
                 className="h-9 px-3 text-sm"
               >
-                Disconnect node
+                Stop node
               </Button>
             ) : (
               <Button
                 variant="secondary"
-                onClick={onConnectNode}
+                onClick={onStartNode}
                 className="h-9 px-3 text-sm"
               >
-                Connect node
+                Start node
               </Button>
             )}
+            <Button
+              variant="secondary"
+              onClick={onRefreshNodeStatus}
+              className="h-9 px-3 text-sm"
+            >
+              Refresh
+            </Button>
             <Button variant="secondary" onClick={onLock} className="h-9 px-3 text-sm">
               Lock
             </Button>
@@ -97,16 +114,43 @@ export function Dashboard({
 
         {nodeConnected && nodeInfo && (
           <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 mb-6">
-            <div className="flex items-center justify-between gap-4">
-              <div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-slate-800/50 rounded-lg p-3">
                 <p className="text-xs text-slate-400 uppercase tracking-wider">
-                  Node connection
+                  Chain ID
                 </p>
                 <p className="text-sm text-white font-mono">
-                  {nodeInfo.chainId} • tip #{nodeInfo.tipHeight} • v{nodeInfo.version}
+                  {nodeInfo.chainId}
                 </p>
               </div>
-              <div className="w-2 h-2 rounded-full bg-emerald-500" />
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">
+                  Tip height
+                </p>
+                <p className="text-sm text-white font-mono">
+                  #{nodeInfo.tipHeight}
+                </p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">
+                  Peers
+                </p>
+                <p className="text-sm text-white font-mono">
+                  {nodeInfo.peerCount}
+                </p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">
+                  Syncing
+                </p>
+                <p className={`text-sm font-mono ${
+                  nodeInfo.syncing
+                    ? 'text-amber-400'
+                    : 'text-emerald-400'
+                }`}>
+                  {nodeInfo.syncing ? 'yes' : 'no'}
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -145,7 +189,7 @@ export function Dashboard({
             </div>
             {!nodeConnected && balance === 0 && (
               <p className="mt-2 text-xs text-slate-500">
-                Offline ChainState — balance is 0 until a live node is connected.
+                Start the embedded node to see real balances.
               </p>
             )}
             <Button
@@ -162,26 +206,16 @@ export function Dashboard({
         {!nodeConnected && (
           <div className="mt-6 bg-slate-900/50 border border-slate-700/50 rounded-xl p-6">
             <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              Connect to node
+              Embedded node
             </h2>
             <p className="text-xs text-slate-500 mb-3">
-              Connect to a running atoll-node to see real balances and submit
-              transactions. The node must be running on the address below.
+              The GUI wallet runs a full Atoll node in-process. Start it to
+              validate the chain, see real balances, and submit transactions
+              directly — no separate node process required.
             </p>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400">Node URL</span>
-                <input
-                  type="text"
-                  value="http://localhost:8080"
-                  readOnly
-                  className="flex-1 block w-full rounded-md border border-slate-600 bg-slate-900 px-3 py-2 text-xs text-slate-100 font-mono"
-                />
-              </div>
-              <Button variant="primary" onClick={onConnectNode} className="w-full">
-                Connect
-              </Button>
-            </div>
+            <Button variant="primary" onClick={onStartNode} className="w-full">
+              Start embedded node
+            </Button>
           </div>
         )}
 

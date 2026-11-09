@@ -5,9 +5,11 @@ import { Send } from '@/views/Send';
 import { History } from '@/views/History';
 import { DeriveAddress } from '@/views/DeriveAddress';
 import {
-  nodeConnect,
-  nodeDisconnect,
-  NodeConnectResponse,
+  nodeStart,
+  nodeStop,
+  nodeStatus,
+  NodeStartResponse,
+  NodeStatusResponse,
 } from '@/tauri';
 
 type View = 'welcome' | 'dashboard' | 'send' | 'history' | 'derive-address';
@@ -18,8 +20,15 @@ interface AppState {
   selectedAddress: string | null;
   passphrase: string;
   nodeConnected: boolean;
-  nodeUrl: string;
-  nodeInfo: { chainId: string; tipHeight: number; version: string } | null;
+  nodeInfo: {
+    chainId: number;
+    tipHeight: number;
+    finalizedHeight: number;
+    blockCount: number;
+    peerCount: number;
+    syncing: boolean;
+    version: string;
+  } | null;
 }
 
 export default function App() {
@@ -29,7 +38,6 @@ export default function App() {
     selectedAddress: null,
     passphrase: '',
     nodeConnected: false,
-    nodeUrl: 'http://localhost:8080',
     nodeInfo: null,
   });
 
@@ -56,37 +64,59 @@ export default function App() {
     }));
   }, []);
 
-  const handleConnectNode = useCallback(async () => {
+  const handleStartNode = useCallback(async () => {
     try {
-      const result: NodeConnectResponse = await nodeConnect({
-        url: state.nodeUrl,
-      });
+      const result: NodeStartResponse = await nodeStart({});
       setState((prev) => ({
         ...prev,
         nodeConnected: true,
         nodeInfo: {
           chainId: result.chain_id,
           tipHeight: result.tip_height,
+          finalizedHeight: 0,
+          blockCount: 1,
+          peerCount: 0,
+          syncing: false,
           version: result.version,
         },
       }));
     } catch (err) {
-      // Connection failure is non-fatal; wallet still works offline.
-      console.error('Node connection failed:', err);
+      console.error('Node start failed:', err);
     }
-  }, [state.nodeUrl]);
+  }, []);
 
-  const handleDisconnectNode = useCallback(async () => {
+  const handleStopNode = useCallback(async () => {
     try {
-      await nodeDisconnect({});
+      await nodeStop({});
     } catch {
-      // Ignore errors on disconnect
+      // Ignore errors on stop
     }
     setState((prev) => ({
       ...prev,
       nodeConnected: false,
       nodeInfo: null,
     }));
+  }, []);
+
+  const handleRefreshNodeStatus = useCallback(async () => {
+    try {
+      const result: NodeStatusResponse = await nodeStatus({});
+      setState((prev) => ({
+        ...prev,
+        nodeConnected: result.running,
+        nodeInfo: {
+          chainId: result.chain_id,
+          tipHeight: result.tip_height,
+          finalizedHeight: result.finalized_height,
+          blockCount: result.block_count,
+          peerCount: result.peer_count,
+          syncing: result.syncing,
+          version: result.version,
+        },
+      }));
+    } catch (err) {
+      console.error('Node status refresh failed:', err);
+    }
   }, []);
 
   /** Clears the passphrase from React state once an operation is finished. */
@@ -113,8 +143,9 @@ export default function App() {
           onDeriveAddress={() => setState((prev) => ({ ...prev, view: 'derive-address' }))}
           nodeConnected={state.nodeConnected}
           nodeInfo={state.nodeInfo}
-          onConnectNode={handleConnectNode}
-          onDisconnectNode={handleDisconnectNode}
+          onStartNode={handleStartNode}
+          onStopNode={handleStopNode}
+          onRefreshNodeStatus={handleRefreshNodeStatus}
         />
       )}
 

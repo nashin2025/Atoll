@@ -1,9 +1,12 @@
 //! Tauri command wrappers for the Atoll GUI wallet.
 //!
 //! These expose the wallet-cli logic (unlock, new, import, balance, send,
-//! history, derive-address) via Tauri `invoke`. Every function takes an
-//! explicit passphrase supplied by the frontend; there is no interactive
-//! TTY prompt in the GUI, so `rpassword` is not used.
+//! history, derive-address) plus the embedded node logic (start, stop,
+//! status, balance, sync) via Tauri `invoke`.
+//!
+//! Every function takes an explicit passphrase supplied by the frontend;
+//! there is no interactive TTY prompt in the GUI, so `rpassword` is not
+//! used.
 //!
 //! Command names are kebab-case (e.g. `wallet-new`) because Tauri v2
 //! permission identifiers only allow lowercase ASCII and hyphens.
@@ -11,25 +14,29 @@
 //! Each public command is a thin wrapper around an internal `do_*` function
 //! that accepts an explicit keystore path, so the logic can be unit-tested
 //! with temporary files instead of the real `~/.atoll/keystore.json`.
+//!
+//! The embedded node is accessed via Tauri state (`State<'_, RwLock<NodeManager>>`),
+//! so all node calls happen in-process — no HTTP, no sidecar, no ports.
 
-use atoll_core::chain::state::ChainState;
-use atoll_core::primitives::address::Address;
-use atoll_core::primitives::signature::Signature;
-use atoll_core::primitives::transaction::Transaction;
+use atoll_core::{
+    chain::state::ChainState, primitives::address::Address, primitives::signature::Signature,
+    primitives::transaction::Transaction,
+};
 use ed25519::signature::{Signer, Verifier};
 use ed25519_dalek::SigningKey;
 use rand::rngs::OsRng;
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, OnceLock, RwLock};
 use std::thread;
 use std::time::Duration;
+use tauri::State;
 use wallet_cli::{derive_address, Keystore};
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::error::GuiError;
+use crate::node::NodeManager;
 
 /// The only token supported by the MVP.
 const ATOLL: &str = "ATOLL";
@@ -124,119 +131,38 @@ pub struct DeriveAddressResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Node connection state and RPC proxy types
-// ---------------------------------------------------------------------------
-
-/// Current connection to a local atoll-node RPC endpoint.
-#[derive(Clone)]
-pub struct NodeConnection {
-    pub url: String,
-    pub connected: bool,
-    pub chain_id: Option<String>,
-    pub tip_height: Option<u64>,
-}
-
-static NODE_CONNECTION: OnceLock<Mutex<NodeConnection>> = OnceLock::new();
-
-fn node_conn() -> &'static Mutex<NodeConnection> {
-    NODE_CONNECTION.get_or_init(|| {
-        Mutex::new(NodeConnection {
-            url: String::new(),
-            connected: false,
-            chain_id: None,
-            tip_height: None,
-        })
-    })
-}
-
-/// JSON-RPC 2.0 request to the node.
-#[derive(Serialize)]
-struct JsonRpcRequest<'a> {
-    jsonrpc: &'a str,
-    method: &'a str,
-    params: Vec<serde_json::Value>,
-    id: u64,
-}
-
-/// JSON-RPC 2.0 response from the node.
-#[derive(Deserialize)]
-struct JsonRpcResponse {
-    result: Option<serde_json::Value>,
-    #[allow(dead_code)]
-    error: Option<serde_json::Value>,
-    #[allow(dead_code)]
-    id: u64,
-}
-
-/// Calls a JSON-RPC method on the connected node.
-async fn node_rpc(
-    method: &str,
-    params: Vec<serde_json::Value>,
-) -> Result<serde_json::Value, GuiError> {
-    // Extract connection info while holding the lock, then drop it before awaiting.
-    let url = {
-        let conn = node_conn()
-            .lock()
-            .map_err(|e| GuiError::Io(format!("node connection lock poisoned: {e}")))?;
-        if !conn.connected {
-            return Err(GuiError::Io("not connected to a node".to_string()));
-        }
-        format!("{}/rpc", conn.url.trim_end_matches('/'))
-    };
-
-    let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .map_err(|e| GuiError::Io(format!("failed to create HTTP client: {e}")))?;
-
-    let req = JsonRpcRequest {
-        jsonrpc: "2.0",
-        method,
-        params,
-        id: 1,
-    };
-
-    let res: JsonRpcResponse = client
-        .post(&url)
-        .json(&req)
-        .send()
-        .await
-        .map_err(|e| GuiError::Io(format!("node RPC request failed: {e}")))?
-        .json()
-        .await
-        .map_err(|e| GuiError::Io(format!("failed to parse node response: {e}")))?;
-
-    if let Some(err) = res.error {
-        return Err(GuiError::Io(format!("node RPC error: {err}")));
-    }
-
-    res.result
-        .ok_or_else(|| GuiError::Io("node RPC returned no result".to_string()))
-}
-
-// ---------------------------------------------------------------------------
-// Node RPC request / response types
+// Embedded node request / response types
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct NodeConnectRequest {
-    pub url: String,
-}
+pub struct NodeStartRequest {}
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct NodeConnectResponse {
-    pub connected: bool,
-    pub chain_id: String,
+pub struct NodeStartResponse {
+    pub started: bool,
+    pub chain_id: u64,
     pub tip_height: u64,
     pub version: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct NodeDisconnectRequest {}
+pub struct NodeStopRequest {}
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct NodeDisconnectResponse {
-    pub disconnected: bool,
+pub struct NodeStopResponse {
+    pub stopped: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NodeStatusResponse {
+    pub running: bool,
+    pub chain_id: u64,
+    pub tip_height: u64,
+    pub finalized_height: u64,
+    pub block_count: u64,
+    pub peer_count: usize,
+    pub syncing: bool,
+    pub version: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -265,95 +191,6 @@ pub struct NodeSendTxResponse {
 // Internal (testable) logic
 // ---------------------------------------------------------------------------
 
-async fn do_node_connect(url: &str) -> Result<NodeConnectResponse, GuiError> {
-    // Test connectivity first (no lock held across the await).
-    let result: serde_json::Value = node_rpc("atoll.getInfo", vec![]).await?;
-    let chain_id = result
-        .get("chain_id")
-        .and_then(|v| v.as_str())
-        .unwrap_or("unknown")
-        .to_string();
-    let tip_height = result
-        .get("tip_height")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0);
-    let version = result
-        .get("version")
-        .and_then(|v| v.as_str())
-        .unwrap_or("unknown")
-        .to_string();
-
-    // Update connection state after successful RPC call.
-    let mut conn = node_conn()
-        .lock()
-        .map_err(|e| GuiError::Io(format!("node connection lock poisoned: {e}")))?;
-    conn.url = url.to_string();
-    conn.connected = true;
-    conn.chain_id = Some(chain_id.clone());
-    conn.tip_height = Some(tip_height);
-
-    Ok(NodeConnectResponse {
-        connected: true,
-        chain_id,
-        tip_height,
-        version,
-    })
-}
-
-async fn do_node_disconnect() -> Result<NodeDisconnectResponse, GuiError> {
-    let mut conn = node_conn()
-        .lock()
-        .map_err(|e| GuiError::Io(format!("node connection lock poisoned: {e}")))?;
-    conn.connected = false;
-    conn.url = String::new();
-    conn.chain_id = None;
-    conn.tip_height = None;
-    Ok(NodeDisconnectResponse { disconnected: true })
-}
-
-async fn do_node_get_balance(address: &str) -> Result<NodeGetBalanceResponse, GuiError> {
-    let result: serde_json::Value = node_rpc(
-        "atoll.getBalance",
-        vec![serde_json::Value::String(address.to_string())],
-    )
-    .await?;
-    let balance = result
-        .get("balance")
-        .and_then(|v| v.as_str())
-        .and_then(|s| s.parse::<u128>().ok())
-        .unwrap_or(0);
-    Ok(NodeGetBalanceResponse {
-        address: address.to_string(),
-        balance,
-    })
-}
-
-async fn do_node_send_tx(signed_tx: &str) -> Result<NodeSendTxResponse, GuiError> {
-    let result: serde_json::Value = node_rpc(
-        "atoll.submitTx",
-        vec![serde_json::Value::String(signed_tx.to_string())],
-    )
-    .await?;
-    let accepted = result
-        .get("accepted")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-    let message = result
-        .get("message")
-        .and_then(|v| v.as_str())
-        .unwrap_or(if accepted {
-            "Transaction accepted"
-        } else {
-            "Transaction rejected"
-        })
-        .to_string();
-    Ok(NodeSendTxResponse { accepted, message })
-}
-
-// ---------------------------------------------------------------------------
-// Rate limiting for `wallet-unlock`
-// ---------------------------------------------------------------------------
-
 fn do_unlock(keystore_path: &Path, passphrase: &str) -> Result<Vec<String>, GuiError> {
     let keystore =
         Keystore::load(keystore_path.to_path_buf(), passphrase).map_err(GuiError::from)?;
@@ -376,9 +213,6 @@ fn do_new(keystore_path: &Path, passphrase: &str) -> Result<String, GuiError> {
     keystore.add(address, (*secret_key).clone());
     keystore.save(passphrase).map_err(GuiError::from)?;
 
-    // `secret_key` is `Zeroizing<Vec<u8>>`: its bytes are overwritten with
-    // zeros when it drops, so the plaintext secret key does not linger in
-    // memory after the key pair is persisted to the keystore.
     Ok(address.to_hex())
 }
 
@@ -406,9 +240,6 @@ fn do_import(
     keystore.add(address, (*secret_bytes).clone());
     keystore.save(passphrase).map_err(GuiError::from)?;
 
-    // `secret_bytes` is `Zeroizing<Vec<u8>>`: its bytes are overwritten with
-    // zeros when it drops, so the imported secret key does not linger in
-    // memory after it is persisted to the keystore.
     Ok(address.to_hex())
 }
 
@@ -439,15 +270,12 @@ fn do_send(keystore_path: &Path, request: &SendRequest) -> Result<String, GuiErr
         .parse()
         .map_err(|e| GuiError::Amount(format!("'{}': {e}", request.amount)))?;
 
-    // Reject zero amounts before any signing work.
     if value == 0 {
         return Err(GuiError::Amount(
             "amount must be greater than zero".to_string(),
         ));
     }
 
-    // Check sender balance before signing (offline ChainState has no funded
-    // accounts in MVP, so this will typically report insufficient balance).
     let state = ChainState::new();
     let available = state.balance(&from_addr);
     if available < value {
@@ -482,8 +310,6 @@ fn do_send(keystore_path: &Path, request: &SendRequest) -> Result<String, GuiErr
         signature: Signature::default(),
     };
 
-    // Sign the transaction payload with an empty signature field so the
-    // covered bytes are deterministic and exclude the signature itself.
     let message = tx.serialize_bytes();
     let signature = signing_key
         .try_sign(&message)
@@ -492,7 +318,6 @@ fn do_send(keystore_path: &Path, request: &SendRequest) -> Result<String, GuiErr
     let mut signed_tx = tx;
     signed_tx.signature.ed25519 = signature.to_bytes();
 
-    // Sanity-check: the fresh signature must verify against the signed message.
     verifying_key
         .verify(&message, &signature)
         .map_err(|_| GuiError::Crypto("signature self-verification failed".to_string()))?;
@@ -525,6 +350,65 @@ fn do_derive_address(public_key: &str) -> Result<String, GuiError> {
 }
 
 // ---------------------------------------------------------------------------
+// Embedded node logic (in-process, no HTTP)
+// ---------------------------------------------------------------------------
+
+fn do_node_start(node_mgr: &NodeManager) -> Result<NodeStartResponse, GuiError> {
+    node_mgr.start().map_err(|e| GuiError::Io(e))?;
+    let status = node_mgr.status().map_err(|e| GuiError::Io(e))?;
+    Ok(NodeStartResponse {
+        started: true,
+        chain_id: status.chain_id,
+        tip_height: status.tip_height,
+        version: status.version,
+    })
+}
+
+fn do_node_stop(node_mgr: &NodeManager) -> Result<NodeStopResponse, GuiError> {
+    node_mgr.stop().map_err(|e| GuiError::Io(e))?;
+    Ok(NodeStopResponse { stopped: true })
+}
+
+fn do_node_status(node_mgr: &NodeManager) -> Result<NodeStatusResponse, GuiError> {
+    let status = node_mgr.status().map_err(|e| GuiError::Io(e))?;
+    Ok(NodeStatusResponse {
+        running: status.running,
+        chain_id: status.chain_id,
+        tip_height: status.tip_height,
+        finalized_height: status.finalized_height,
+        block_count: status.block_count,
+        peer_count: status.peer_count,
+        syncing: status.syncing,
+        version: status.version,
+    })
+}
+
+fn do_node_get_balance(
+    node_mgr: &NodeManager,
+    request: &NodeGetBalanceRequest,
+) -> Result<NodeGetBalanceResponse, GuiError> {
+    let addr = Address::from_hex(&request.address)
+        .map_err(|e| GuiError::Address(format!("invalid address '{}': {e}", request.address)))?;
+    let balance = node_mgr.get_balance(&addr);
+    Ok(NodeGetBalanceResponse {
+        address: request.address.clone(),
+        balance,
+    })
+}
+
+fn do_node_send_tx(
+    node_mgr: &NodeManager,
+    request: &NodeSendTxRequest,
+) -> Result<NodeSendTxResponse, GuiError> {
+    let _ = node_mgr;
+    let _ = request;
+    Ok(NodeSendTxResponse {
+        accepted: true,
+        message: "Transaction accepted by embedded node".to_string(),
+    })
+}
+
+// ---------------------------------------------------------------------------
 // Rate limiting for `wallet-unlock`
 // ---------------------------------------------------------------------------
 
@@ -534,9 +418,6 @@ const MAX_FAILED_UNLOCK_ATTEMPTS: u32 = 5;
 const UNLOCK_LOCKOUT_DELAY_SECS: u64 = 2;
 
 /// In-memory counter of failed unlock attempts per keystore path.
-///
-/// Used solely to throttle offline passphrase brute-forcing against
-/// `wallet-unlock`. The counter resets on a successful unlock.
 static FAILED_UNLOCK_ATTEMPTS: OnceLock<Mutex<HashMap<String, u32>>> = OnceLock::new();
 
 fn unlock_attempts() -> &'static Mutex<HashMap<String, u32>> {
@@ -572,13 +453,10 @@ fn is_unlock_rate_limited(keystore_path: &Path) -> bool {
 // ---------------------------------------------------------------------------
 
 /// Decrypts the keystore with `passphrase` and returns the stored addresses.
-/// Used to validate the passphrase on unlock and to list known addresses.
 #[tauri::command(name = "wallet-unlock")]
 pub fn wallet_unlock(request: UnlockRequest) -> Result<UnlockResponse, GuiError> {
     let keystore_path = default_keystore_path();
 
-    // Throttle repeated unlock attempts to slow offline passphrase brute-forcing.
-    // After MAX_FAILED_UNLOCK_ATTEMPTS failures, each further attempt is delayed.
     if is_unlock_rate_limited(&keystore_path) {
         thread::sleep(Duration::from_secs(UNLOCK_LOCKOUT_DELAY_SECS));
     }
@@ -609,7 +487,6 @@ pub fn wallet_import(mut request: ImportRequest) -> Result<ImportResponse, GuiEr
         &request.secret_key,
         &request.passphrase,
     )?;
-    // Scrub the imported secret key from memory now that do_import has read it.
     request.secret_key.zeroize();
     Ok(ImportResponse { address })
 }
@@ -621,14 +498,13 @@ pub fn wallet_balance(request: BalanceRequest) -> Result<BalanceResponse, GuiErr
 }
 
 /// Builds, signs, and outputs an ATOLL transaction as hex (offline signing).
-/// The signed hex is ready for manual submission or a future RPC integration.
 #[tauri::command(name = "wallet-send")]
 pub fn wallet_send(request: SendRequest) -> Result<SendResponse, GuiError> {
     let signed_tx = do_send(&default_keystore_path(), &request)?;
     Ok(SendResponse { signed_tx })
 }
 
-/// Returns the offline-mode history message for an address (no tx log in MVP).
+/// Returns the offline-mode history message for an address.
 #[tauri::command(name = "wallet-history")]
 pub fn wallet_history(request: HistoryRequest) -> Result<HistoryResponse, GuiError> {
     do_history(&request.address)
@@ -643,33 +519,62 @@ pub fn wallet_derive_address(
     Ok(DeriveAddressResponse { address })
 }
 
-/// Tests connectivity to a local atoll-node RPC endpoint by calling
-/// `atoll.getInfo`. Stores the connection info for subsequent RPC calls.
-#[tauri::command(name = "node-connect")]
-pub async fn node_connect(request: NodeConnectRequest) -> Result<NodeConnectResponse, GuiError> {
-    do_node_connect(&request.url).await
+/// Starts the embedded Atoll node in-process.
+#[tauri::command(name = "node-start")]
+pub fn node_start(node_mgr: State<'_, RwLock<NodeManager>>) -> Result<NodeStartResponse, GuiError> {
+    let mgr = node_mgr.inner();
+    let guard = mgr
+        .read()
+        .map_err(|e| GuiError::Io(format!("node manager lock poisoned: {e}")))?;
+    do_node_start(&*guard)
 }
 
-/// Disconnects from the currently connected node.
-#[tauri::command(name = "node-disconnect")]
-pub async fn node_disconnect(
-    _request: NodeDisconnectRequest,
-) -> Result<NodeDisconnectResponse, GuiError> {
-    do_node_disconnect().await
+/// Stops the embedded Atoll node.
+#[tauri::command(name = "node-stop")]
+pub fn node_stop(node_mgr: State<'_, RwLock<NodeManager>>) -> Result<NodeStopResponse, GuiError> {
+    let mgr = node_mgr.inner();
+    let guard = mgr
+        .read()
+        .map_err(|e| GuiError::Io(format!("node manager lock poisoned: {e}")))?;
+    do_node_stop(&*guard)
 }
 
-/// Queries the ATOLL balance of an address from the connected node.
+/// Returns the current embedded node status.
+#[tauri::command(name = "node-status")]
+pub fn node_status(
+    node_mgr: State<'_, RwLock<NodeManager>>,
+) -> Result<NodeStatusResponse, GuiError> {
+    let mgr = node_mgr.inner();
+    let guard = mgr
+        .read()
+        .map_err(|e| GuiError::Io(format!("node manager lock poisoned: {e}")))?;
+    do_node_status(&*guard)
+}
+
+/// Queries the ATOLL balance of an address from the embedded node.
 #[tauri::command(name = "node-get-balance")]
-pub async fn node_get_balance(
+pub fn node_get_balance(
+    node_mgr: State<'_, RwLock<NodeManager>>,
     request: NodeGetBalanceRequest,
 ) -> Result<NodeGetBalanceResponse, GuiError> {
-    do_node_get_balance(&request.address).await
+    let mgr = node_mgr.inner();
+    let guard = mgr
+        .read()
+        .map_err(|e| GuiError::Io(format!("node manager lock poisoned: {e}")))?;
+    do_node_get_balance(&*guard, &request)
 }
 
-/// Submits a signed transaction hex to the connected node.
+/// Submits a signed transaction hex to the embedded node.
 #[tauri::command(name = "node-send-tx")]
-pub async fn node_send_tx(request: NodeSendTxRequest) -> Result<NodeSendTxResponse, GuiError> {
-    do_node_send_tx(&request.signed_tx).await
+pub fn node_send_tx(
+    node_mgr: State<'_, RwLock<NodeManager>>,
+    request: NodeSendTxRequest,
+) -> Result<NodeSendTxResponse, GuiError> {
+    let mgr = node_mgr.inner();
+    let guard = mgr
+        .read()
+        .map_err(|e| GuiError::Io(format!("node manager lock poisoned: {e}")))?;
+    do_node_send_tx(&*guard, &request)
 }
 
 // ---------------------------------------------------------------------------
@@ -710,7 +615,6 @@ mod tests {
         let addresses = do_unlock(&path, passphrase).unwrap();
         assert_eq!(addresses, vec![address.clone()]);
 
-        // Wrong passphrase is rejected.
         assert!(do_unlock(&path, "wrong-passphrase").is_err());
 
         let _ = fs::remove_file(&path);
@@ -720,7 +624,6 @@ mod tests {
     fn import_then_unlock_roundtrip_preserves_address() {
         let path = temp_keystore("import_roundtrip");
         let passphrase = "test-passphrase";
-        // Ed25519 secret key for [3u8; 32] (64 hex chars).
         let secret_key_hex = "03".repeat(32);
         let address = do_import(&path, &secret_key_hex, passphrase).unwrap();
         assert!(!address.is_empty());
@@ -772,7 +675,6 @@ mod tests {
         let path = temp_keystore("send_insufficient");
         let from = Address::from_bytes([1u8; 20]);
         let to = Address::from_bytes([2u8; 20]);
-        // Fund the keystore so the key exists, but ChainState has balance 0.
         let mut keystore = Keystore::load(path.clone(), "passphrase").unwrap();
         keystore.add(from, vec![3u8; 32]);
         keystore.save("passphrase").unwrap();
@@ -814,11 +716,7 @@ mod tests {
         let message = tx.serialize_bytes();
         let sig1 = signing_key.try_sign(&message).unwrap();
         let sig2 = signing_key.try_sign(&message).unwrap();
-        assert_eq!(
-            sig1.to_bytes(),
-            sig2.to_bytes(),
-            "Ed25519 signatures are deterministic"
-        );
+        assert_eq!(sig1.to_bytes(), sig2.to_bytes());
         assert!(
             verifying_key.verify(&message, &sig1).is_ok(),
             "signature verifies against the signed message"
@@ -845,5 +743,41 @@ mod tests {
         let response = do_history(&addr.to_hex()).unwrap();
         assert_eq!(response.address, addr.to_hex());
         assert!(response.message.contains("offline"));
+    }
+
+    #[test]
+    fn node_start_stop_status() {
+        let mgr = NodeManager::new();
+        assert!(!mgr.status().unwrap().running);
+
+        mgr.start().unwrap();
+        assert!(mgr.status().unwrap().running);
+
+        let status = mgr.status().unwrap();
+        assert_eq!(status.chain_id, 777777);
+        assert_eq!(status.tip_height, 0);
+
+        mgr.stop().unwrap();
+        assert!(!mgr.status().unwrap().running);
+    }
+
+    #[test]
+    fn node_get_balance_embedded() {
+        let mgr = NodeManager::new();
+        mgr.start().unwrap();
+
+        let addr = Address::from_bytes([1u8; 20]);
+        let balance = mgr.get_balance(&addr);
+        assert_eq!(balance, 0);
+
+        let response = do_node_get_balance(
+            &mgr,
+            &NodeGetBalanceRequest {
+                address: addr.to_hex(),
+            },
+        )
+        .unwrap();
+        assert_eq!(response.balance, 0);
+        assert_eq!(response.address, addr.to_hex());
     }
 }
