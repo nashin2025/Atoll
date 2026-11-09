@@ -205,8 +205,8 @@ jobs:
           prefix-key: "v1-rust-build"
           shared-key: "v1-rust-build"
 
-      - name: Build workspace
-        run: cargo build --workspace --release --locked
+      - name: Build release binaries
+        run: cargo build --release -p atoll-core -p wallet-cli --locked
 
   # ============================================================================
   # BENCHMARKS
@@ -233,7 +233,7 @@ jobs:
           shared-key: "v1-rust-bench"
 
       - name: Run benchmarks
-        run: cargo bench --workspace
+        run: cargo bench -p atoll-core -p wallet-cli
 
       - name: Benchmark comparison
         uses: pioneersies/benchmark-action@v1
