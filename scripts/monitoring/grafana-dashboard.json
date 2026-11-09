@@ -1,0 +1,162 @@
+{
+  "title": "Atoll Protocol Monitoring Dashboard",
+  "uid": "atoll-dashboard",
+  "timezone": "browser",
+  "panels": [
+    {
+      "title": "Node Status",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "up{job=\"atoll-node\"}",
+          "legendFormat": "Node {{ $labels.instance }}"
+        }
+      ],
+      "fieldConfig": {
+        "mappings": [
+          {
+            "operator": "value",
+            "value": 0,
+            "text": "DOWN",
+            "color": "red"
+          },
+          {
+            "operator": "value",
+            "value": 1,
+            "text": "UP",
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "title": "Block Height",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "atoll_block_height",
+          "legendFormat": "Block Height {{ $labels.instance }}"
+        }
+      ]
+    },
+    {
+      "title": "Peer Count",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "atoll_peer_count",
+          "legendFormat": "Peers {{ $labels.instance }}"
+        }
+      ]
+    },
+    {
+      "title": "Transaction Rate",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(atoll_transactions_total[1m])",
+          "legendFormat": "TPS {{ $labels.instance }}"
+        }
+      ],
+      "fieldConfig": {
+        "unit": "ops"
+      }
+    },
+    {
+      "title": "Transaction Latency (p99)",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, rate(atoll_request_duration_seconds_bucket[5m]))",
+          "legendFormat": "p99 {{ $labels.instance }}"
+        }
+      ],
+      "fieldConfig": {
+        "unit": "s"
+      }
+    },
+    {
+      "title": "Error Rate",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(atoll_request_errors_total[5m])",
+          "legendFormat": "Error Rate {{ $labels.instance }}"
+        }
+      ],
+      "fieldConfig": {
+        "unit": "percent"
+      }
+    },
+    {
+      "title": "CPU Usage",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(process_cpu_seconds_total[5m])",
+          "legendFormat": "CPU {{ $labels.instance }}"
+        }
+      ],
+      "fieldConfig": {
+        "unit": "percent"
+      }
+    },
+    {
+      "title": "Memory Usage",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "process_resident_memory_bytes",
+          "legendFormat": "Memory {{ $labels.instance }}"
+        }
+      ],
+      "fieldConfig": {
+        "unit": "bytes"
+      }
+    },
+    {
+      "title": "Disk Usage",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "node_filesystem_avail_bytes{mountpoint=\"/\"}",
+          "legendFormat": "Disk Free {{ $labels.instance }}"
+        }
+      ],
+      "fieldConfig": {
+        "unit": "bytes"
+      }
+    },
+    {
+      "title": "Alerts",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "ALERTS{alertname=~\".*\"}",
+          "legendFormat": "{{ $labels.alertname }}"
+        }
+      ],
+      "fieldConfig": {
+        "mappings": [
+          {
+            "operator": "value",
+            "value": 0,
+            "text": "No Alerts",
+            "color": "green"
+          },
+          {
+            "operator": "value",
+            "value": 1,
+            "text": "Alerts Active",
+            "color": "red"
+          }
+        ]
+      }
+    }
+  ],
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "30s"
+}
