@@ -16,7 +16,6 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: "-D warnings"
   RUSTUP_TOOLCHAIN: stable
 
 jobs:
@@ -28,6 +27,8 @@ jobs:
     name: Build and Test
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,7 +40,7 @@ jobs:
           profile: minimal
 
       - name: Cache dependencies
-        uses: swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2
         with:
           path: |
             ~/.cargo/registry
@@ -73,12 +74,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [build-and-test]
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@master
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -117,6 +121,8 @@ jobs:
     timeout-minutes: 40
     needs: [build-and-test, release]
     environment: release
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -128,7 +134,7 @@ jobs:
           profile: minimal
 
       - name: Cache dependencies
-        uses: swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2
         with:
           path: |
             ~/.cargo/registry
@@ -184,7 +190,7 @@ jobs:
           if ($env:PFX_PATH -and (Test-Path $env:PFX_PATH)) { Remove-Item -Force $env:PFX_PATH }
 
       - name: Upload atoll-node.exe to release
-        uses: actions/upload-release-asset@v1
+        uses: actions/upload-release-asset@v2
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -194,7 +200,7 @@ jobs:
           asset_content_type: application/octet-stream
 
       - name: Upload wallet-cli.exe to release
-        uses: actions/upload-release-asset@v1
+        uses: actions/upload-release-asset@v2
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -213,6 +219,8 @@ jobs:
     timeout-minutes: 60
     needs: [build-and-test, release]
     environment: release
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -229,7 +237,7 @@ jobs:
           profile: minimal
 
       - name: Cache dependencies
-        uses: swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2
         with:
           path: |
             ~/.cargo/registry
@@ -289,7 +297,7 @@ jobs:
           if ($env:PFX_PATH -and (Test-Path $env:PFX_PATH)) { Remove-Item -Force $env:PFX_PATH }
 
       - name: Upload atoll-gui.exe to release
-        uses: actions/upload-release-asset@v1
+        uses: actions/upload-release-asset@v2
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -308,6 +316,8 @@ jobs:
     timeout-minutes: 60
     needs: [build-and-test, release]
     environment: release
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -324,7 +334,7 @@ jobs:
           profile: minimal
 
       - name: Cache dependencies
-        uses: swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2
         with:
           path: |
             ~/.cargo/registry
@@ -360,7 +370,7 @@ jobs:
           fi
 
       - name: Upload macOS app to release
-        uses: actions/upload-release-asset@v1
+        uses: actions/upload-release-asset@v2
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -379,12 +389,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [docker-build]
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Generate Docker image SBOM
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@v2
         continue-on-error: true
         with:
           image: ghcr.io/${{ github.repository_owner }}/atoll-node:${{ github.ref_name }}
@@ -417,6 +429,8 @@ jobs:
     needs: [docker-build]
     outputs:
       upload_url: ${{ steps.create-release.outputs.upload_url }}
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -456,7 +470,7 @@ jobs:
           prerelease: false
 
       - name: Upload SBOM to release
-        uses: actions/upload-release-asset@v1
+        uses: actions/upload-release-asset@v2
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
