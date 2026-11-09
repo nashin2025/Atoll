@@ -6,9 +6,10 @@ use crate::primitives::address::Address;
 use crate::primitives::hash::Hash512;
 use crate::primitives::signature::Signature;
 use crate::primitives::transaction::Transaction;
+use serde::{Deserialize, Serialize};
 
 /// Block header containing metadata about a block
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockHeader {
     pub version: u32,
     pub height: u64,
@@ -22,13 +23,13 @@ pub struct BlockHeader {
 }
 
 /// Block body containing transactions
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockBody {
     pub transactions: Vec<crate::primitives::transaction::Transaction>,
 }
 
 /// Complete block with header and body
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Block {
     pub header: BlockHeader,
     pub body: BlockBody,

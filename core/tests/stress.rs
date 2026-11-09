@@ -3,31 +3,22 @@
 //! High-concurrency, high-throughput scenarios that verify the system
 //! remains correct under load.
 
+#![allow(dead_code)]
+
 use atoll_core::chain::blockchain::Blockchain;
 use atoll_core::chain::sharding::cross_shard::CrossShardManager;
-use atoll_core::chain::sharding::rebalancer::ShardRebalancer;
 use atoll_core::chain::sharding::shard_manager::ShardManager;
 use atoll_core::chain::state::ChainState;
 use atoll_core::consensus::finality::hotstuff::{HotStuffBFT, HotStuffState, VoteType};
 use atoll_core::consensus::penta::{poh, por, pos_vrf, post, pouw, PentaConsensus};
-use atoll_core::crypto::morph_hash::{select_algorithm_chain, MorphHashEngine};
-use atoll_core::network::encrypted_mempool::EncryptedMempool as NetworkEncryptedMempool;
+use atoll_core::crypto::morph_hash::MorphHashEngine;
 use atoll_core::network::gossip::{GossipConfig, GossipProtocol};
-use atoll_core::network::PeerInfo;
 use atoll_core::network::{NetworkMessage, PingMessage};
 use atoll_core::primitives::address::Address;
 use atoll_core::primitives::block::{Block, BlockBody, BlockHeader};
 use atoll_core::primitives::hash::Hash512;
-use atoll_core::primitives::signature::Signature;
-use atoll_core::primitives::transaction::Transaction;
 use atoll_core::privacy::encrypted_mempool::{
-    DecryptionShare, EncryptedMempool as PrivacyEncryptedMempool, EncryptedTransaction,
-};
-use atoll_core::privacy::homomorphic::{
-    HomomorphicContext, HomomorphicEngine, HomomorphicScheme, Plaintext,
-};
-use atoll_core::privacy::post_quantum::{
-    PQKEMEngine, PQKEMScheme, PQSignatureEngine, PQSignatureScheme,
+    EncryptedMempool as PrivacyEncryptedMempool, EncryptedTransaction,
 };
 use atoll_core::vm::evm::EVMExecutor;
 use atoll_core::vm::{ExecutionContext, VMRouter, VMType};
@@ -192,7 +183,7 @@ fn blake3_hash_high_throughput() {
 #[test]
 fn blockchain_many_blocks_stress() {
     let mut bc = Blockchain::default();
-    let consensus = PentaConsensus::new();
+    let _consensus = PentaConsensus::new();
     let validation = make_valid_validation();
 
     let mut prev_hash = bc.tip_hash();
@@ -210,12 +201,12 @@ fn blockchain_many_blocks_stress() {
 #[test]
 fn blockchain_rejects_out_of_order_blocks() {
     let mut bc = Blockchain::default();
-    let consensus = PentaConsensus::new();
+    let _consensus = PentaConsensus::new();
     let validation = make_valid_validation();
 
     // Insert block at height 1
     let block1 = make_block(bc.tip_hash(), 1, make_address([1u8; 20]));
-    let hash1 = bc.insert_block(block1, &validation).unwrap();
+    let _hash1 = bc.insert_block(block1, &validation).unwrap();
 
     // Try to insert block with wrong prev_hash
     let block2_wrong = make_block(
@@ -452,15 +443,15 @@ fn cross_shard_many_transactions() {
 
     // Convert all requests to receipts
     let mut receipt_ids = Vec::new();
-    for i in 0..5_000 {
-        let receipt = xshard_mgr.request_to_receipt(&request_ids[i]).unwrap();
+    for request_id in &request_ids {
+        let receipt = xshard_mgr.request_to_receipt(request_id).unwrap();
         receipt_ids.push(receipt.id);
     }
     assert_eq!(xshard_mgr.pending_receipt_count(), 5_000);
 
     // Execute first 1000 receipts
-    for i in 0..1_000 {
-        xshard_mgr.execute_receipt(&receipt_ids[i], 1050).unwrap();
+    for receipt_id in receipt_ids.iter().take(1_000) {
+        xshard_mgr.execute_receipt(receipt_id, 1050).unwrap();
     }
 
     assert_eq!(xshard_mgr.executed_receipt_count(), 1_000);

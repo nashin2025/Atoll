@@ -22,5 +22,8 @@
     "security": {
       "csp": "default-src 'self' tauri:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' tauri: http://localhost:*;"
     }
+  },
+  "bundle": {
+    "windows": {}
   }
 }

@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
-import { walletBalance, formatInvokeError } from '@/tauri';
+import {
+  walletBalance,
+  nodeGetBalance,
+  formatInvokeError,
+} from '@/tauri';
 import { Button, ErrorDisplay, Loading, AddressDisplay } from '@/components/ui';
 
 interface DashboardProps {
@@ -8,6 +12,20 @@ interface DashboardProps {
   onLock: () => void;
   onSend: () => void;
   onHistory: () => void;
+  onDeriveAddress: () => void;
+  nodeConnected: boolean;
+  nodeInfo: {
+    chainId: number;
+    tipHeight: number;
+    finalizedHeight: number;
+    blockCount: number;
+    peerCount: number;
+    syncing: boolean;
+    version: string;
+  } | null;
+  onStartNode: () => void;
+  onStopNode: () => void;
+  onRefreshNodeStatus: () => void;
 }
 
 export function Dashboard({
@@ -16,36 +34,28 @@ export function Dashboard({
   onLock,
   onSend,
   onHistory,
+  onDeriveAddress,
+  nodeConnected,
+  nodeInfo,
+  onStartNode,
+  onStopNode,
+  onRefreshNodeStatus,
 }: DashboardProps) {
   const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await walletBalance({ address });
-        if (!cancelled) setBalance(response.balance);
-      } catch (err) {
-        if (!cancelled) setError(formatInvokeError(err));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [address, passphrase]);
-
-  const refresh = async () => {
+  const fetchBalance = async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await walletBalance({ address });
-      setBalance(response.balance);
+      if (nodeConnected) {
+        const response = await nodeGetBalance({ address });
+        setBalance(response.balance);
+      } else {
+        const response = await walletBalance({ address });
+        setBalance(response.balance);
+      }
     } catch (err) {
       setError(formatInvokeError(err));
     } finally {
@@ -53,15 +63,47 @@ export function Dashboard({
     }
   };
 
+  useEffect(() => {
+    (async () => {
+      await fetchBalance();
+    })();
+  }, [address, passphrase, nodeConnected, nodeInfo]);
+
   return (
     <div className="min-h-screen bg-slate-950 p-6">
       <div className="max-w-3xl mx-auto">
         <header className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-            <p className="text-slate-400 text-sm">Atoll Protocol — Offline Wallet</p>
+            <p className="text-slate-400 text-sm">
+              {nodeConnected ? 'embedded node running' : 'offline wallet'}
+            </p>
           </div>
           <div className="flex gap-2">
+            {nodeConnected ? (
+              <Button
+                variant="secondary"
+                onClick={onStopNode}
+                className="h-9 px-3 text-sm"
+              >
+                Stop node
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                onClick={onStartNode}
+                className="h-9 px-3 text-sm"
+              >
+                Start node
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              onClick={onRefreshNodeStatus}
+              className="h-9 px-3 text-sm"
+            >
+              Refresh
+            </Button>
             <Button variant="secondary" onClick={onLock} className="h-9 px-3 text-sm">
               Lock
             </Button>
@@ -69,6 +111,49 @@ export function Dashboard({
         </header>
 
         {error && <ErrorDisplay message={error} />}
+
+        {nodeConnected && nodeInfo && (
+          <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">
+                  Chain ID
+                </p>
+                <p className="text-sm text-white font-mono">
+                  {nodeInfo.chainId}
+                </p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">
+                  Tip height
+                </p>
+                <p className="text-sm text-white font-mono">
+                  #{nodeInfo.tipHeight}
+                </p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">
+                  Peers
+                </p>
+                <p className="text-sm text-white font-mono">
+                  {nodeInfo.peerCount}
+                </p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">
+                  Syncing
+                </p>
+                <p className={`text-sm font-mono ${
+                  nodeInfo.syncing
+                    ? 'text-amber-400'
+                    : 'text-emerald-400'
+                }`}>
+                  {nodeInfo.syncing ? 'yes' : 'no'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-6">
@@ -102,14 +187,14 @@ export function Dashboard({
               )}
               <span className="text-slate-500 text-sm">ATOLL</span>
             </div>
-            {balance === 0 && (
+            {!nodeConnected && balance === 0 && (
               <p className="mt-2 text-xs text-slate-500">
-                Offline ChainState — balance is 0 until a live node is connected.
+                Start the embedded node to see real balances.
               </p>
             )}
             <Button
               variant="secondary"
-              onClick={refresh}
+              onClick={fetchBalance}
               className="mt-4 w-full text-xs"
               disabled={loading}
             >
@@ -118,12 +203,31 @@ export function Dashboard({
           </div>
         </div>
 
+        {!nodeConnected && (
+          <div className="mt-6 bg-slate-900/50 border border-slate-700/50 rounded-xl p-6">
+            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
+              Embedded node
+            </h2>
+            <p className="text-xs text-slate-500 mb-3">
+              The GUI wallet runs a full Atoll node in-process. Start it to
+              validate the chain, see real balances, and submit transactions
+              directly — no separate node process required.
+            </p>
+            <Button variant="primary" onClick={onStartNode} className="w-full">
+              Start embedded node
+            </Button>
+          </div>
+        )}
+
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
           <Button variant="secondary" onClick={onSend} className="w-full">
             Send ATOLL
           </Button>
           <Button variant="secondary" onClick={onHistory} className="w-full">
             History
+          </Button>
+          <Button variant="secondary" onClick={onDeriveAddress} className="w-full">
+            Derive Address
           </Button>
         </div>
 

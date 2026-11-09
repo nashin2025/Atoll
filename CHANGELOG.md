@@ -1,51 +1,95 @@
-# Changelog
+# Atoll Protocol — Changelog
 
-All notable changes to the Atoll Protocol node are documented in this file.
+All notable changes to Atoll Protocol will be documented in this file.
 
-## [v0.1.0-rc.1] — Release Candidate 1
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/).
 
-### Overview
-First release candidate for mainnet. Hardens the node for production operation: structured telemetry, finalized genesis, bootstrap-based peer discovery, TLS for RPC, and API authentication with rate limiting.
+## [Unreleased]
 
 ### Added
 
-**Task 5 — Structured logging** (`core/src/telemetry/logging.rs`)
-- JSON-formatted structured logs via `tracing` + `tracing-subscriber`.
-- Log level controlled by the `RUST_LOG` environment variable (default `info`).
-- Stdout output (container-friendly) or rotating file output via `tracing-appender` (`/var/log/atoll/`, daily rotation).
-- Integrated into `core/src/main.rs`.
-
-**Task 6 — Genesis block finalization** (`core/src/chain/genesis.rs`)
-- `GenesisConfig`: `chain_id`, `genesis_timestamp`, `initial_difficulty`, `initial_distribution` (`HashMap<Address, u128>`).
-- `GenesisLoader`: load config from JSON file or generate the default; builds the genesis block; validates the genesis hash (Morph-Hash); applies the initial distribution to chain state.
-- `Blockchain::new(&GenesisConfig)` constructs the chain from the genesis config.
-
-**Task 7 — Bootstrap nodes** (`core/src/network/bootstrap.rs`)
-- `BootstrapNode` (`address`, `node_id`) with a hardcoded mainnet seed list.
-- `BootstrapClient` connects to seed nodes over the Noise transport, exchanges `FindNode`/`Neighbors` discovery messages, and returns discovered peers.
-- `BootstrapClient::register_discovered` integrates discovered peers with `DiscoveryProtocol` and `PeerManager`.
-- Added `Neighbors` message deserialization to the P2P codec (`core/src/network/p2p.rs`).
-
-**Task 8 — TLS for RPC** (`core/src/api/tls.rs`)
-- Self-signed certificate generation via `rcgen` + `rcgen`'s `generate_simple_self_signed`.
-- Certificates written to `/etc/atoll/tls/` (`cert.pem`, `key.pem`).
-- `rustls` `ServerConfig` and `tokio-rustls` `TlsAcceptor` for HTTPS/TLS servers.
-- Added `rustls`, `rcgen`, `tokio-rustls` to `core/Cargo.toml`.
-
-**Task 9 — API auth + rate limiting** (`core/src/api/auth.rs`)
-- API key validation via the `X-API-Key` header (keys from `ATOLL_API_KEYS`, dev fallback `atoll-local`).
-- Per-IP token-bucket rate limiter, configurable RPM via `ATOLL_API_RATE_LIMIT_RPM` (default 60).
-- Combined `auth_and_rate_limit` axum middleware returns `401 Unauthorized` / `429 Too Many Requests`.
-- Wrapped around `/health` and `/metrics` in `core/src/api/rest.rs`.
+- Embedded Atoll node in GUI wallet — running the GUI wallet makes it a node, no separate process required
+- Node status display in Dashboard (chain ID, tip height, peer count, syncing)
+- Tokenomics module: ATOLL emission schedule, block reward distribution, MINT/PROOF tokens
+- Governance system: proposals, quadratic voting, timelock execution, quorum enforcement
+- Block Explorer frontend (React + TypeScript + Tailwind + Apollo Client)
+- Live node RPC integration for GUI wallet
+- Derive Address view in GUI wallet
 
 ### Changed
-- `core/Cargo.toml`: added `serde_json`, `tracing-appender`, `rustls`, `rcgen`, `tokio-rustls`.
-- `core/src/main.rs`: initialises structured logging and auth + rate-limit state.
-- `Blockchain::default()` now builds genesis from `GenesisConfig::default()` (timestamp `GENESIS_TIMESTAMP`, difficulty `INITIAL_DIFFICULTY`).
 
-### Testing
-- 392 unit tests pass (`cargo test -p atoll-core --lib`), including 21 new tests for logging, genesis, bootstrap, TLS, and auth.
-- `cargo clippy` and `cargo fmt --check` clean on all changed files.
+- GUI wallet now runs `atoll-core` in-process instead of proxying HTTP RPC to a separate node
+- Removed `reqwest` HTTP client dependency from GUI backend
+- Dashboard: "Connect node" replaced with "Start embedded node"
 
-### Note
-This is a release candidate. The self-signed TLS certificate and dev API key (`atoll-local`) are intended for development/staging; production deployments should provide operator-managed certs and set `ATOLL_API_KEYS`.
+### Fixed
+
+- Tauri v2 windows subsystem configuration (`#![windows_subsystem = "windows"]` in main.rs)
+- Removed error information leaks in production code (M2 security findings)
+- Removed unmaintained `bincode` dependency (M5 security finding)
+- Fixed `cargo fmt` formatting issues across all new code
+
+## [1.0.3] — 2026-11-09
+
+### Added
+
+- Block Explorer frontend with GraphQL integration
+- Live node RPC commands for GUI wallet
+- Security hardening (error leakage removal, bincode removal)
+
+### Fixed
+
+- Tauri v2 bundle schema validation error (invalid `windowsSubsystem` property)
+- Windows console window suppression
+- macOS ad-hoc signing and SBOM non-blocking
+- SBOM generation and release signing pipeline
+
+## [1.0.2] — 2026-11-09
+
+### Added
+
+- Code signing, SBOM generation, and macOS build to release pipeline
+- Code signing cleanup and timestamp verification
+
+### Fixed
+
+- macOS bundle path and Windows certificate cleanup guard
+- SBOM non-blocking for release pipeline
+
+## [1.0.1] — 2026-11-08
+
+### Added
+
+- Windows console window suppression via `#![windows_subsystem = "windows"]`
+- Dashboard subheading set to "offline wallet"
+- Crypto wallet GUI CI best practices documentation
+- macOS app icon (icon.png converted from icon.ico)
+
+### Fixed
+
+- Tauri v2 invoke payload wrapping (`request` key for snake_case commands)
+- Tauri v2 bundle configuration
+
+## [1.0.0] — 2026-11-08
+
+### Added
+
+- Initial mainnet release
+- Atoll Protocol Layer 1 blockchain with Morph-Hash and Penta-Consensus
+- Sharded architecture (64 shards)
+- Triple-token system (ATOLL/MIND/PROOF)
+- CLI wallet (new, import, balance, send, history)
+- GUI wallet with offline mode
+- Post-quantum cryptography (Dilithium, SPHINCS+, Kyber)
+- zk-STARKs and homomorphic encryption
+- Encrypted mempool
+- Docker/CI/CD release pipeline
+
+## [1.0.0-rc.54] — 2026-11-08
+
+### Added
+
+- Release candidate pipeline with all 7 CI jobs green
+- Windows CLI, wallet CLI, and GUI binaries
+- macOS build and Docker image

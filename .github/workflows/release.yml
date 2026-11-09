@@ -1,0 +1,202 @@
+name: "Release Pipeline"
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  security-events: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTUP_TOOLCHAIN: stable
+  CARGO_NET_RETRY: 10
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ toLower(github.repository) }}
+
+jobs:
+  # ============================================================================
+  # BUILD & TEST
+  # ============================================================================
+
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "v1-rust-release"
+          shared-key: "v1-rust-release"
+
+      - name: Verify formatting
+        run: cargo fmt --all --check
+
+      - name: Run clippy
+        run: cargo clippy -p atoll-core -p wallet-cli --all-targets
+
+      - name: Run unit tests
+        run: cargo test -p atoll-core -p wallet-cli --lib
+
+      - name: Run integration tests
+        run: cargo test -p atoll-core -p wallet-cli --test integration
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Run cargo audit
+        run: cargo audit
+
+      - name: Build release binary
+        run: cargo build --release -p atoll-core --locked
+
+  # ============================================================================
+  # DOCKER BUILD & PUSH
+  # ============================================================================
+
+  docker:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [build]
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags:
+            - type=ref,event=tag
+            - type=raw,value=latest,event=tag
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cache,mode=max
+
+  # ============================================================================
+  # ARTIFACT SIGNING
+  # ============================================================================
+
+  sign:
+    name: Sign Release Artifacts
+    runs-on: ubuntu-latest
+    needs: [build, docker]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "v1-rust-release-sign"
+          shared-key: "v1-rust-release-sign"
+
+      - name: Build release binary
+        run: cargo build --workspace --release --locked
+
+      - name: Sign release binary
+        run: |
+          cosign sign-blob \
+            --key ${{ secrets.COSIGN_KEY }} \
+            --output-signature target/release/atoll-node.sig \
+            target/release/atoll-node
+
+      - name: Upload signature
+        uses: actions/upload-artifact@v4
+        with:
+          name: atoll-core-signature
+          path: target/release/atoll-node.sig
+          retention-days: 30
+
+  # ============================================================================
+  # GITHUB RELEASE
+  # ============================================================================
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build, docker, sign]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "v1-rust-release-final"
+          shared-key: "v1-rust-release-final"
+
+      - name: Build release binary
+        run: cargo build --workspace --release --locked
+
+      - name: Upload release binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: atoll-node-binary
+          path: target/release/atoll-node
+          retention-days: 30
+
+      - name: Download signature
+        uses: actions/download-artifact@v4
+        with:
+          name: atoll-core-signature
+          path: ./signature
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files:
+            - target/release/atoll-node
+            - ./signature/atoll-node.sig

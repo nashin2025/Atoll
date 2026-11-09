@@ -143,10 +143,7 @@ impl GenesisLoader {
         let mut engine = MorphHashEngine::new();
         let computed = engine.morph_hash(&block.serialize_bytes(), &Hash512::zero(), 0);
         if computed != expected {
-            return Err(format!(
-                "genesis hash mismatch: expected {:?}, computed {:?}",
-                expected, computed
-            ));
+            return Err("genesis hash mismatch".to_string());
         }
         Ok(computed)
     }

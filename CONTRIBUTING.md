@@ -1,212 +1,202 @@
-# CONTRIBUTING.md
+# Atoll Protocol — Contributing Guide
 
-# Contributing to Atoll Protocol
-
-Thank you for your interest in contributing to Atoll Protocol! This document outlines the process for contributing code, documentation, and other improvements.
+Thank you for contributing to Atoll Protocol! This guide covers how to set up the development environment, run tests, and submit pull requests.
 
 ## Table of Contents
 
 - [Code of Conduct](#code-of-conduct)
-- [Security Policy](#security-policy)
 - [Getting Started](#getting-started)
 - [Development Workflow](#development-workflow)
-- [Commit Message Conventions](#commit-message-conventions)
-- [Branch Naming](#branch-naming)
-- [Testing Expectations](#testing-expectations)
-- [Documentation Expectations](#documentation-expectations)
-- [Pull Request Process](#pull-request-process)
-- [Review Requirements](#review-requirements)
-- [Merge Strategy](#merge-strategy)
+- [Submitting a Pull Request](#submitting-a-pull-request)
+- [Coding Standards](#coding-standards)
+- [Testing](#testing)
+- [Security](#security)
 
 ## Code of Conduct
 
-This project adheres to the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to the project maintainers.
-
-## Security Policy
-
-Please refer to our [Security Policy](SECURITY.md) for details on how to report security vulnerabilities. **Do not** disclose security issues publicly — use the private reporting channel described in SECURITY.md.
+This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). By participating, you agree to uphold this code. Please report unacceptable behavior to the project maintainers.
 
 ## Getting Started
 
 ### Prerequisites
 
-- **Rust** 1.87+ (stable channel)
-- **Node.js** 20+ (for GUI wallet and block explorer)
-- **npm** or **yarn** (for frontend dependencies)
-- **Docker** 24+ (optional, for containerized development)
-- **Git** 2.40+
+- **Rust** (stable toolchain) — [rustup.rs](https://rustup.rs/)
+- **Node.js** v20+ — for GUI wallet and block explorer frontend
+- **Git** — for version control
+- **Tauri CLI** (optional, for GUI development) — `cargo install tauri-cli`
 
-### Getting the Source
+### Clone the Repository
 
 ```bash
 git clone https://github.com/nashin2025/Atoll.git
 cd Atoll
 ```
 
-### Build / Test / Lint
+### Build the Core Protocol
 
 ```bash
-# Build all workspace crates
-cargo build --workspace
+cd core
+cargo build --release
+cargo test --lib
+```
 
-# Run the full test suite
-cargo test --workspace
+### Build the GUI Wallet
 
-# Check formatting
-cargo fmt --all --check
+```bash
+cd wallet/gui
+cargo build --release
+cargo test
+npm install
+npm run build
+```
 
-# Run clippy linter
-cargo clippy --workspace --all-targets -- -D warnings
+### Build the Block Explorer
 
-# Run security audit
-cargo audit
-
-# Format code in place
-cargo fmt --all
+```bash
+cd explorer/frontend
+npm install
+npm run build
 ```
 
 ## Development Workflow
 
-### 1. Create a Feature Branch
+Atoll Protocol follows a **fork-and-pull** model with trunk-based development:
 
-All work must be done on a feature branch, never directly on `main`:
+1. **Fork** the repository to your GitHub account
+2. **Create a feature branch** from `main`:
+   ```bash
+   git checkout -b feature/<your-feature-name>
+   ```
+3. **Implement your changes** following the coding standards below
+4. **Run tests** and verify everything passes:
+   ```bash
+   cargo test --workspace
+   npm test  # for GUI and explorer
+   ```
+5. **Format your code**:
+   ```bash
+   cargo fmt --all
+   cargo clippy --workspace --all-targets -- -D warnings
+   ```
+6. **Commit** using conventional commits:
+   ```bash
+   git commit -m "feat(gui): add new feature"
+   ```
+7. **Push** and open a pull request against `main`
 
-```bash
-git checkout -b feat/<feature-name> main
-# or
-git checkout -b fix/<bug-description> main
+## Submitting a Pull Request
+
+1. Push your branch to your fork
+2. Open a PR against `main` in the Atoll repository
+3. Use the [PR template](.github/PULL_REQUEST_TEMPLATE.md) — fill out all sections
+4. Ensure all CI checks pass (format, lint, tests, security scans)
+5. Address any review feedback
+6. A maintainer will merge your PR after approval
+
+### PR Requirements
+
+- All tests must pass (`cargo test --workspace`)
+- Code must be formatted (`cargo fmt --all --check` passes)
+- Clippy must pass with no warnings (`cargo clippy --workspace --all-targets -- -D warnings`)
+- No hardcoded secrets or credentials
+- New features must include tests
+- Documentation must be updated for user-facing changes
+
+## Coding Standards
+
+### Rust
+
+- Follow the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/)
+- Use `clippy::all` lints (pedantic is allowed but not required)
+- All public items must have doc comments (`///`)
+- Error types must implement `std::error::Error` and be serializable for IPC
+- Avoid `unwrap()` in production code — use proper error handling
+
+### TypeScript / React
+
+- Use TypeScript strict mode
+- Follow the existing component patterns in `src/components/ui.tsx`
+- All user-facing strings must be externalized for future i18n
+- Components must be accessible (ARIA labels, keyboard navigation)
+
+### Commit Messages
+
+Use [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+feat(scope): description
+fix(scope): description
+docs(scope): description
+style(scope): description
+refactor(scope): description
+test(scope): description
+chore(scope): description
 ```
 
-Branch naming conventions:
+Examples:
+- `feat(gui): add embedded node support`
+- `fix(core): resolve genesis hash mismatch`
+- `docs(core): document tokenomics model`
 
-| Type | Description |
-|------|-------------|
-| `feat/<name>` | New features |
-| `fix/<name>` | Bug fixes |
-| `docs/<name>` | Documentation changes |
-| `perf/<name>` | Performance improvements |
-| `refactor/<name>` | Code refactoring |
-| `test/<name>` | Test additions or improvements |
-| `chore/<name>` | Maintenance tasks |
-| `security/<name>` | Security fixes |
+## Testing
 
-### 2. Implement Your Changes
-
-Follow the **Research → Implement → Test → PR** workflow:
-
-1. **Research** — Understand the problem, read relevant specs and code
-2. **Implement** — Write clean, idiomatic Rust with full error handling
-3. **Test** — Add unit, integration, and adversarial tests
-4. **PR** — Open a pull request after all checks pass
-
-### 3. Run Pre-Commit Checks
-
-Before committing, ensure:
+### Rust
 
 ```bash
-cargo build --workspace
+# Run all library unit tests
+cargo test --lib
+
+# Run all tests including integration
 cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
-cargo fmt --all --check
+
+# Run tests for a specific crate
+cargo test -p atoll-core
+cargo test -p wallet-cli
+cargo test -p atoll-gui
 ```
 
-## Commit Message Conventions
+### Frontend (Vitest)
 
-Atoll Protocol uses [Conventional Commits](https://www.conventionalcommits.org/):
+```bash
+cd wallet/gui
+npm test
 
-```
-<type>(<scope>): <description>
-
-[optional body]
-
-[optional footer]
+cd explorer/frontend
+npm test
 ```
 
-### Types
+### CI
 
-| Type | Description |
-|------|-------------|
-| `feat` | New feature |
-| `fix` | Bug fix |
-| `docs` | Documentation changes |
-| `style` | Formatting, missing semicolons, etc. (no code change) |
-| `refactor` | Code refactoring (no behavior change) |
-| `perf` | Performance improvements |
-| `test` | Adding or correcting tests |
-| `chore` | Maintenance tasks |
-| `security` | Security fixes |
+All tests run automatically on push and PR via [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
 
-### Scope
+- Format check (`cargo fmt --check`)
+- Clippy lint (`cargo clippy -- -D warnings`)
+- Unit tests (`cargo test --lib`)
+- Integration tests (`cargo test --test integration`)
+- Security scans (`cargo audit`, `cargo deny`, TruffleHog, detect-secrets)
+- Build (`cargo build --release --locked`)
+- Frontend tests and build
 
-The scope should be the crate, module, or component affected (e.g., `vm`, `consensus`, `network`, `wallet-cli`, `explorer`).
+## Security
 
-### Examples
+### Reporting Vulnerabilities
 
-```
-feat(vm): add Move VM bytecode validation
-fix(consensus): resolve Penta-Consensus slashing edge case
-docs(api): document GraphQL endpoint authentication
-style(cli): align CLI output formatting
-refactor(crypto): unify hash function interfaces
-perf(chain): cache MorphHashEngine in Blockchain
-test(network): add adversarial gossip test cases
-chore(deps): update winterfell to v0.13.1
-security(network): encrypt P2P transport with Noise XX
-```
+See [SECURITY.md](SECURITY.md) for how to report security vulnerabilities.
 
-## Testing Expectations
+### Security Guidelines
 
-- **Unit tests**: All new code must have unit tests in `#[cfg(test)]` modules
-- **Integration tests**: Cross-module scenarios in `core/tests/`
-- **Adversarial tests**: Invalid inputs, edge cases, malformed data
-- **Fuzzing tests**: Property-based testing with `proptest` or `quickcheck`
-- **Stress tests**: High-concurrency, high-throughput scenarios
-- **Coverage target**: 95%+ line coverage on all changed files
+- **Never** hardcode secrets, API keys, or credentials
+- All user inputs must be validated and sanitized
+- Error messages must not leak internal details
+- Use parameterized queries for all database operations
+- Authentication and authorization checks on all protected endpoints
 
-## Documentation Expectations
+## Getting Help
 
-When making code changes, you must update:
-
-- `README.md` — Project status, architecture, test results
-- `VIBE_PLAN.md` — Task tracking and phase status
-- `audits/SECURITY_AUDIT_PHASE6.md` — Security findings (if security-related)
-- `PERFORMANCE_PHASE6.md` — Performance benchmarks (if performance-related)
-
-If you add new public APIs, document them with `///` doc comments.
-
-## Pull Request Process
-
-1. **Push your feature branch** to GitHub
-2. **Open a pull request** targeting `main`
-3. **Fill out the PR template** completely
-4. **Ensure all CI checks pass**
-5. **Request review from CODEOWNERS**
-6. **Address review feedback**
-7. **Merge after approval**
-
-### PR Template
-
-All PRs must use the [pull request template](.github/PULL_REQUEST_TEMPLATE.md).
-
-### Squash Commits
-
-All PRs are squash-merged into `main`. Ensure your commit history is clean and descriptive before submitting.
-
-## Review Requirements
-
-- **At least one human review** is required for all PRs
-- **CODEOWNERS-based review** — file owners are automatically requested
-- **All CI checks must pass** before merge
-- **No merge conflicts** with `main`
-- **Up-to-date branch** — rebase onto latest `main` before merge
-
-## Merge Strategy
-
-- **Squash merge** — All PR commits are squashed into a single commit on `main`
-- **No direct pushes** to `main` — all changes must go through PR review
-- **Force pushes** are not allowed on `main`
-- **No empty commits** on `main`
+- Open a [discussion](https://github.com/nashin2025/Atoll/discussions) for questions
+- Open an [issue](https://github.com/nashin2025/Atoll/issues) for bugs or feature requests
+- Contact the maintainer: @nashin2025
 
 ## License
 
-By contributing to Atoll Protocol, you agree that your contributions will be licensed under the project's [LICENSE](LICENSE).
+This project is licensed under the terms in [LICENSE](LICENSE).

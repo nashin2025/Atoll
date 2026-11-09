@@ -23,6 +23,10 @@ const MAX_CIRCUIT_SIZE: usize = 1 * 1024 * 1024;
 const MAX_PROOF_SIZE: usize = 64 * 1024;
 /// Maximum public inputs size: 64 KB
 const MAX_PUBLIC_INPUTS_SIZE: usize = 64 * 1024;
+/// Maximum number of public inputs per execution
+const MAX_PUBLIC_INPUT_COUNT: usize = 100;
+/// Maximum deployed circuits per VM instance
+const MAX_DEPLOYED_CIRCUITS: usize = 10_000;
 /// Gas per KB for circuit deployment
 const GAS_PER_KB_DEPLOY: u64 = 100;
 /// Base gas for circuit validation
@@ -50,6 +54,7 @@ pub struct ZKVMExecutor {
     /// Deployed circuits indexed by hash
     circuit_registry: Vec<DeployedCircuit>,
     pub max_circuit_size: usize,
+    pub max_deployed_circuits: usize,
 }
 
 impl ZKVMExecutor {
@@ -59,6 +64,7 @@ impl ZKVMExecutor {
             context,
             circuit_registry: Vec::new(),
             max_circuit_size: MAX_CIRCUIT_SIZE,
+            max_deployed_circuits: MAX_DEPLOYED_CIRCUITS,
         }
     }
 
@@ -79,6 +85,11 @@ impl ZKVMExecutor {
 
         // Check for duplicate deployment
         if self.circuit_registry.iter().any(|c| c.hash == circuit_hash) {
+            return Err(VMError::UnsupportedOperation);
+        }
+
+        // Check deployed circuit count limit
+        if self.circuit_registry.len() >= self.max_deployed_circuits {
             return Err(VMError::UnsupportedOperation);
         }
 
@@ -124,6 +135,11 @@ impl ZKVMExecutor {
         let total_input_size: usize = public_inputs.iter().map(|i| i.len()).sum();
         if total_input_size > MAX_PUBLIC_INPUTS_SIZE {
             return Err(VMError::InvalidInstruction);
+        }
+
+        // Validate public input count
+        if public_inputs.len() > MAX_PUBLIC_INPUT_COUNT {
+            return Err(VMError::UnsupportedOperation);
         }
 
         // Charge gas for circuit lookup
@@ -176,6 +192,11 @@ impl ZKVMExecutor {
         let total_input_size: usize = public_inputs.iter().map(|i| i.len()).sum();
         if total_input_size > MAX_PUBLIC_INPUTS_SIZE {
             return Err(VMError::InvalidInstruction);
+        }
+
+        // Validate public input count
+        if public_inputs.len() > MAX_PUBLIC_INPUT_COUNT {
+            return Err(VMError::UnsupportedOperation);
         }
 
         // Charge gas for verification
@@ -366,7 +387,7 @@ mod tests {
         zk_vm.deploy_circuit(&circuit_bytes).unwrap();
         let circuit_id = Hash512::blake3(&circuit_bytes);
         let public_inputs = vec![vec![4, 5]];
-        let proof = vec![0x01, 0x02, 0x03];
+        let proof = [0x01, 0x02, 0x03];
         let wrong_proof = vec![0xFF; proof.len()];
         let result = zk_vm.verify_proof(&circuit_id, &public_inputs, &wrong_proof);
         assert!(result.is_ok());
@@ -394,5 +415,73 @@ mod tests {
         let result = zk_vm.deploy_circuit(&circuit_bytes);
         assert!(result.is_ok());
         assert!(zk_vm.remaining_gas() < 20_000);
+    }
+
+    // --- Circuit count limit tests ---
+
+    #[test]
+    fn zk_max_deployed_circuits_limit() {
+        let mut zk_vm = ZKVMExecutor::new(ExecutionContext::default(), 100_000_000);
+        zk_vm.max_deployed_circuits = 2; // Override for test
+
+        let circuit1 = vec![1u8; 20];
+        let circuit2 = vec![2u8; 20];
+        let circuit3 = vec![3u8; 20];
+
+        zk_vm.deploy_circuit(&circuit1).unwrap();
+        zk_vm.deploy_circuit(&circuit2).unwrap();
+        let result = zk_vm.deploy_circuit(&circuit3);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), VMError::UnsupportedOperation);
+        assert_eq!(zk_vm.circuit_count(), 2);
+    }
+
+    // --- Public input count limit tests ---
+
+    #[test]
+    fn zk_execute_too_many_public_inputs() {
+        let mut zk_vm = ZKVMExecutor::default();
+        let circuit_bytes = make_test_circuit();
+        zk_vm.deploy_circuit(&circuit_bytes).unwrap();
+        let circuit_id = Hash512::blake3(&circuit_bytes);
+
+        // Create MAX_PUBLIC_INPUT_COUNT + 1 inputs
+        let too_many_inputs: Vec<Vec<u8>> =
+            (0..=MAX_PUBLIC_INPUT_COUNT).map(|_| vec![1u8]).collect();
+        let proof = vec![0x01, 0x02, 0x03];
+        let result = zk_vm.execute(&circuit_id, &too_many_inputs, &proof);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), VMError::UnsupportedOperation);
+    }
+
+    #[test]
+    fn zk_verify_too_many_public_inputs() {
+        let mut zk_vm = ZKVMExecutor::default();
+        let circuit_bytes = make_test_circuit();
+        zk_vm.deploy_circuit(&circuit_bytes).unwrap();
+        let circuit_id = Hash512::blake3(&circuit_bytes);
+
+        // Create MAX_PUBLIC_INPUT_COUNT + 1 inputs
+        let too_many_inputs: Vec<Vec<u8>> =
+            (0..=MAX_PUBLIC_INPUT_COUNT).map(|_| vec![1u8]).collect();
+        let proof = vec![0x01, 0x02, 0x03];
+        let result = zk_vm.verify_proof(&circuit_id, &too_many_inputs, &proof);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), VMError::UnsupportedOperation);
+    }
+
+    #[test]
+    fn zk_execute_at_input_count_limit() {
+        let mut zk_vm = ZKVMExecutor::default();
+        let circuit_bytes = make_test_circuit();
+        zk_vm.deploy_circuit(&circuit_bytes).unwrap();
+        let circuit_id = Hash512::blake3(&circuit_bytes);
+
+        // Input at MAX_PUBLIC_INPUT_COUNT should work
+        let at_limit_inputs: Vec<Vec<u8>> =
+            (0..MAX_PUBLIC_INPUT_COUNT).map(|_| vec![1u8]).collect();
+        let proof = vec![0x01, 0x02, 0x03];
+        let result = zk_vm.execute(&circuit_id, &at_limit_inputs, &proof);
+        assert!(result.is_ok());
     }
 }

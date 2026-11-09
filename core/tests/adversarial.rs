@@ -5,21 +5,18 @@
 
 use atoll_core::chain::blockchain::Blockchain;
 use atoll_core::chain::sharding::cross_shard::CrossShardManager;
-use atoll_core::chain::sharding::rebalancer::ShardRebalancer;
 use atoll_core::chain::sharding::shard_manager::ShardManager;
 use atoll_core::chain::state::ChainState;
-use atoll_core::consensus::finality::hotstuff::{BFTVote, HotStuffBFT, HotStuffState, VoteType};
+use atoll_core::consensus::finality::hotstuff::{BFTVote, HotStuffState, VoteType};
 use atoll_core::consensus::penta::{
     poh, por, pos_vrf, post, pouw, PentaConsensus, PentaValidation,
 };
 use atoll_core::crypto::morph_hash::{select_algorithm_chain, MorphAlgorithm, MorphHashEngine};
 use atoll_core::network::discovery::DiscoveryProtocol;
-use atoll_core::network::encrypted_mempool::EncryptedMempool as NetworkEncryptedMempool;
 use atoll_core::network::gossip::{GossipConfig, GossipProtocol};
-use atoll_core::network::peer_manager::{PeerManager, PeerStatus};
+use atoll_core::network::peer_manager::PeerManager;
 use atoll_core::network::sync::SyncManager;
 use atoll_core::network::PeerInfo;
-use atoll_core::network::{BlockHeader as NetBlockHeader, NetworkMessage, PingMessage};
 use atoll_core::primitives::address::Address;
 use atoll_core::primitives::block::{Block, BlockBody, BlockHeader};
 use atoll_core::primitives::hash::Hash512;
@@ -32,16 +29,16 @@ use atoll_core::privacy::homomorphic::{
     HomomorphicContext, HomomorphicEngine, HomomorphicScheme, Plaintext,
 };
 use atoll_core::privacy::post_quantum::{
-    HybridSignatureEngine, PQKEMEngine, PQKEMScheme, PQSignatureEngine, PQSignatureScheme,
+    PQKEMEngine, PQKEMScheme, PQSignatureEngine, PQSignatureScheme,
 };
-use atoll_core::privacy::zk_starks::{StarkProver, StarkVerifier};
+use atoll_core::privacy::zk_starks::StarkProver;
 use atoll_core::vm::ai_vm::AIVMExecutor;
 use atoll_core::vm::evm::EVMExecutor;
 use atoll_core::vm::move_vm::MoveExecutor;
 use atoll_core::vm::riscv::RISCVExecutor;
 use atoll_core::vm::wasm::WASMExecutor;
 use atoll_core::vm::zk_vm::ZKVMExecutor;
-use atoll_core::vm::{ExecutionContext, GasMeter, VMError, VMRouter, VMType};
+use atoll_core::vm::{ExecutionContext, ExecutionResult, GasMeter, VMError, VMRouter};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -274,8 +271,8 @@ fn morph_hash_different_prev_hash_different_output() {
 #[test]
 fn select_algorithm_chain_deterministic_for_same_inputs() {
     let prev_hash = zero_hash();
-    let chain1 = select_algorithm_chain(&prev_hash, 100);
-    let chain2 = select_algorithm_chain(&prev_hash, 100);
+    let chain1 = select_algorithm_chain(&prev_hash, 100, 16);
+    let chain2 = select_algorithm_chain(&prev_hash, 100, 16);
     assert_eq!(chain1, chain2);
     assert_eq!(chain1.len(), 16);
 }
@@ -283,7 +280,7 @@ fn select_algorithm_chain_deterministic_for_same_inputs() {
 #[test]
 fn select_algorithm_chain_all_valid_algorithms() {
     let prev_hash = zero_hash();
-    let chain = select_algorithm_chain(&prev_hash, 0);
+    let chain = select_algorithm_chain(&prev_hash, 0, 16);
     for algo in &chain {
         // All selected algorithms should be valid variants
         let _name = algo.name();
@@ -390,7 +387,7 @@ fn homomorphic_multiply_noise_too_high_fails() {
 #[test]
 fn pq_sign_empty_secret_key_fails() {
     let engine = PQSignatureEngine::new();
-    let keypair = PQSignatureEngine::new()
+    let _keypair = PQSignatureEngine::new()
         .generate_keypair(PQSignatureScheme::Dilithium2)
         .unwrap();
     // Create a keypair with empty secret key
@@ -446,7 +443,7 @@ fn pq_kem_decapsulate_empty_ciphertext_fails() {
 #[test]
 fn stark_prove_empty_inputs_fails() {
     let prover = StarkProver::new(40, 256);
-    let result = prover.prove(zero_hash(), &[], &vec![vec![1]]);
+    let result = prover.prove(zero_hash(), &[], &[vec![1]]);
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), "No inputs provided");
 }
@@ -454,7 +451,7 @@ fn stark_prove_empty_inputs_fails() {
 #[test]
 fn stark_prove_empty_outputs_fails() {
     let prover = StarkProver::new(40, 256);
-    let result = prover.prove(zero_hash(), &vec![vec![1]], &[]);
+    let result = prover.prove(zero_hash(), &[vec![1]], &[]);
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), "No outputs provided");
 }
@@ -554,7 +551,7 @@ fn hotstuff_vote_wrong_height_no_quorum() {
     let validator = zero_address();
     for _ in 0..67 {
         state.add_vote(BFTVote {
-            validator: validator.clone(),
+            validator,
             block_hash,
             height: 1, // Wrong height
             round: 1,
@@ -605,7 +602,7 @@ fn slashing_downtime_exactly_threshold() {
 #[test]
 fn blockchain_insert_block_wrong_prev_hash() {
     let mut bc = Blockchain::default();
-    let consensus = PentaConsensus::new();
+    let _consensus = PentaConsensus::new();
     let validation = make_valid_validation();
 
     let block = Block {
@@ -1023,7 +1020,7 @@ fn ai_vm_verify_empty_proof() {
 fn zk_vm_empty_proof() {
     let context = ExecutionContext::default();
     let mut zk_vm = ZKVMExecutor::new(context, 100_000_000);
-    let result = zk_vm.execute(&[1], &[], &[]);
+    let result = zk_vm.execute(&Hash512::zero(), &[], &[]);
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
 }
@@ -1032,7 +1029,7 @@ fn zk_vm_empty_proof() {
 fn zk_vm_empty_circuit_id() {
     let context = ExecutionContext::default();
     let mut zk_vm = ZKVMExecutor::new(context, 100_000_000);
-    let result = zk_vm.execute(&[], &[], &[1]);
+    let result = zk_vm.execute(&Hash512::zero(), &[], &[1]);
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
 }
@@ -1041,8 +1038,20 @@ fn zk_vm_empty_circuit_id() {
 fn zk_vm_verify_empty_proof_returns_false() {
     let context = ExecutionContext::default();
     let mut zk_vm = ZKVMExecutor::new(context, 100_000_000);
-    let result = zk_vm.verify_proof(&[1], &[], &[]).unwrap();
-    assert!(!result);
+    let circuit_bytes = vec![
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
+    ];
+    let deploy_result = zk_vm.deploy_circuit(&circuit_bytes).unwrap();
+    let circuit_id = match deploy_result {
+        ExecutionResult::Success { return_value, .. } => {
+            Hash512::from_bytes(&return_value).unwrap()
+        }
+        _ => panic!("Expected Success"),
+    };
+    // Empty proof is rejected with InvalidInstruction (not false).
+    let result = zk_vm.verify_proof(&circuit_id, &[], &[]);
+    assert!(result.is_err());
+    assert_eq!(result.unwrap_err(), VMError::InvalidInstruction);
 }
 
 #[test]

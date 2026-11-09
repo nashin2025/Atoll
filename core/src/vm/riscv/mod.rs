@@ -107,6 +107,10 @@ impl Memory {
 
     fn read_u64(&self, addr: u64) -> Result<u64, VMError> {
         let addr = addr as usize;
+        // Doubleword reads: alignment 8.
+        if addr % 8 != 0 {
+            return Err(VMError::InvalidMemoryAccess);
+        }
         if addr + 8 > self.data.len() {
             return Err(VMError::InvalidMemoryAccess);
         }
@@ -119,6 +123,10 @@ impl Memory {
 
     fn write_u64(&mut self, addr: u64, value: u64) -> Result<(), VMError> {
         let addr = addr as usize;
+        // Doubleword writes: alignment 8.
+        if addr % 8 != 0 {
+            return Err(VMError::InvalidMemoryAccess);
+        }
         if addr + 8 > self.data.len() {
             return Err(VMError::InvalidMemoryAccess);
         }
@@ -130,6 +138,10 @@ impl Memory {
 
     fn read_u32(&self, addr: u64) -> Result<u32, VMError> {
         let addr = addr as usize;
+        // Word reads: alignment 4.
+        if addr % 4 != 0 {
+            return Err(VMError::InvalidMemoryAccess);
+        }
         if addr + 4 > self.data.len() {
             return Err(VMError::InvalidMemoryAccess);
         }
@@ -142,6 +154,10 @@ impl Memory {
 
     fn write_u32(&mut self, addr: u64, value: u32) -> Result<(), VMError> {
         let addr = addr as usize;
+        // Word writes: alignment 4.
+        if addr % 4 != 0 {
+            return Err(VMError::InvalidMemoryAccess);
+        }
         if addr + 4 > self.data.len() {
             return Err(VMError::InvalidMemoryAccess);
         }
@@ -254,6 +270,20 @@ const EM_RISCV: u16 = 243;
 /// RISC-V memory size: 64 KiB sandbox
 const MEMORY_SIZE: usize = 64 * 1024;
 
+/// RISC-V instruction gas costs (differentiated by instruction complexity).
+const GAS_INSTRUCTION_BASE: u64 = 1;
+const GAS_INSTRUCTION_LOAD_STORE: u64 = 2;
+const GAS_INSTRUCTION_BRANCH: u64 = 3;
+const GAS_INSTRUCTION_JUMP: u64 = 4;
+const GAS_INSTRUCTION_SYSTEM: u64 = 10;
+
+/// Stack pointer register index (x2).
+const SP_REG: u8 = 2;
+
+/// Stack bounds: stack grows downward from the top of memory.
+/// The stack must stay within [STACK_BOTTOM, MEMORY_SIZE).
+const STACK_BOTTOM: usize = 0x1000;
+
 impl RISCVExecutor {
     pub fn new(context: ExecutionContext, gas_limit: u64) -> Self {
         Self {
@@ -313,9 +343,6 @@ impl RISCVExecutor {
         const MAX_INSTRUCTIONS: u64 = 10_000;
 
         while instructions_executed < MAX_INSTRUCTIONS {
-            // Charge gas per instruction
-            self.gas_meter.charge(1)?;
-
             // Fetch instruction from memory
             if pc + 4 > MEMORY_SIZE {
                 return Err(VMError::InvalidMemoryAccess);
@@ -335,6 +362,15 @@ impl RISCVExecutor {
             let rs2 = ((instr_word >> 20) & 0x1f) as u8;
             let funct3 = ((instr_word >> 12) & 0x7) as u8;
             let funct7 = (instr_word >> 25) & 0x7f;
+
+            // Charge gas per instruction (differentiated by type)
+            let instruction_gas = match opcode {
+                OPCODE_LOAD | OPCODE_STORE => GAS_INSTRUCTION_LOAD_STORE,
+                OPCODE_BRANCH => GAS_INSTRUCTION_BRANCH,
+                OPCODE_JAL | OPCODE_JALR => GAS_INSTRUCTION_JUMP,
+                _ => GAS_INSTRUCTION_BASE,
+            };
+            self.gas_meter.charge(instruction_gas)?;
 
             let instruction =
                 self.decode_instruction(opcode, funct3, funct7, rd, rs1, rs2, instr_word)?;
@@ -356,7 +392,7 @@ impl RISCVExecutor {
                         registers.write(rd, next_pc);
                     }
                     let target = (pc as i64).wrapping_add(imm as i64) as usize;
-                    if target >= MEMORY_SIZE {
+                    if target >= MEMORY_SIZE || target % 4 != 0 {
                         return Err(VMError::InvalidMemoryAccess);
                     }
                     pc = target;
@@ -367,7 +403,7 @@ impl RISCVExecutor {
                     if rd != 0 {
                         registers.write(rd, pc as u64 + 4);
                     }
-                    if target >= MEMORY_SIZE as u64 {
+                    if target >= MEMORY_SIZE as u64 || target % 4 != 0 {
                         return Err(VMError::InvalidMemoryAccess);
                     }
                     pc = target as usize;
@@ -375,7 +411,7 @@ impl RISCVExecutor {
                 RiscvInstruction::BEQ(rs1, rs2, imm) => {
                     if registers.read(rs1) == registers.read(rs2) {
                         let target = (pc as i64).wrapping_add(imm as i64) as usize;
-                        if target >= MEMORY_SIZE {
+                        if target >= MEMORY_SIZE || target % 4 != 0 {
                             return Err(VMError::InvalidMemoryAccess);
                         }
                         pc = target;
@@ -386,7 +422,7 @@ impl RISCVExecutor {
                 RiscvInstruction::BNE(rs1, rs2, imm) => {
                     if registers.read(rs1) != registers.read(rs2) {
                         let target = (pc as i64).wrapping_add(imm as i64) as usize;
-                        if target >= MEMORY_SIZE {
+                        if target >= MEMORY_SIZE || target % 4 != 0 {
                             return Err(VMError::InvalidMemoryAccess);
                         }
                         pc = target;
@@ -397,7 +433,7 @@ impl RISCVExecutor {
                 RiscvInstruction::BLT(rs1, rs2, imm) => {
                     if registers.read(rs1) < registers.read(rs2) {
                         let target = (pc as i64).wrapping_add(imm as i64) as usize;
-                        if target >= MEMORY_SIZE {
+                        if target >= MEMORY_SIZE || target % 4 != 0 {
                             return Err(VMError::InvalidMemoryAccess);
                         }
                         pc = target;
@@ -408,7 +444,7 @@ impl RISCVExecutor {
                 RiscvInstruction::BGE(rs1, rs2, imm) => {
                     if registers.read(rs1) >= registers.read(rs2) {
                         let target = (pc as i64).wrapping_add(imm as i64) as usize;
-                        if target >= MEMORY_SIZE {
+                        if target >= MEMORY_SIZE || target % 4 != 0 {
                             return Err(VMError::InvalidMemoryAccess);
                         }
                         pc = target;
@@ -419,7 +455,7 @@ impl RISCVExecutor {
                 RiscvInstruction::BLTU(rs1, rs2, imm) => {
                     if registers.read(rs1) < registers.read(rs2) {
                         let target = (pc as i64).wrapping_add(imm as i64) as usize;
-                        if target >= MEMORY_SIZE {
+                        if target >= MEMORY_SIZE || target % 4 != 0 {
                             return Err(VMError::InvalidMemoryAccess);
                         }
                         pc = target;
@@ -430,7 +466,7 @@ impl RISCVExecutor {
                 RiscvInstruction::BGEU(rs1, rs2, imm) => {
                     if registers.read(rs1) >= registers.read(rs2) {
                         let target = (pc as i64).wrapping_add(imm as i64) as usize;
-                        if target >= MEMORY_SIZE {
+                        if target >= MEMORY_SIZE || target % 4 != 0 {
                             return Err(VMError::InvalidMemoryAccess);
                         }
                         pc = target;
@@ -440,51 +476,81 @@ impl RISCVExecutor {
                 }
                 RiscvInstruction::LB(rd, rs1, imm) => {
                     let addr = registers.read(rs1).wrapping_add(imm as i64 as u64);
+                    // Byte loads: alignment 1 (no check needed).
                     let val = memory.read_u64(addr)?;
                     registers.write(rd, val as i8 as u64);
                     pc = (pc + 4) % MEMORY_SIZE;
                 }
                 RiscvInstruction::LH(rd, rs1, imm) => {
                     let addr = registers.read(rs1).wrapping_add(imm as i64 as u64);
+                    // Halfword loads: alignment 2.
+                    if addr % 2 != 0 {
+                        return Err(VMError::InvalidMemoryAccess);
+                    }
                     let val = memory.read_u64(addr)?;
                     registers.write(rd, val as i16 as u64);
                     pc = (pc + 4) % MEMORY_SIZE;
                 }
                 RiscvInstruction::LW(rd, rs1, imm) => {
                     let addr = registers.read(rs1).wrapping_add(imm as i64 as u64);
+                    // Word loads: alignment 4.
+                    if addr % 4 != 0 {
+                        return Err(VMError::InvalidMemoryAccess);
+                    }
                     let val = memory.read_u32(addr)?;
                     registers.write(rd, val as i32 as u64);
                     pc = (pc + 4) % MEMORY_SIZE;
                 }
                 RiscvInstruction::LWU(rd, rs1, imm) => {
                     let addr = registers.read(rs1).wrapping_add(imm as i64 as u64);
+                    // Word loads: alignment 4.
+                    if addr % 4 != 0 {
+                        return Err(VMError::InvalidMemoryAccess);
+                    }
                     let val = memory.read_u32(addr)?;
                     registers.write(rd, val as u64);
                     pc = (pc + 4) % MEMORY_SIZE;
                 }
                 RiscvInstruction::LD(rd, rs1, imm) => {
                     let addr = registers.read(rs1).wrapping_add(imm as i64 as u64);
+                    // Doubleword loads: alignment 8.
+                    if addr % 8 != 0 {
+                        return Err(VMError::InvalidMemoryAccess);
+                    }
                     let val = memory.read_u64(addr)?;
                     registers.write(rd, val);
                     pc = (pc + 4) % MEMORY_SIZE;
                 }
                 RiscvInstruction::SB(rs2, rs1, imm) => {
                     let addr = registers.read(rs1).wrapping_add(imm as i64 as u64);
+                    // Byte stores: alignment 1 (no check needed).
                     memory.write_u64(addr, registers.read(rs2) as u64)?;
                     pc = (pc + 4) % MEMORY_SIZE;
                 }
                 RiscvInstruction::SH(rs2, rs1, imm) => {
                     let addr = registers.read(rs1).wrapping_add(imm as i64 as u64);
+                    // Halfword stores: alignment 2.
+                    if addr % 2 != 0 {
+                        return Err(VMError::InvalidMemoryAccess);
+                    }
                     memory.write_u64(addr, registers.read(rs2) as u16 as u64)?;
                     pc = (pc + 4) % MEMORY_SIZE;
                 }
                 RiscvInstruction::SW(rs2, rs1, imm) => {
                     let addr = registers.read(rs1).wrapping_add(imm as i64 as u64);
+                    // Word stores: alignment 4.
+                    if addr % 4 != 0 {
+                        return Err(VMError::InvalidMemoryAccess);
+                    }
                     memory.write_u32(addr, registers.read(rs2) as u32)?;
                     pc = (pc + 4) % MEMORY_SIZE;
                 }
                 RiscvInstruction::SD(rs2, rs1, imm) => {
                     let addr = registers.read(rs1).wrapping_add(imm as i64 as u64);
+                    // Doubleword stores: alignment 8.
+                    if addr % 8 != 0 {
+                        return Err(VMError::InvalidMemoryAccess);
+                    }
                     memory.write_u64(addr, registers.read(rs2))?;
                     pc = (pc + 4) % MEMORY_SIZE;
                 }
@@ -600,6 +666,14 @@ impl RISCVExecutor {
             }
 
             instructions_executed += 1;
+
+            // Stack bounds check: stack pointer (x2) must stay within
+            // [STACK_BOTTOM, MEMORY_SIZE) to prevent stack overflow
+            // or underflow into reserved memory regions.
+            let sp = registers.read(SP_REG);
+            if sp < STACK_BOTTOM as u64 || sp >= MEMORY_SIZE as u64 {
+                return Err(VMError::InvalidMemoryAccess);
+            }
         }
 
         // Return deterministic output: final register state hash
@@ -1025,5 +1099,85 @@ mod tests {
         let h2 = vm2.parse_elf_header(&binary).unwrap();
         assert_eq!(h1.e_entry, h2.e_entry);
         assert_eq!(h1.e_machine, h2.e_machine);
+    }
+
+    // --- Memory alignment tests ---
+
+    #[test]
+    fn memory_read_u64_requires_8_byte_alignment() {
+        let mut memory = Memory::new(64);
+        memory.write_u64(8, 0x1234567890ABCDEF).unwrap();
+        // Aligned read works
+        assert_eq!(memory.read_u64(8).unwrap(), 0x1234567890ABCDEF);
+        // Misaligned read fails
+        assert_eq!(memory.read_u64(9), Err(VMError::InvalidMemoryAccess));
+        assert_eq!(memory.read_u64(10), Err(VMError::InvalidMemoryAccess));
+        assert_eq!(memory.read_u64(1), Err(VMError::InvalidMemoryAccess));
+    }
+
+    #[test]
+    fn memory_write_u64_requires_8_byte_alignment() {
+        let mut memory = Memory::new(64);
+        // Aligned write works
+        assert!(memory.write_u64(16, 0xDEADBEEF).is_ok());
+        assert_eq!(memory.read_u64(16).unwrap(), 0xDEADBEEF);
+        // Misaligned write fails
+        assert_eq!(
+            memory.write_u64(17, 0xDEADBEEF),
+            Err(VMError::InvalidMemoryAccess)
+        );
+    }
+
+    #[test]
+    fn memory_read_u32_requires_4_byte_alignment() {
+        let mut memory = Memory::new(64);
+        memory.write_u32(4, 0xDEADBEEF).unwrap();
+        // Aligned read works
+        assert_eq!(memory.read_u32(4).unwrap(), 0xDEADBEEF);
+        // Misaligned read fails
+        assert_eq!(memory.read_u32(5), Err(VMError::InvalidMemoryAccess));
+        assert_eq!(memory.read_u32(1), Err(VMError::InvalidMemoryAccess));
+    }
+
+    #[test]
+    fn memory_write_u32_requires_4_byte_alignment() {
+        let mut memory = Memory::new(64);
+        // Aligned write works
+        assert!(memory.write_u32(12, 0xCAFEBABE).is_ok());
+        assert_eq!(memory.read_u32(12).unwrap(), 0xCAFEBABE);
+        // Misaligned write fails
+        assert_eq!(
+            memory.write_u32(13, 0xCAFEBABE),
+            Err(VMError::InvalidMemoryAccess)
+        );
+    }
+
+    // --- Stack bounds tests ---
+
+    #[test]
+    fn stack_pointer_out_of_bounds_rejected() {
+        let mut registers = RegisterFile::new();
+        // Set SP below STACK_BOTTOM
+        registers.write(SP_REG, STACK_BOTTOM as u64 - 1);
+        assert!(sp_within_bounds(&registers).is_err());
+        // Set SP above MEMORY_SIZE
+        registers.write(SP_REG, MEMORY_SIZE as u64);
+        assert!(sp_within_bounds(&registers).is_err());
+        // Set SP within bounds
+        registers.write(SP_REG, STACK_BOTTOM as u64 + 100);
+        assert!(sp_within_bounds(&registers).is_ok());
+        // x0 always reads as 0, but SP is x2 - direct write to x2
+        registers.write(2, STACK_BOTTOM as u64);
+        assert_eq!(registers.read(SP_REG), STACK_BOTTOM as u64);
+    }
+
+    /// Helper to check stack pointer bounds (mirrors the runtime check).
+    fn sp_within_bounds(registers: &RegisterFile) -> Result<(), VMError> {
+        let sp = registers.read(SP_REG);
+        if sp < STACK_BOTTOM as u64 || sp >= MEMORY_SIZE as u64 {
+            Err(VMError::InvalidMemoryAccess)
+        } else {
+            Ok(())
+        }
     }
 }

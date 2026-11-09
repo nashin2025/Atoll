@@ -43,9 +43,7 @@ fn fuzz_hash512_blake3_deterministic() {
 #[test]
 fn fuzz_hash512_output_is_64_bytes() {
     for i in 0..10_000u32 {
-        let input: Vec<u8> = (0..(i % 1000))
-            .map(|j| (i * 5 + (j as u32)) as u8)
-            .collect();
+        let input: Vec<u8> = (0..(i % 1000)).map(|j| (i * 5 + j) as u8).collect();
         let hash = Hash512::blake3(&input);
         assert_eq!(hash.to_array().len(), 64);
     }
@@ -219,7 +217,7 @@ fn fuzz_chain_state_transfer_insufficient_fails() {
         let amount = balance + 1;
 
         let mut state = ChainState::new();
-        state.set_balance(from.clone(), balance);
+        state.set_balance(from, balance);
 
         let result = state.transfer(&from, &to, amount);
         assert!(result.is_err());
@@ -237,7 +235,7 @@ fn fuzz_chain_state_transfer_preserves_supply() {
         let amount = i as u128 * 100;
 
         let mut state = ChainState::new();
-        state.set_balance(from.clone(), balance);
+        state.set_balance(from, balance);
         let initial = state.balance(&from) + state.balance(&to);
 
         let result = state.transfer(&from, &to, amount);
@@ -340,7 +338,7 @@ fn fuzz_gas_meter_remaining_is_limit_minus_used() {
 #[test]
 fn fuzz_morph_hash_deterministic() {
     for i in 0..1_000u32 {
-        let input: Vec<u8> = (0..(i % 50)).map(|j| (i * 3 + (j as u32)) as u8).collect();
+        let input: Vec<u8> = (0..(i % 50)).map(|j| (i * 3 + j) as u8).collect();
         let height = (i % 100) as u64;
         let mut engine = MorphHashEngine::new();
         let prev_hash = Hash512::zero();
@@ -370,7 +368,7 @@ fn fuzz_select_algorithm_chain_always_16() {
         }
         let prev_hash = Hash512::from_array(bytes);
         let height = (i % 1000) as u64;
-        let chain = select_algorithm_chain(&prev_hash, height);
+        let chain = select_algorithm_chain(&prev_hash, height, 16);
         assert_eq!(chain.len(), 16);
     }
 }

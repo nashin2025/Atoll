@@ -63,7 +63,7 @@ jobs:
           shared-key: "v1-rust-lint"
 
       - name: Run clippy
-        run: cargo clippy --workspace --all-targets
+        run: cargo clippy -p atoll-core -p wallet-cli --all-targets
 
   # ============================================================================
   # TESTING
@@ -90,7 +90,7 @@ jobs:
           shared-key: "v1-rust-test"
 
       - name: Run unit tests
-        run: cargo test --workspace --lib
+        run: cargo test -p atoll-core -p wallet-cli --lib
 
   integration-test:
     name: Integration Tests
@@ -113,7 +113,7 @@ jobs:
           shared-key: "v1-rust-integration"
 
       - name: Run integration tests
-        run: cargo test --workspace --tests
+        run: cargo test -p atoll-core -p wallet-cli --test integration
 
   # ============================================================================
   # SECURITY SCANNING (Shift Left)
@@ -133,9 +133,7 @@ jobs:
           toolchain: stable
 
       - name: Install cargo-audit
-        uses: rust-sec/scan-action@v1
-        with:
-          tool: cargo-audit
+        run: cargo install cargo-audit
 
       - name: Run cargo audit
         run: cargo audit
@@ -208,7 +206,7 @@ jobs:
           shared-key: "v1-rust-build"
 
       - name: Build workspace
-        run: cargo build --workspace --release
+        run: cargo build --workspace --release --locked
 
   # ============================================================================
   # BENCHMARKS

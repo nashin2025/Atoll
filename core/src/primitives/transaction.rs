@@ -2,9 +2,10 @@
 
 use crate::primitives::address::Address;
 use crate::primitives::signature::Signature;
+use serde::{Deserialize, Serialize};
 
 /// Transaction structure
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transaction {
     pub version: u8,
     pub from: Address,

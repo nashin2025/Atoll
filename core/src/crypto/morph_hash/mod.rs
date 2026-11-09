@@ -13,13 +13,16 @@ use digest::{Digest, OutputSizeUser};
 use sha2::Sha512;
 use sha3::{Digest as Sha3Digest, Sha3_512};
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 /// Number of algorithms in the rotation pool
 pub const ALGORITHM_POOL_SIZE: usize = 32;
 
-/// Number of algorithms chained per hash invocation
-pub const CHAIN_LENGTH: usize = 16;
+/// Default number of algorithms chained per hash invocation.
+/// Can be reduced (e.g., to 8) for faster hashing at the cost of
+/// slightly reduced diffusion. Set via [`MorphHashEngine::with_chain_length`].
+pub const DEFAULT_CHAIN_LENGTH: usize = 16;
 
 /// S-box evolution interval (blocks)
 pub const SBOX_EVOLUTION_INTERVAL: u64 = 10_000;
@@ -479,17 +482,25 @@ fn fisher_yates_shuffle(seed: &[u8], n: usize) -> Vec<usize> {
     indices
 }
 
-/// Selects 16 of 32 algorithms based on previous block hash and block height.
-pub fn select_algorithm_chain(prev_hash: &Hash512, block_height: u64) -> Vec<MorphAlgorithm> {
+/// Selects `chain_length` of 32 algorithms based on previous block hash and block height.
+pub fn select_algorithm_chain(
+    prev_hash: &Hash512,
+    block_height: u64,
+    chain_length: usize,
+) -> Vec<MorphAlgorithm> {
+    if chain_length == 0 {
+        return Vec::new();
+    }
     let shuffled = fisher_yates_shuffle(prev_hash.as_ref(), ALGORITHM_POOL_SIZE);
+    let actual_length = chain_length.min(ALGORITHM_POOL_SIZE);
     let mut selected: Vec<MorphAlgorithm> = shuffled
         .into_iter()
-        .take(CHAIN_LENGTH)
+        .take(actual_length)
         .map(|idx| MorphAlgorithm::all()[idx])
         .collect();
 
     // Additional rotation based on block height
-    let rotation = (block_height % CHAIN_LENGTH as u64) as usize;
+    let rotation = (block_height % actual_length as u64) as usize;
     selected.rotate_left(rotation);
 
     selected
@@ -641,6 +652,16 @@ pub struct MorphHashEngine {
     sbox_generation: u64,
     memory_layer: MemoryHardLayer,
     pq_finalizer: PostQuantumFinalizer,
+    /// Number of algorithms in the hash chain. Defaults to 16.
+    /// Can be reduced (e.g., to 8) for faster hashing.
+    chain_length: usize,
+    /// Cache of algorithm chains keyed by (prev_hash, block_height).
+    /// Avoids recomputing the Fisher-Yates shuffle on every morph_hash call.
+    algorithm_chain_cache: HashMap<(Hash512, u64), Vec<MorphAlgorithm>>,
+    /// Number of cache hits (chain found in cache).
+    cache_hits: u64,
+    /// Number of cache misses (chain had to be computed).
+    cache_misses: u64,
 }
 
 impl Default for MorphHashEngine {
@@ -655,6 +676,10 @@ impl MorphHashEngine {
             sbox_generation: 0,
             memory_layer: MemoryHardLayer::with_buffer_size(4096),
             pq_finalizer: PostQuantumFinalizer::new(),
+            chain_length: DEFAULT_CHAIN_LENGTH,
+            algorithm_chain_cache: HashMap::new(),
+            cache_hits: 0,
+            cache_misses: 0,
         }
     }
 
@@ -663,6 +688,10 @@ impl MorphHashEngine {
             sbox_generation: 0,
             memory_layer: MemoryHardLayer::new(),
             pq_finalizer: PostQuantumFinalizer::new(),
+            chain_length: DEFAULT_CHAIN_LENGTH,
+            algorithm_chain_cache: HashMap::new(),
+            cache_hits: 0,
+            cache_misses: 0,
         }
     }
 
@@ -671,6 +700,10 @@ impl MorphHashEngine {
             sbox_generation: 0,
             memory_layer: MemoryHardLayer::with_buffer_size(buffer_size),
             pq_finalizer: PostQuantumFinalizer::new(),
+            chain_length: DEFAULT_CHAIN_LENGTH,
+            algorithm_chain_cache: HashMap::new(),
+            cache_hits: 0,
+            cache_misses: 0,
         }
     }
 
@@ -682,13 +715,60 @@ impl MorphHashEngine {
         self.sbox_generation = generation;
     }
 
+    /// Returns the current chain length (number of algorithms per hash).
+    pub fn chain_length(&self) -> usize {
+        self.chain_length
+    }
+
+    /// Sets the chain length (number of algorithms per hash).
+    ///
+    /// Default is [`DEFAULT_CHAIN_LENGTH`] (16). Reducing to 8 roughly
+    /// halves Morph-Hash computation time at the cost of slightly reduced
+    /// diffusion.
+    pub fn with_chain_length(mut self, chain_length: usize) -> Self {
+        self.chain_length = chain_length;
+        self
+    }
+
+    /// Returns cache statistics: (hits, misses, hit_rate_percent).
+    pub fn cache_stats(&self) -> (u64, u64, f64) {
+        let total = self.cache_hits + self.cache_misses;
+        let hit_rate = if total > 0 {
+            self.cache_hits as f64 / total as f64 * 100.0
+        } else {
+            0.0
+        };
+        (self.cache_hits, self.cache_misses, hit_rate)
+    }
+
+    /// Returns the number of cached algorithm chains.
+    pub fn cache_size(&self) -> usize {
+        self.algorithm_chain_cache.len()
+    }
+
+    /// Clears the algorithm chain cache.
+    pub fn clear_cache(&mut self) {
+        self.algorithm_chain_cache.clear();
+        self.cache_hits = 0;
+        self.cache_misses = 0;
+    }
+
     pub fn morph_hash(
         &mut self,
         input: &[u8],
         prev_block_hash: &Hash512,
         block_height: u64,
     ) -> Hash512 {
-        let chain = select_algorithm_chain(prev_block_hash, block_height);
+        let cache_key = (*prev_block_hash, block_height);
+        let chain = if let Some(cached) = self.algorithm_chain_cache.get(&cache_key) {
+            self.cache_hits += 1;
+            cached.clone()
+        } else {
+            self.cache_misses += 1;
+            let chain = select_algorithm_chain(prev_block_hash, block_height, self.chain_length);
+            self.algorithm_chain_cache.insert(cache_key, chain.clone());
+            chain
+        };
         let memory_buffer = self.memory_layer.init_buffer_in_place(prev_block_hash);
 
         let mut state = input.to_vec();
@@ -748,23 +828,30 @@ mod tests {
     #[test]
     fn select_algorithm_chain_returns_16() {
         let prev_hash = Hash512::zero();
-        let chain = select_algorithm_chain(&prev_hash, 0);
-        assert_eq!(chain.len(), CHAIN_LENGTH);
+        let chain = select_algorithm_chain(&prev_hash, 0, DEFAULT_CHAIN_LENGTH);
+        assert_eq!(chain.len(), DEFAULT_CHAIN_LENGTH);
+    }
+
+    #[test]
+    fn select_algorithm_chain_returns_8() {
+        let prev_hash = Hash512::zero();
+        let chain = select_algorithm_chain(&prev_hash, 0, 8);
+        assert_eq!(chain.len(), 8);
     }
 
     #[test]
     fn select_algorithm_chain_is_deterministic() {
         let prev_hash = Hash512::blake3(b"test_seed");
-        let chain1 = select_algorithm_chain(&prev_hash, 5);
-        let chain2 = select_algorithm_chain(&prev_hash, 5);
+        let chain1 = select_algorithm_chain(&prev_hash, 5, DEFAULT_CHAIN_LENGTH);
+        let chain2 = select_algorithm_chain(&prev_hash, 5, DEFAULT_CHAIN_LENGTH);
         assert_eq!(chain1, chain2);
     }
 
     #[test]
     fn select_algorithm_chain_changes_with_height() {
         let prev_hash = Hash512::zero();
-        let chain_h0 = select_algorithm_chain(&prev_hash, 0);
-        let chain_h1 = select_algorithm_chain(&prev_hash, 1);
+        let chain_h0 = select_algorithm_chain(&prev_hash, 0, DEFAULT_CHAIN_LENGTH);
+        let chain_h1 = select_algorithm_chain(&prev_hash, 1, DEFAULT_CHAIN_LENGTH);
         assert_ne!(chain_h0, chain_h1);
     }
 
@@ -909,5 +996,180 @@ mod tests {
     fn atoll_tree_hash_algorithm() {
         let result = apply_algorithm(MorphAlgorithm::AtollTreeHash, b"test");
         assert_eq!(result.len(), 64);
+    }
+
+    // --- Algorithm chain cache tests ---
+
+    #[test]
+    fn algorithm_chain_cache_hit_on_repeat() {
+        let mut engine = MorphHashEngine::new();
+        let prev_hash = Hash512::blake3(b"test_seed");
+        let height = 42;
+
+        // First call: cache miss
+        let h1 = engine.morph_hash(b"test", &prev_hash, height);
+        let (hits, misses, _) = engine.cache_stats();
+        assert_eq!(misses, 1, "First call should be a cache miss");
+        assert_eq!(hits, 0, "First call should have no cache hits");
+
+        // Second call with same inputs: cache hit
+        let h2 = engine.morph_hash(b"test", &prev_hash, height);
+        let (hits, misses, _) = engine.cache_stats();
+        assert_eq!(misses, 1, "Still one cache miss");
+        assert_eq!(hits, 1, "Second call should be a cache hit");
+        assert_eq!(h1, h2, "Cached chain should produce same result");
+    }
+
+    #[test]
+    fn algorithm_chain_cache_different_heights() {
+        let mut engine = MorphHashEngine::new();
+        let prev_hash = Hash512::blake3(b"test_seed");
+
+        let h1 = engine.morph_hash(b"test", &prev_hash, 0);
+        let h2 = engine.morph_hash(b"test", &prev_hash, 1);
+        let (hits, misses, _) = engine.cache_stats();
+        assert_eq!(misses, 2, "Different heights should each be a cache miss");
+        assert_eq!(hits, 0, "No cache hits expected");
+        assert_ne!(h1, h2, "Different heights should produce different results");
+    }
+
+    #[test]
+    fn algorithm_chain_cache_different_prev_hashes() {
+        let mut engine = MorphHashEngine::new();
+        let height = 5;
+
+        let hash1 = Hash512::blake3(b"hash1");
+        let hash2 = Hash512::blake3(b"hash2");
+
+        let h1 = engine.morph_hash(b"test", &hash1, height);
+        let h2 = engine.morph_hash(b"test", &hash2, height);
+        let (hits, misses, _) = engine.cache_stats();
+        assert_eq!(
+            misses, 2,
+            "Different prev_hashes should each be a cache miss"
+        );
+        assert_eq!(hits, 0, "No cache hits expected");
+    }
+
+    #[test]
+    fn algorithm_chain_cache_stats_accurate() {
+        let mut engine = MorphHashEngine::new();
+        let prev_hash = Hash512::zero();
+
+        engine.morph_hash(b"a", &prev_hash, 0);
+        engine.morph_hash(b"a", &prev_hash, 0); // hit
+        engine.morph_hash(b"a", &prev_hash, 0); // hit
+        engine.morph_hash(b"a", &prev_hash, 1); // miss (different height)
+
+        let (hits, misses, hit_rate) = engine.cache_stats();
+        assert_eq!(hits, 2);
+        assert_eq!(misses, 2);
+        assert!(
+            (hit_rate - 50.0).abs() < f64::EPSILON,
+            "Hit rate should be 50%"
+        );
+    }
+
+    #[test]
+    fn algorithm_chain_cache_size() {
+        let mut engine = MorphHashEngine::new();
+        let prev_hash = Hash512::zero();
+
+        assert_eq!(engine.cache_size(), 0);
+
+        engine.morph_hash(b"a", &prev_hash, 0);
+        engine.morph_hash(b"a", &prev_hash, 1);
+        assert_eq!(engine.cache_size(), 2);
+
+        engine.morph_hash(b"a", &prev_hash, 0); // hit, no new entry
+        assert_eq!(engine.cache_size(), 2);
+    }
+
+    #[test]
+    fn algorithm_chain_cache_clear() {
+        let mut engine = MorphHashEngine::new();
+        let prev_hash = Hash512::zero();
+
+        engine.morph_hash(b"a", &prev_hash, 0);
+        engine.morph_hash(b"a", &prev_hash, 0); // hit
+        assert!(engine.cache_stats().0 > 0);
+
+        engine.clear_cache();
+        assert_eq!(engine.cache_stats().0, 0);
+        assert_eq!(engine.cache_stats().1, 0);
+        assert_eq!(engine.cache_size(), 0);
+
+        // After clear, next call is a miss again
+        engine.morph_hash(b"a", &prev_hash, 0);
+        let (hits, misses, _) = engine.cache_stats();
+        assert_eq!(hits, 0);
+        assert_eq!(misses, 1);
+    }
+
+    #[test]
+    fn algorithm_chain_cache_preserves_determinism() {
+        let mut cached_engine = MorphHashEngine::new();
+        let mut fresh_engine = MorphHashEngine::new();
+        let prev_hash = Hash512::blake3(b"determinism_test");
+        let height = 100;
+
+        // Run multiple times through cached engine
+        for _ in 0..10 {
+            cached_engine.morph_hash(b"same_input", &prev_hash, height);
+        }
+
+        // Fresh engine should produce identical results
+        let cached_hash = cached_engine.morph_hash(b"same_input", &prev_hash, height);
+        let fresh_hash = fresh_engine.morph_hash(b"same_input", &prev_hash, height);
+        assert_eq!(cached_hash, fresh_hash);
+    }
+
+    // --- Chain length configuration tests ---
+
+    #[test]
+    fn chain_length_default_is_16() {
+        let engine = MorphHashEngine::new();
+        assert_eq!(engine.chain_length(), DEFAULT_CHAIN_LENGTH);
+    }
+
+    #[test]
+    fn with_chain_length_sets_custom_length() {
+        let engine = MorphHashEngine::new().with_chain_length(8);
+        assert_eq!(engine.chain_length(), 8);
+    }
+
+    #[test]
+    fn morph_hash_with_chain_length_8_is_deterministic() {
+        let mut engine = MorphHashEngine::new().with_chain_length(8);
+        let prev_hash = Hash512::blake3(b"test");
+        let h1 = engine.morph_hash(b"ATOLL", &prev_hash, 1);
+        let h2 = engine.morph_hash(b"ATOLL", &prev_hash, 1);
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn morph_hash_with_chain_length_8_differs_from_16() {
+        let mut engine_8 = MorphHashEngine::new().with_chain_length(8);
+        let mut engine_16 = MorphHashEngine::new();
+        let prev_hash = Hash512::blake3(b"test");
+        let h8 = engine_8.morph_hash(b"ATOLL", &prev_hash, 1);
+        let h16 = engine_16.morph_hash(b"ATOLL", &prev_hash, 1);
+        // Different chain lengths should produce different hashes
+        assert_ne!(h8, h16);
+    }
+
+    #[test]
+    fn chain_length_cannot_exceed_pool_size() {
+        let prev_hash = Hash512::zero();
+        // Requesting more than pool size should clamp to pool size
+        let chain = select_algorithm_chain(&prev_hash, 0, 100);
+        assert_eq!(chain.len(), ALGORITHM_POOL_SIZE);
+    }
+
+    #[test]
+    fn chain_length_zero_returns_empty_chain() {
+        let prev_hash = Hash512::zero();
+        let chain = select_algorithm_chain(&prev_hash, 0, 0);
+        assert!(chain.is_empty());
     }
 }

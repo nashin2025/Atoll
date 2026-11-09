@@ -1,25 +1,39 @@
 import { useState } from 'react';
-import { walletHistory, formatInvokeError } from '@/tauri';
+import {
+  walletHistory,
+  nodeGetBalance,
+  formatInvokeError,
+} from '@/tauri';
 import { Button, ErrorDisplay, Input, Loading } from '@/components/ui';
 
 interface HistoryProps {
   onBack: () => void;
+  nodeConnected: boolean;
 }
 
-export function History({ onBack }: HistoryProps) {
+export function History({ onBack, nodeConnected }: HistoryProps) {
   const [address, setAddress] = useState('');
   const [message, setMessage] = useState<string | null>(null);
+  const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleHistory = async (e: React.FormEvent) => {
+  const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     setMessage(null);
+    setBalance(null);
     try {
-      const response = await walletHistory({ address });
-      setMessage(response.message);
+      if (nodeConnected) {
+        // Query balance from the connected node
+        const response = await nodeGetBalance({ address });
+        setBalance(response.balance);
+        setMessage(`Address ${response.address} has ${response.balance} ATOLL (live node)`);
+      } else {
+        const response = await walletHistory({ address });
+        setMessage(response.message);
+      }
     } catch (err) {
       setError(formatInvokeError(err));
     } finally {
@@ -39,7 +53,7 @@ export function History({ onBack }: HistoryProps) {
 
         {error && <ErrorDisplay message={error} />}
 
-        <form onSubmit={handleHistory} className="mb-6">
+        <form onSubmit={handleLookup} className="mb-6">
           <Input
             label="Address"
             placeholder="0x… address to look up"
@@ -47,22 +61,30 @@ export function History({ onBack }: HistoryProps) {
             onChange={(e) => setAddress(e.target.value)}
           />
           <Button type="submit" variant="secondary" disabled={loading || !address}>
-            Look up history
+            {nodeConnected ? 'Look up on node' : 'Look up history'}
           </Button>
         </form>
 
         <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-6">
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
-            Transaction history
+            {nodeConnected ? 'Address lookup (live node)' : 'Transaction history'}
           </h2>
           {loading ? (
             <Loading className="h-6 w-6" />
+          ) : balance !== null ? (
+            <div className="space-y-2">
+              <p className="text-sm text-slate-300">{message}</p>
+              <p className="text-xs font-mono text-slate-500">
+                Balance: {balance} ATOLL
+              </p>
+            </div>
           ) : message ? (
             <p className="text-slate-400 text-sm">{message}</p>
           ) : (
             <p className="text-slate-500 text-sm">
-              Enter an address above to check history. MVP: offline mode, no
-              transaction log available.
+              {nodeConnected
+                ? 'Enter an address above to look up its balance on the live node.'
+                : 'Enter an address above to check history. MVP: offline mode, no transaction log available.'}
             </p>
           )}
         </div>

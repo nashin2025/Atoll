@@ -37,7 +37,7 @@ describe('Welcome', () => {
     expect(onUnlocked).toHaveBeenCalledWith(['0xabc123'], 'test-passphrase');
   });
 
-  it('calls wallet-new on create and notifies parent', async () => {
+  it('calls wallet_new on create and notifies parent', async () => {
     const onUnlocked = vi.fn();
     vi.mocked(walletNew).mockResolvedValue({ address: '0xnewaddress' });
     render(<Welcome onUnlocked={onUnlocked} />);

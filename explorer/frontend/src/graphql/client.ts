@@ -1,19 +1,17 @@
-import { ApolloClient, ApolloLink, InMemoryCache, createHttpLink } from '@apollo/client';
-
-const API_KEY = (import.meta.env as { VITE_API_KEY?: string }).VITE_API_KEY ?? 'atoll-local';
+import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
+import { setContext } from '@apollo/client/link/context';
 
 const httpLink = createHttpLink({
   uri: '/graphql',
 });
 
-const authLink = new ApolloLink((operation, forward) => {
-  operation.setContext(({ headers = {} }: { headers?: Record<string, string> }) => ({
+const authLink = setContext((_, { headers }) => {
+  return {
     headers: {
       ...headers,
-      'X-API-Key': API_KEY,
+      'X-API-Key': 'atoll-explorer',
     },
-  }));
-  return forward(operation);
+  };
 });
 
 export const client = new ApolloClient({

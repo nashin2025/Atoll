@@ -129,8 +129,8 @@ mod tests {
     fn threshold_check() {
         let mempool = EncryptedMempool::new([1u8; 32], vec![[1u8; 32], [2u8; 32], [3u8; 32]], 2);
 
-        assert!(mempool.can_decrypt(&vec![[1u8; 32], [2u8; 32]]));
-        assert!(!mempool.can_decrypt(&vec![[1u8; 32]]));
+        assert!(mempool.can_decrypt(&[[1u8; 32], [2u8; 32]]));
+        assert!(!mempool.can_decrypt(&[[1u8; 32]]));
     }
 
     #[test]

@@ -152,6 +152,34 @@ impl MoveExecutor {
             return Err(VMError::InvalidInstruction);
         }
 
+        // Module body size must be consistent with declared section counts.
+        // Each declared function requires at least 4 bytes of body code,
+        // each import requires at least 8 bytes, each resource requires
+        // at least 32 bytes. This prevents malformed modules with inflated
+        // counts from passing validation.
+        let expected_body = module.function_count as usize * 4
+            + module.import_count as usize * 8
+            + module.resource_count as usize * 32;
+        if module.body.len() < expected_body {
+            return Err(VMError::InvalidInstruction);
+        }
+
+        // Resource type safety: resources cannot be copied or dropped
+        // implicitly. In this MVP, resource operations are tracked by
+        // ensuring the body contains no implicit resource duplication
+        // patterns (opcode 0x10 = copy, 0x11 = drop in Move bytecode).
+        // Any resource type that appears in a copy/drop context is rejected.
+        for (i, window) in module.body.windows(2).enumerate() {
+            if window[0] == 0x10 || window[0] == 0x11 {
+                // Check if this copy/drop operates on a resource type by
+                // examining the following type index byte.
+                let type_index = window[1] as usize;
+                if type_index < module.resource_count as usize {
+                    return Err(VMError::InvalidInstruction);
+                }
+            }
+        }
+
         // Deterministic output: hash of module structure
         let mut output = Vec::with_capacity(32);
         output.extend_from_slice(&module.magic);
@@ -194,8 +222,9 @@ mod tests {
         bytes.extend_from_slice(&functions.to_le_bytes());
         bytes.extend_from_slice(&resources.to_le_bytes());
         bytes.extend_from_slice(&imports.to_le_bytes());
-        // Pad body to satisfy resource size check
-        bytes.extend_from_slice(&vec![0u8; resources as usize * 32]);
+        // Pad body to satisfy resource size check and function/import/body size validation
+        let min_body = functions as usize * 4 + imports as usize * 8 + resources as usize * 32;
+        bytes.extend_from_slice(&vec![0u8; min_body.max(resources as usize * 32)]);
         bytes
     }
 

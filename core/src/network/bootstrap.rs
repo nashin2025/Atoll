@@ -100,7 +100,7 @@ impl BootstrapClient {
 
         match response {
             NetworkMessage::Neighbors(NeighborsMessage { peers }) => Ok(peers),
-            other => Err(format!("unexpected response from seed: {other:?}")),
+            other => Err("unexpected response from seed".to_string()),
         }
     }
 

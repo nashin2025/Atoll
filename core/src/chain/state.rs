@@ -13,6 +13,10 @@ pub struct AccountState {
     pub nonce: u64,
     pub code_hash: Option<Hash512>,
     pub storage_root: Hash512,
+    /// MIND token balance (gas/computation token, transferable)
+    pub mind_balance: u128,
+    /// PROOF token balance (soulbound reputation, non-transferable, decays)
+    pub proof_balance: u128,
 }
 
 /// Chain state: tracks all account states
@@ -25,6 +29,8 @@ pub struct ChainState {
     mind_supply: u128,
     /// Block number
     block_number: u64,
+    /// Block number at which PROOF decay was last applied
+    last_proof_decay_block: u64,
 }
 
 impl ChainState {
@@ -35,6 +41,7 @@ impl ChainState {
             total_supply: 0,
             mind_supply: 0,
             block_number: 0,
+            last_proof_decay_block: 0,
         }
     }
 
@@ -177,6 +184,108 @@ impl ChainState {
         self.total_supply = new_total;
         Ok(())
     }
+
+    /// Returns the MIND balance of an address
+    pub fn mind_balance(&self, address: &Address) -> u128 {
+        self.accounts
+            .get(address)
+            .map(|a| a.mind_balance)
+            .unwrap_or(0)
+    }
+
+    /// Sets the MIND balance of an address
+    pub fn set_mind_balance(&mut self, address: Address, balance: u128) {
+        self.accounts.entry(address).or_default().mind_balance = balance;
+    }
+
+    /// Mints new MIND tokens
+    pub fn mint_mind(&mut self, address: Address, amount: u128) -> Result<(), String> {
+        let current = self.mind_balance(&address);
+        let new_balance = current
+            .checked_add(amount)
+            .ok_or_else(|| "MIND balance addition overflow".to_string())?;
+        self.set_mind_balance(address, new_balance);
+        let new_total = self
+            .mind_supply
+            .checked_add(amount)
+            .ok_or_else(|| "MIND total supply addition overflow".to_string())?;
+        self.mind_supply = new_total;
+        Ok(())
+    }
+
+    /// Burns MIND tokens
+    pub fn burn_mind(&mut self, address: &Address, amount: u128) -> Result<(), String> {
+        let current = self.mind_balance(address);
+        if current < amount {
+            return Err("Insufficient MIND balance for burn".to_string());
+        }
+        let new_balance = current
+            .checked_sub(amount)
+            .ok_or_else(|| "MIND balance subtraction underflow".to_string())?;
+        self.set_mind_balance(*address, new_balance);
+        let new_total = self
+            .mind_supply
+            .checked_sub(amount)
+            .ok_or_else(|| "MIND total supply subtraction underflow".to_string())?;
+        self.mind_supply = new_total;
+        Ok(())
+    }
+
+    /// Returns the PROOF balance of an address
+    pub fn proof_balance(&self, address: &Address) -> u128 {
+        self.accounts
+            .get(address)
+            .map(|a| a.proof_balance)
+            .unwrap_or(0)
+    }
+
+    /// Awards PROOF tokens to an address (soulbound - cannot be transferred)
+    pub fn award_proof(&mut self, address: Address, amount: u128) -> Result<(), String> {
+        let current = self.proof_balance(&address);
+        let new_balance = current
+            .checked_add(amount)
+            .ok_or_else(|| "PROOF balance addition overflow".to_string())?;
+        self.accounts.entry(address).or_default().proof_balance = new_balance;
+        Ok(())
+    }
+
+    /// Applies PROOF decay (10% per year, continuously compounded).
+    ///
+    /// Decay is applied based on blocks elapsed since the last decay call.
+    /// At 1-second blocks, ~31,536,000 blocks = 1 year.
+    pub fn decay_proof(&mut self, current_block: u64) {
+        if current_block <= self.last_proof_decay_block {
+            return;
+        }
+
+        let blocks_elapsed = current_block - self.last_proof_decay_block;
+        const BLOCKS_PER_YEAR: u64 = 31_536_000;
+        const DECAY_RATE: f64 = 0.10; // 10% per year
+
+        let decay_factor = (-DECAY_RATE * (blocks_elapsed as f64 / BLOCKS_PER_YEAR as f64)).exp();
+
+        for account in self.accounts.values_mut() {
+            if account.proof_balance > 0 {
+                account.proof_balance = (account.proof_balance as f64 * decay_factor) as u128;
+            }
+        }
+
+        self.last_proof_decay_block = current_block;
+    }
+
+    /// Returns the block number at which PROOF decay was last applied
+    pub fn last_proof_decay_block(&self) -> u64 {
+        self.last_proof_decay_block
+    }
+
+    /// Returns the number of accounts with non-zero PROOF balance
+    /// (used for quorum calculation in governance).
+    pub fn proof_holder_count(&self) -> u64 {
+        self.accounts
+            .values()
+            .filter(|a| a.proof_balance > 0)
+            .count() as u64
+    }
 }
 
 impl Default for ChainState {
@@ -195,6 +304,7 @@ mod tests {
         assert_eq!(state.total_supply(), 0);
         assert_eq!(state.mind_supply(), 0);
         assert_eq!(state.block_number(), 0);
+        assert_eq!(state.last_proof_decay_block(), 0);
         assert_eq!(state.account_count(), 0);
     }
 
@@ -274,5 +384,70 @@ mod tests {
 
         assert_eq!(state.get_code_hash(&addr), Some(&code_hash));
         assert_eq!(state.get_storage_root(&addr), Some(&storage_root));
+    }
+
+    #[test]
+    fn mind_mint_and_burn() {
+        let mut state = ChainState::new();
+        let addr = Address::from_bytes([1u8; 20]);
+
+        state.mint_mind(addr, 1000).unwrap();
+        assert_eq!(state.mind_supply(), 1000);
+        assert_eq!(state.mind_balance(&addr), 1000);
+
+        state.burn_mind(&addr, 300).unwrap();
+        assert_eq!(state.mind_supply(), 700);
+        assert_eq!(state.mind_balance(&addr), 700);
+    }
+
+    #[test]
+    fn mind_burn_insufficient_balance() {
+        let mut state = ChainState::new();
+        let addr = Address::from_bytes([1u8; 20]);
+
+        state.mint_mind(addr, 100).unwrap();
+        assert!(state.burn_mind(&addr, 500).is_err());
+        assert_eq!(state.mind_supply(), 100);
+    }
+
+    #[test]
+    fn proof_award_and_decay() {
+        let mut state = ChainState::new();
+        let addr = Address::from_bytes([1u8; 20]);
+
+        // Award PROOF at block 0
+        state.award_proof(addr, 1000).unwrap();
+        assert_eq!(state.proof_balance(&addr), 1000);
+
+        // No decay if no blocks elapsed
+        state.decay_proof(0);
+        assert_eq!(state.proof_balance(&addr), 1000);
+
+        // Decay after ~1 year (31,536,000 blocks at 1-second blocks)
+        state.decay_proof(31_536_000);
+        let decayed = state.proof_balance(&addr);
+        // ~90.48% remaining (e^-0.10)
+        assert!(decayed < 1000);
+        assert!(decayed > 900);
+        assert_eq!(state.last_proof_decay_block(), 31_536_000);
+
+        // No additional decay if called again at same block
+        state.decay_proof(31_536_000);
+        assert_eq!(state.proof_balance(&addr), decayed);
+    }
+
+    #[test]
+    fn proof_is_soulbound() {
+        // PROOF can only be awarded, not transferred. The `award_proof` method
+        // only increases balance; there is no transfer method for PROOF.
+        let mut state = ChainState::new();
+        let addr = Address::from_bytes([1u8; 20]);
+
+        state.award_proof(addr, 500).unwrap();
+        assert_eq!(state.proof_balance(&addr), 500);
+
+        // No way to reduce PROOF except decay (which reduces all accounts)
+        state.decay_proof(31_536_000);
+        assert!(state.proof_balance(&addr) < 500);
     }
 }

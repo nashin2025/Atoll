@@ -86,10 +86,7 @@ impl Blockchain {
     ) -> Result<Hash512, String> {
         // Verify the block's previous hash matches our tip
         if block.header.prev_hash != self.tip_hash {
-            return Err(format!(
-                "Block prev_hash {:?} does not match tip {:?}",
-                block.header.prev_hash, self.tip_hash
-            ));
+            return Err("Block prev_hash does not match tip".to_string());
         }
 
         // Verify composite score meets threshold

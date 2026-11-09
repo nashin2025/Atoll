@@ -1,35 +1,24 @@
-import { Routes, Route } from 'react-router-dom';
-import { Layout } from './components/Layout';
-import { SearchBar } from './components/SearchBar';
-import { Home } from './pages/Home';
-import { BlocksList, BlockDetail } from './pages/Blocks';
-import { TransactionsList, TransactionDetail } from './pages/Transactions';
-import { ValidatorsList, ValidatorDetail } from './pages/Validators';
-import { ApolloProvider } from '@apollo/client';
-import { client } from './graphql/client';
+import { createBrowserRouter, RouterProvider, RouteObject } from 'react-router-dom';
+import { Home } from '@/pages/Home';
+import { BlocksList } from '@/pages/BlocksList';
+import { BlockDetail } from '@/pages/BlockDetail';
+import { TransactionsList } from '@/pages/TransactionsList';
+import { TransactionDetail } from '@/pages/TransactionDetail';
+import { AddressPage } from '@/pages/AddressPage';
+import { ValidatorsList } from '@/pages/ValidatorsList';
 
-function AppRoutes() {
-  return (
-    <Routes>
-      <Route path="/" element={<Home />}>
-        <Route index element={<SearchBar />} />
-      </Route>
-      <Route path="/blocks" element={<BlocksList />} />
-      <Route path="/blocks/:hash" element={<BlockDetail />} />
-      <Route path="/transactions" element={<TransactionsList />} />
-      <Route path="/transactions/:hash" element={<TransactionDetail />} />
-      <Route path="/validators" element={<ValidatorsList />} />
-      <Route path="/validators/:address" element={<ValidatorDetail />} />
-    </Routes>
-  );
-}
+const routes: RouteObject[] = [
+  { path: '/', element: <Home /> },
+  { path: '/blocks', element: <BlocksList /> },
+  { path: '/blocks/:hash', element: <BlockDetail /> },
+  { path: '/transactions', element: <TransactionsList /> },
+  { path: '/transactions/:hash', element: <TransactionDetail /> },
+  { path: '/address/:address', element: <AddressPage /> },
+  { path: '/validators', element: <ValidatorsList /> },
+];
+
+const router = createBrowserRouter(routes);
 
 export default function App() {
-  return (
-    <ApolloProvider client={client}>
-      <Layout>
-        <AppRoutes />
-      </Layout>
-    </ApolloProvider>
-  );
+  return <RouterProvider router={router} />;
 }
