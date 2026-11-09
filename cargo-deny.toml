@@ -1,0 +1,17 @@
+# cargo-deny configuration for Atoll Project
+# Licenses that are allowed but not in the default set
+
+[[licenses]]
+# Allow Unicode-3.0 (used by icu/zerovec via tauri/reqwest)
+name = "Unicode-3.0"
+# Allow BSD-3-Clause (used by zstd/zstd-safe/zstd-sys via wasmtime)
+name = "BSD-3-Clause"
+
+[[advisories]]
+# Allowlist unmaintained advisories that have no safe upgrade available
+# fxhash - no maintained replacement without significant refactoring
+crate = "fxhash"
+# proc-macro-error - used by glib-macros via tauri, no safe upgrade
+crate = "proc-macro-error"
+# unsafe-libyaml - used by serde_yaml via atoll-core, no safe upgrade
+crate = "unsafe-libyaml"

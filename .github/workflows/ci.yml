@@ -254,7 +254,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+
+      - name: Cache frontend dependencies
+        uses: actions/cache@v4
+        with:
+          path: explorer/frontend/node_modules
+          key: ${{ runner.os }}-frontend-npm-${{ hashFiles('explorer/frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-frontend-npm-
 
       - name: Install frontend dependencies
         run: npm ci
