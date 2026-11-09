@@ -278,6 +278,12 @@ impl ChainState {
     pub fn last_proof_decay_block(&self) -> u64 {
         self.last_proof_decay_block
     }
+
+    /// Returns the number of accounts with non-zero PROOF balance
+    /// (used for quorum calculation in governance).
+    pub fn proof_holder_count(&self) -> u64 {
+        self.accounts.values().filter(|a| a.proof_balance > 0).count() as u64
+    }
 }
 
 impl Default for ChainState {
