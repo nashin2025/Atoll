@@ -229,9 +229,6 @@ jobs:
       - name: Run benchmarks
         run: cargo bench -p atoll-core -p wallet-cli
 
-      - name: Benchmark comparison
-        uses: pioneersies/benchmark-action@v1
-
   # ============================================================================
   # FRONTEND TESTS
   # ============================================================================
