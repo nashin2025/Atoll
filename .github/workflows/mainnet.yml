@@ -223,6 +223,7 @@ jobs:
     environment: release
     permissions:
       contents: read
+    continue-on-error: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -321,6 +322,7 @@ jobs:
     environment: release
     permissions:
       contents: read
+    continue-on-error: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
