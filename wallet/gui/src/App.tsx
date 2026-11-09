@@ -11,8 +11,9 @@ import {
   NodeStartResponse,
   NodeStatusResponse,
 } from '@/tauri';
+import { Staking } from '@/views/Staking';
 
-type View = 'welcome' | 'dashboard' | 'send' | 'history' | 'derive-address';
+type View = 'welcome' | 'dashboard' | 'send' | 'history' | 'derive-address' | 'staking';
 
 interface AppState {
   view: View;
@@ -168,6 +169,14 @@ export default function App() {
 
       {state.view === 'derive-address' && (
         <DeriveAddress onBack={() => setState((prev) => ({ ...prev, view: 'dashboard' }))} />
+      )}
+
+      {state.view === 'staking' && selectedAddress && (
+        <Staking
+          address={selectedAddress}
+          passphrase={passphrase}
+          onBack={() => setState((prev) => ({ ...prev, view: 'dashboard' }))}
+        />
       )}
     </div>
   );
