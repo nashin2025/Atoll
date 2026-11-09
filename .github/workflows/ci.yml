@@ -151,6 +151,7 @@ jobs:
         with:
           base: ${{ github.event.before }}
           head: ${{ github.event.head }}
+          args: --only-verified
 
   # ============================================================================
   # DEPENDENCY SCANNING
