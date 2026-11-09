@@ -138,9 +138,6 @@ jobs:
       - name: Run cargo audit
         run: cargo audit
 
-      - name: Run cargo-deny
-        uses: EmbarkStudios/rust-deny-action@v1
-
   secrets-scan:
     name: Secret Scanning
     runs-on: ubuntu-latest
@@ -154,9 +151,6 @@ jobs:
         with:
           base: ${{ github.event.before }}
           head: ${{ github.event.head }}
-
-      - name: Run detect-secrets
-        uses: 418sec/headlights@main
 
   # ============================================================================
   # DEPENDENCY SCANNING

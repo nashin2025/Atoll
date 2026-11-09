@@ -1,6 +1,40 @@
 # cargo-deny configuration for Atoll Project
-# Advisory allowlist for unmaintained crates with no safe upgrade available
 
+# Allow common open source licenses
+[[license]]
+name = "MIT"
+
+[[license]]
+name = "Apache-2.0"
+
+[[license]]
+name = "BSD-2-Clause"
+
+[[license]]
+name = "BSD-3-Clause"
+
+[[license]]
+name = "0BSD"
+
+[[license]]
+name = "ISC"
+
+[[license]]
+name = "Zlib"
+
+[[license]]
+name = "Unicode-3.0"
+
+[[license]]
+name = "MPL-2.0"
+
+[[license]]
+name = "CC0-1.0"
+
+[[license]]
+name = "Unlicense"
+
+# Advisory allowlist for unmaintained crates with no safe upgrade available
 [[advisories]]
 crate = "fxhash"
 
