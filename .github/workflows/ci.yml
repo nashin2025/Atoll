@@ -281,27 +281,27 @@ jobs:
       - name: Check results
         run: |
           echo "=== Quality Gate Results ==="
-          echo "Format: ${{ jobs.fmt.result }}"
-          echo "Lint: ${{ jobs.lint.result }}"
-          echo "Unit Tests: ${{ jobs.unit-test.result }}"
-          echo "Integration Tests: ${{ jobs.integration-test.result }}"
-          echo "Security Scan: ${{ jobs.security-scan.result }}"
-          echo "Secrets Scan: ${{ jobs.secrets-scan.result }}"
-          echo "Dependency Scan: ${{ jobs.dependency-scan.result }}"
-          echo "Build: ${{ jobs.build.result }}"
-          echo "Benchmarks: ${{ jobs.benchmarks.result }}"
-          echo "Frontend Tests: ${{ jobs.frontend-test.result }}"
+          echo "Format: ${{ needs.fmt.result }}"
+          echo "Lint: ${{ needs.lint.result }}"
+          echo "Unit Tests: ${{ needs.unit-test.result }}"
+          echo "Integration Tests: ${{ needs.integration-test.result }}"
+          echo "Security Scan: ${{ needs.security-scan.result }}"
+          echo "Secrets Scan: ${{ needs.secrets-scan.result }}"
+          echo "Dependency Scan: ${{ needs.dependency-scan.result }}"
+          echo "Build: ${{ needs.build.result }}"
+          echo "Benchmarks: ${{ needs.benchmarks.result }}"
+          echo "Frontend Tests: ${{ needs.frontend-test.result }}"
 
           # Fail if any job failed
-          if [ "${{ jobs.fmt.result }}" != "success" ] || \
-             [ "${{ jobs.lint.result }}" != "success" ] || \
-             [ "${{ jobs.unit-test.result }}" != "success" ] || \
-             [ "${{ jobs.integration-test.result }}" != "success" ] || \
-             [ "${{ jobs.security-scan.result }}" != "success" ] || \
-             [ "${{ jobs.secrets-scan.result }}" != "success" ] || \
-             [ "${{ jobs.dependency-scan.result }}" != "success" ] || \
-             [ "${{ jobs.build.result }}" != "success" ] || \
-             [ "${{ jobs.frontend-test.result }}" != "success" ]; then
+          if [ "${{ needs.fmt.result }}" != "success" ] || \
+             [ "${{ needs.lint.result }}" != "success" ] || \
+             [ "${{ needs.unit-test.result }}" != "success" ] || \
+             [ "${{ needs.integration-test.result }}" != "success" ] || \
+             [ "${{ needs.security-scan.result }}" != "success" ] || \
+             [ "${{ needs.secrets-scan.result }}" != "success" ] || \
+             [ "${{ needs.dependency-scan.result }}" != "success" ] || \
+             [ "${{ needs.build.result }}" != "success" ] || \
+             [ "${{ needs.frontend-test.result }}" != "success" ]; then
             echo "::error::Quality gate failed"
             exit 1
           fi
