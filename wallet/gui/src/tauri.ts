@@ -164,6 +164,51 @@ export async function nodeSendTx(req: NodeSendTxRequest): Promise<NodeSendTxResp
 }
 
 // ---------------------------------------------------------------------------
+// Staking invoke wrappers
+// ---------------------------------------------------------------------------
+
+export interface StakeRequest {
+  from: string;
+  amount: string;
+  passphrase: string;
+}
+export interface StakeResponse {
+  signed_tx: string;
+}
+
+export interface UnstakeRequest {
+  from: string;
+  amount: string;
+  passphrase: string;
+}
+export interface UnstakeResponse {
+  signed_tx: string;
+}
+
+export interface StakeInfoRequest {
+  address: string;
+}
+export interface StakeInfoResponse {
+  address: string;
+  staked_amount: number;
+  rewards: number;
+}
+
+export async function walletStake(req: StakeRequest): Promise<StakeResponse> {
+  return invoke('wallet_stake', { request: req });
+}
+
+export async function walletUnstake(req: UnstakeRequest): Promise<UnstakeResponse> {
+  return invoke('wallet_unstake', { request: req });
+}
+
+export async function walletStakeInfo(
+  req: StakeInfoRequest,
+): Promise<StakeInfoResponse> {
+  return invoke('wallet_stake_info', { request: req });
+}
+
+// ---------------------------------------------------------------------------
 // Error formatting for command failures
 // ---------------------------------------------------------------------------
 
