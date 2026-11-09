@@ -1,6 +1,7 @@
 # cargo-deny configuration for Atoll Project
 
 [licenses]
+extend = true
 allow = ["Unicode-3.0"]
 
 # Advisory allowlist for unmaintained crates with no safe upgrade available
