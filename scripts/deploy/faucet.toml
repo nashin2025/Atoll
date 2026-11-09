@@ -1,0 +1,37 @@
+# Atoll Protocol Testnet Faucet Configuration
+# Distributes test ATOLL to testnet participants
+
+[faucet]
+# Faucet address (must have test ATOLL in genesis)
+faucet_address = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+# Faucet private key (hex, 32 bytes) - FOR TESTNET ONLY, NEVER USE ON MAINNET
+# In production, this should be managed by a multi-sig wallet
+faucet_private_key = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+# Amount to dispense per request (in smallest ATOLL unit)
+dispense_amount = 1000000000000000000
+
+# Cooldown period between requests (in seconds)
+cooldown_seconds = 3600
+
+# Maximum balance per address
+max_balance = 10000000000000000000
+
+# RPC endpoint for submitting faucet transactions
+rpc_url = "http://localhost:8081"
+
+# Faucet API listen address
+listen_address = "0.0.0.0:8083"
+
+# Enable CORS for browser-based faucet clients
+enable_cors = true
+
+# Allowed CORS origins
+cors_origins = [
+  "http://localhost:3000",
+  "https://testnet.atoll.network"
+]
+
+# Rate limiting
+rate_limit_requests_per_minute = 60
