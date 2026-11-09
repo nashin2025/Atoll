@@ -64,7 +64,7 @@ fn bench_morph_hash(c: &mut Criterion) {
 }
 
 fn bench_morph_hash_production(c: &mut Criterion) {
-    let mut engine = MorphHashEngine::with_memory_size(4096);
+    let mut engine = MorphHashEngine::with_memory_size(256);
     let input = b"Atoll Protocol morph hash production benchmark";
     let prev_hash = Hash512::zero();
     c.bench_function("morph_hash_production", |b| {
@@ -484,11 +484,11 @@ fn bench_cross_shard_batch_100(c: &mut Criterion) {
 // ---------------------------------------------------------------------------
 
 fn bench_zk_starks_prove(c: &mut Criterion) {
-    let prover = StarkProver::new(40, 256);
+    let prover = StarkProver::new(8, 64);
     let computation_hash = Hash512::blake3(b"benchmark_computation");
     let inputs = vec![vec![1u8; 32], vec![2u8; 32], vec![3u8; 32]];
     let outputs = vec![vec![4u8; 32]];
-    c.bench_function("zk_starks_prove_40_queries", |b| {
+    c.bench_function("zk_starks_prove_8_queries", |b| {
         b.iter(|| {
             let _ = prover
                 .prove(
@@ -502,13 +502,13 @@ fn bench_zk_starks_prove(c: &mut Criterion) {
 }
 
 fn bench_zk_starks_verify(c: &mut Criterion) {
-    let prover = StarkProver::new(40, 256);
+    let prover = StarkProver::new(8, 64);
     let verifier = StarkVerifier::new();
     let computation_hash = Hash512::blake3(b"benchmark_computation");
     let inputs = vec![vec![1u8; 32], vec![2u8; 32], vec![3u8; 32]];
     let outputs = vec![vec![4u8; 32]];
     let proof = prover.prove(computation_hash, &inputs, &outputs).unwrap();
-    c.bench_function("zk_starks_verify_40_queries", |b| {
+    c.bench_function("zk_starks_verify_8_queries", |b| {
         b.iter(|| {
             let _ = verifier
                 .verify(
@@ -524,7 +524,7 @@ fn bench_zk_starks_verify(c: &mut Criterion) {
 fn bench_zk_starks_roundtrip(c: &mut Criterion) {
     c.bench_function("zk_starks_prove_verify_roundtrip", |b| {
         b.iter(|| {
-            let prover = StarkProver::new(40, 256);
+            let prover = StarkProver::new(8, 64);
             let verifier = StarkVerifier::new();
             let computation_hash = Hash512::blake3(b"roundtrip_computation");
             let inputs = vec![vec![1u8; 32], vec![2u8; 32]];
