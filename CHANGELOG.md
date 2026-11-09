@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.5] — 2026-11-09
+
 ### Added
 
 - Embedded Atoll node in GUI wallet — running the GUI wallet makes it a node, no separate process required
@@ -16,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Block Explorer frontend (React + TypeScript + Tailwind + Apollo Client)
 - Live node RPC integration for GUI wallet
 - Derive Address view in GUI wallet
+- Staking UI: stake/unstake ATOLL, view balance and rewards in GUI wallet
+- Multi-sig treasury module with threshold signatures and propose-execute flow
+- Legal entity documentation: jurisdiction, entity type, regulatory compliance, tax, IP
+- Disaster recovery plan with rollback procedures, backups, and runbooks
+- Production monitoring: Prometheus, Grafana, alerting rules, dashboards
+- E2E tests (Playwright + Vitest) for GUI wallet
+- Performance benchmarks (TPS, latency, load testing)
+- Block Explorer deployment infrastructure (Docker Compose, nginx)
+- Testnet infrastructure (genesis, network config, Docker Compose, faucet, docs)
+- Atoll Protocol litepaper v1.0 (whitepaper)
 
 ### Changed
 
