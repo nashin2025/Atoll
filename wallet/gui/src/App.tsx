@@ -8,8 +8,14 @@ import {
   nodeStart,
   nodeStop,
   nodeStatus,
+  nodeMine,
+  nodeAutoMine,
+  nodeAddPeer,
   NodeStartResponse,
   NodeStatusResponse,
+  NodeMineResponse,
+  NodeAutoMineResponse,
+  NodeAddPeerResponse,
 } from '@/tauri';
 import { Staking } from '@/views/Staking';
 
@@ -27,6 +33,8 @@ interface AppState {
     finalizedHeight: number;
     blockCount: number;
     peerCount: number;
+    mempoolSize: number;
+    autoMine: boolean;
     syncing: boolean;
     version: string;
   } | null;
@@ -77,6 +85,8 @@ export default function App() {
           finalizedHeight: 0,
           blockCount: 1,
           peerCount: 0,
+          mempoolSize: 0,
+          autoMine: true,
           syncing: false,
           version: result.version,
         },
@@ -111,6 +121,8 @@ export default function App() {
           finalizedHeight: result.finalized_height,
           blockCount: result.block_count,
           peerCount: result.peer_count,
+          mempoolSize: result.mempool_size,
+          autoMine: result.auto_mine,
           syncing: result.syncing,
           version: result.version,
         },
@@ -124,6 +136,57 @@ export default function App() {
   const clearPassphrase = useCallback(() => {
     setState((prev) => ({ ...prev, passphrase: '' }));
   }, []);
+
+  const handleMine = useCallback(async () => {
+    try {
+      const result: NodeMineResponse = await nodeMine({});
+      setState((prev) => ({
+        ...prev,
+        nodeInfo: prev.nodeInfo
+          ? {
+              ...prev.nodeInfo,
+              tipHeight: result.height,
+              blockCount: result.height + 1,
+            }
+          : prev.nodeInfo,
+      }));
+      // Refresh to get updated mempool size and other state
+      await handleRefreshNodeStatus();
+    } catch (err) {
+      console.error('Mine failed:', err);
+    }
+  }, []);
+
+  const handleAutoMine = useCallback(async (enabled: boolean) => {
+    try {
+      const result: NodeAutoMineResponse = await nodeAutoMine({ enabled });
+      setState((prev) => ({
+        ...prev,
+        nodeInfo: prev.nodeInfo
+          ? { ...prev.nodeInfo, autoMine: result.enabled }
+          : prev.nodeInfo,
+      }));
+    } catch (err) {
+      console.error('Auto-mine toggle failed:', err);
+    }
+  }, []);
+
+  const handleAddPeer = useCallback(
+    async (address: string, nodeId?: string) => {
+      try {
+        const result: NodeAddPeerResponse = await nodeAddPeer({
+          address,
+          node_id: nodeId,
+        });
+        if (result.added) {
+          await handleRefreshNodeStatus();
+        }
+      } catch (err) {
+        console.error('Add peer failed:', err);
+      }
+    },
+    []
+  );
 
   const selectedAddress = state.selectedAddress;
   const passphrase = state.passphrase;
@@ -147,6 +210,9 @@ export default function App() {
           onStartNode={handleStartNode}
           onStopNode={handleStopNode}
           onRefreshNodeStatus={handleRefreshNodeStatus}
+          onMine={handleMine}
+          onAutoMine={handleAutoMine}
+          onAddPeer={handleAddPeer}
         />
       )}
 

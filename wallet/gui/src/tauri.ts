@@ -84,6 +84,8 @@ export interface NodeStatusResponse {
   finalized_height: number;
   block_count: number;
   peer_count: number;
+  mempool_size: number;
+  auto_mine: boolean;
   syncing: boolean;
   version: string;
 }
@@ -101,6 +103,37 @@ export interface NodeSendTxRequest {
 }
 export interface NodeSendTxResponse {
   accepted: boolean;
+  message: string;
+}
+
+export interface NodeMineRequest {}
+export interface NodeMineResponse {
+  mined: boolean;
+  height: number;
+  txs_included: number;
+  message: string;
+}
+
+export interface NodeAutoMineRequest {
+  enabled: boolean;
+}
+export interface NodeAutoMineResponse {
+  enabled: boolean;
+  message: string;
+}
+
+export interface NodeAutoMineStatusRequest {}
+export interface NodeAutoMineStatusResponse {
+  enabled: boolean;
+  interval_ms: number;
+}
+
+export interface NodeAddPeerRequest {
+  address: string;
+  node_id?: string;
+}
+export interface NodeAddPeerResponse {
+  added: boolean;
   message: string;
 }
 
@@ -161,6 +194,26 @@ export async function nodeGetBalance(
 
 export async function nodeSendTx(req: NodeSendTxRequest): Promise<NodeSendTxResponse> {
   return invoke('node_send_tx', { request: req });
+}
+
+export async function nodeMine(_req: NodeMineRequest): Promise<NodeMineResponse> {
+  return invoke('node_mine', { request: _req });
+}
+
+export async function nodeAutoMine(req: NodeAutoMineRequest): Promise<NodeAutoMineResponse> {
+  return invoke('node_auto_mine', { request: req });
+}
+
+export async function nodeAutoMineStatus(
+  _req: NodeAutoMineStatusRequest,
+): Promise<NodeAutoMineStatusResponse> {
+  return invoke('node_auto_mine_status', { request: _req });
+}
+
+export async function nodeAddPeer(
+  req: NodeAddPeerRequest,
+): Promise<NodeAddPeerResponse> {
+  return invoke('node_add_peer', { request: req });
 }
 
 // ---------------------------------------------------------------------------

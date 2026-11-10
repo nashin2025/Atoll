@@ -29,6 +29,8 @@ fn main() {
             commands::node_status,
             commands::node_get_balance,
             commands::node_send_tx,
+            commands::node_sync,
+            commands::node_add_peer,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

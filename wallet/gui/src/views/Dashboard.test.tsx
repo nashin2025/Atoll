@@ -26,6 +26,9 @@ const defaultProps = {
   onStartNode: vi.fn(),
   onStopNode: vi.fn(),
   onRefreshNodeStatus: vi.fn(),
+  onMine: vi.fn(),
+  onAutoMine: vi.fn(),
+  onAddPeer: vi.fn(),
 };
 
 describe('Dashboard', () => {
@@ -70,6 +73,8 @@ describe('Dashboard', () => {
       finalizedHeight: 40,
       blockCount: 43,
       peerCount: 3,
+      mempoolSize: 0,
+      autoMine: true,
       syncing: false,
       version: '1.0.0',
     }} />);
