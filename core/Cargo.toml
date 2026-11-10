@@ -72,6 +72,10 @@ hyper = { version = "0.14", features = ["server", "http1"] }
 async-graphql = "7"
 async-graphql-axum = "7"
 
+# GraphQL server (async-graphql + axum integration) — Block Explorer backend
+async-graphql = "7"
+async-graphql-axum = "7"
+
 # Prometheus metrics exposition for the `GET /metrics` endpoint
 prometheus = "0.14"
 

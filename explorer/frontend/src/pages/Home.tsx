@@ -1,66 +1,77 @@
 import { useQuery } from '@apollo/client';
-import { useNavigate } from 'react-router-dom';
-import { NETWORK_STATS_QUERY } from '@/graphql/queries';
-import { SearchBar } from '@/components/SearchBar';
-import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell } from '@/components/Table';
-import { Loading } from '@/components/Loading';
-import { ErrorDisplay } from '@/components/ErrorDisplay';
+import { gql } from '@apollo/client';
+import { NetworkStats } from '../types';
+import { StatsCard } from '../components/StatsCard';
+import { SearchBar } from '../components/SearchBar';
+
+const NETWORK_STATS = gql`
+  query NetworkStats {
+    networkStats {
+      blockHeight
+      finalizedHeight
+      blockCount
+      totalSupply
+      mindSupply
+      peerCount
+      syncing
+    }
+  }
+`;
 
 export function Home() {
-  const { loading, error, data } = useQuery(NETWORK_STATS_QUERY);
-  const navigate = useNavigate();
+  const { data, loading, error } = useQuery<{ networkStats: NetworkStats }>(
+    NETWORK_STATS,
+  );
 
-  if (loading) return <Loading />;
-  if (error) return <ErrorDisplay message={error.message} />;
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex justify-center py-20">
+          <div className="h-4 w-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="card p-8 text-center">
+          <p className="text-red-400">Failed to load network stats</p>
+        </div>
+      </div>
+    );
+  }
 
   const stats = data?.networkStats;
+
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Atoll Explorer</h1>
-        <p className="text-slate-400 mt-1">Blockchain explorer for the Atoll Protocol</p>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-slate-100 mb-2">Network Overview</h1>
+        <p className="text-slate-400">Real-time statistics from the Atoll Protocol network</p>
       </div>
 
-      <SearchBar
-        onSearch={(query) => {
-          if (query.startsWith('0x') && query.length === 66) {
-            navigate(`/blocks/${query}`);
-          } else if (query.startsWith('0x')) {
-            navigate(`/address/${query}`);
-          } else {
-            navigate(`/blocks/${query}`);
-          }
-        }}
-      />
+      <SearchBar />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="card">
-          <div className="text-slate-400 text-xs font-semibold uppercase mb-2">Block Height</div>
-          <div className="text-2xl font-mono text-white">{stats?.blockHeight || '–'}</div>
-        </div>
-        <div className="card">
-          <div className="text-slate-400 text-xs font-semibold uppercase mb-2">Finalized Height</div>
-          <div className="text-2xl font-mono text-white">{stats?.finalizedHeight || '–'}</div>
-        </div>
-        <div className="card">
-          <div className="text-slate-400 text-xs font-semibold uppercase mb-2">Peer Count</div>
-          <div className="text-2xl font-mono text-white">{stats?.peerCount || '–'}</div>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
+        <StatsCard title="Block Height" value={stats?.block_height ?? '--'} />
+        <StatsCard title="Finalized Height" value={stats?.finalized_height ?? '--'} />
+        <StatsCard title="Block Count" value={stats?.block_count?.toLocaleString() ?? '--'} />
+        <StatsCard title="Peer Count" value={stats?.peer_count?.toLocaleString() ?? '--'} />
+        <StatsCard title="Total Supply (ATOLL)" value={stats?.total_supply ?? '--'} />
+        <StatsCard title="Total Supply (MIND)" value={stats?.mind_supply ?? '--'} />
       </div>
 
-      <div className="card">
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell>Recent Blocks</TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            <TableRow>
-              <TableCell className="text-slate-500">No blocks yet</TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
+      <div className="mt-8 card">
+        <div className="flex items-center justify-between p-4 border-b border-slate-800">
+          <h2 className="text-lg font-semibold">Network Status</h2>
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+            stats?.syncing ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+          }`}>
+            {stats?.syncing ? 'Syncing' : 'Synced'}
+          </span>
+        </div>
       </div>
     </div>
   );
