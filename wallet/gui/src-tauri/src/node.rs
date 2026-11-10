@@ -53,6 +53,16 @@ use std::time::{Duration, SystemTime};
 use tokio::runtime::Runtime;
 
 // ---------------------------------------------------------------------------
+// Logging: thin wrapper over log_msg! so we can swap in a real logging
+// crate (e.g. `tracing` or `log`) without touching every call site.
+// ---------------------------------------------------------------------------
+macro_rules! log_msg {
+    ($($tt:tt)*) => {
+        eprintln!($($tt)*)
+    };
+}
+
+// ---------------------------------------------------------------------------
 // Node running state
 // ---------------------------------------------------------------------------
 
@@ -110,6 +120,7 @@ pub struct NodeManager {
     pub data_dir: Option<PathBuf>,
     pub block_producer_interval_ms: u64,
     pub auto_mine: RwLock<bool>,
+    #[allow(dead_code)]
     pub block_producer_handle: RwLock<Option<std::thread::ThreadId>>,
 }
 
@@ -242,7 +253,7 @@ impl NodeManager {
             let rt = match Runtime::new() {
                 Ok(r) => r,
                 Err(e) => {
-                    eprintln!("failed to create tokio runtime: {e}");
+                    log_msg!("failed to create tokio runtime: {e}");
                     return;
                 }
             };
@@ -256,7 +267,7 @@ impl NodeManager {
                     let mut disc = match discovery.write() {
                         Ok(d) => d,
                         Err(e) => {
-                            eprintln!("discovery lock poisoned: {e}");
+                            log_msg!("discovery lock poisoned: {e}");
                             return;
                         }
                     };
@@ -270,7 +281,7 @@ impl NodeManager {
                     let mut pm = match peer_manager.write() {
                         Ok(p) => p,
                         Err(e) => {
-                            eprintln!("peer manager lock poisoned: {e}");
+                            log_msg!("peer manager lock poisoned: {e}");
                             return;
                         }
                     };
@@ -283,11 +294,11 @@ impl NodeManager {
                 let mut listener = match PeerListener::bind("0.0.0.0:30333", identity).await {
                     Ok(l) => l,
                     Err(e) => {
-                        eprintln!("failed to bind P2P listener on 0.0.0.0:30333: {e}");
+                        log_msg!("failed to bind P2P listener on 0.0.0.0:30333: {e}");
                         return;
                     }
                 };
-                eprintln!("Atoll node listening for P2P connections on 0.0.0.0:30333");
+                log_msg!("Atoll node listening for P2P connections on 0.0.0.0:30333");
 
                 // Step 3: Accept connections loop
                 loop {
@@ -295,13 +306,13 @@ impl NodeManager {
                         Ok(conn) => {
                             let peer_id = conn.node_id();
                             let addr = conn.address().to_string();
-                            eprintln!("Inbound connection from {} ({})", addr, hex::encode(&peer_id));
+                            log_msg!("Inbound connection from {} ({})", addr, hex::encode(&peer_id));
                             // Phase 1: accept and immediately close.
                             // Phase 2: maintain connection for gossip/block sync.
                             drop(conn);
                         }
                         Err(e) => {
-                            eprintln!("failed to accept connection: {e}");
+                            log_msg!("failed to accept connection: {e}");
                         }
                     }
                 }
@@ -313,7 +324,7 @@ impl NodeManager {
             let auto_mine = match self.auto_mine.read() {
                 Ok(a) => *a,
                 Err(e) => {
-                    eprintln!("auto_mine lock poisoned: {e}");
+                    log_msg!("auto_mine lock poisoned: {e}");
                     true
                 }
             };
@@ -327,7 +338,7 @@ impl NodeManager {
                     let rt = match Runtime::new() {
                         Ok(r) => r,
                         Err(e) => {
-                            eprintln!("failed to create tokio runtime: {e}");
+                            log_msg!("failed to create tokio runtime: {e}");
                             return;
                         }
                     };
@@ -341,7 +352,7 @@ impl NodeManager {
                                 let mut mp = match mempool.write() {
                                     Ok(m) => m,
                                     Err(e) => {
-                                        eprintln!("mempool lock poisoned: {e}");
+                                        log_msg!("mempool lock poisoned: {e}");
                                         break;
                                     }
                                 };
@@ -351,16 +362,16 @@ impl NodeManager {
 
                             if pending_txs.is_empty() {
                                 // Still produce empty blocks to keep chain advancing
-                                eprintln!("No transactions in mempool, producing empty block...");
+                                log_msg!("No transactions in mempool, producing empty block...");
                             } else {
-                                eprintln!("Producing block with {} transactions", pending_txs.len());
+                                log_msg!("Producing block with {} transactions", pending_txs.len());
                             }
 
                             // Build the new block
                             let bc = match blockchain.read() {
                                 Ok(b) => b,
                                 Err(e) => {
-                                    eprintln!("blockchain lock poisoned: {e}");
+                                    log_msg!("blockchain lock poisoned: {e}");
                                     break;
                                 }
                             };
@@ -375,7 +386,7 @@ impl NodeManager {
                                 timestamp: match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
                                     Ok(d) => d.as_secs(),
                                     Err(e) => {
-                                        eprintln!("system time error: {e}");
+                                        log_msg!("system time error: {e}");
                                         break;
                                     }
                                 },
@@ -397,7 +408,7 @@ impl NodeManager {
                             let cs = match consensus.read() {
                                 Ok(c) => c,
                                 Err(e) => {
-                                    eprintln!("consensus lock poisoned: {e}");
+                                    log_msg!("consensus lock poisoned: {e}");
                                     break;
                                 }
                             };
@@ -436,7 +447,7 @@ impl NodeManager {
                                         let tx_count = block.body.transactions.len();
                                         match bc.insert_block(block, &val) {
                                             Ok(hash) => {
-                                                eprintln!(
+                                                log_msg!(
                                                     "Produced block #{} hash={} txs={}",
                                                     height,
                                                     hex::encode(&hash.0[..8]),
@@ -444,15 +455,15 @@ impl NodeManager {
                                                 );
                                             }
                                             Err(e) => {
-                                                eprintln!("Failed to insert block: {e}");
+                                                log_msg!("Failed to insert block: {e}");
                                             }
                                         }
                                     } else {
-                                        eprintln!("Block validation failed: composite={:.3}", val.composite_score);
+                                        log_msg!("Block validation failed: composite={:.3}", val.composite_score);
                                     }
                                 }
                                 Err(e) => {
-                                    eprintln!("Consensus validation failed: {e:?}");
+                                    log_msg!("Consensus validation failed: {e:?}");
                                 }
                             }
                             drop(cs);
@@ -494,7 +505,7 @@ impl NodeManager {
         let auto_mine = match self.auto_mine.read() {
             Ok(a) => *a,
             Err(e) => {
-                eprintln!("auto_mine lock poisoned: {e}");
+                log_msg!("auto_mine lock poisoned: {e}");
                 false
             }
         };
@@ -531,7 +542,7 @@ impl NodeManager {
         let state = match self.chain_state.read() {
             Ok(s) => s,
             Err(e) => {
-                eprintln!("chain_state lock poisoned: {e}");
+                log_msg!("chain_state lock poisoned: {e}");
                 return 0;
             }
         };
@@ -539,11 +550,12 @@ impl NodeManager {
     }
 
     /// Returns the total ATOLL supply from the embedded ChainState.
+    #[allow(dead_code)]
     pub fn total_supply(&self) -> u128 {
         let state = match self.chain_state.read() {
             Ok(s) => s,
             Err(e) => {
-                eprintln!("chain_state lock poisoned: {e}");
+                log_msg!("chain_state lock poisoned: {e}");
                 return 0;
             }
         };
@@ -551,11 +563,12 @@ impl NodeManager {
     }
 
     /// Returns the MIND supply from the embedded ChainState.
+    #[allow(dead_code)]
     pub fn mind_supply(&self) -> u128 {
         let state = match self.chain_state.read() {
             Ok(s) => s,
             Err(e) => {
-                eprintln!("chain_state lock poisoned: {e}");
+                log_msg!("chain_state lock poisoned: {e}");
                 return 0;
             }
         };
@@ -563,11 +576,12 @@ impl NodeManager {
     }
 
     /// Returns the PROOF balance of an address.
+    #[allow(dead_code)]
     pub fn proof_balance(&self, address: &Address) -> u128 {
         let state = match self.chain_state.read() {
             Ok(s) => s,
             Err(e) => {
-                eprintln!("chain_state lock poisoned: {e}");
+                log_msg!("chain_state lock poisoned: {e}");
                 return 0;
             }
         };
@@ -585,7 +599,7 @@ impl NodeManager {
             received_at: match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
                 Ok(d) => d.as_secs(),
                 Err(e) => {
-                    eprintln!("system time error: {e}");
+                    log_msg!("system time error: {e}");
                     0
                 }
             },
@@ -594,11 +608,12 @@ impl NodeManager {
     }
 
     /// Returns the number of transactions in the mempool.
+    #[allow(dead_code)]
     pub fn mempool_size(&self) -> usize {
         match self.mempool.read() {
             Ok(mp) => mp.len(),
             Err(e) => {
-                eprintln!("mempool lock poisoned: {e}");
+                log_msg!("mempool lock poisoned: {e}");
                 0
             }
         }
@@ -693,11 +708,12 @@ impl NodeManager {
     }
 
     /// Toggles auto-mining on/off.
+    #[allow(dead_code)]
     pub fn toggle_auto_mine(&self) -> bool {
         let mut am = match self.auto_mine.write() {
             Ok(a) => a,
             Err(e) => {
-                eprintln!("auto_mine lock poisoned: {e}");
+                log_msg!("auto_mine lock poisoned: {e}");
                 return false;
             }
         };
@@ -709,7 +725,7 @@ impl NodeManager {
     pub fn set_auto_mine(&self, enabled: bool) {
         match self.auto_mine.write() {
             Ok(mut a) => *a = enabled,
-            Err(e) => eprintln!("auto_mine lock poisoned: {e}"),
+            Err(e) => log_msg!("auto_mine lock poisoned: {e}"),
         }
     }
 
@@ -718,7 +734,7 @@ impl NodeManager {
         match self.auto_mine.read() {
             Ok(a) => *a,
             Err(e) => {
-                eprintln!("auto_mine lock poisoned: {e}");
+                log_msg!("auto_mine lock poisoned: {e}");
                 false
             }
         }
