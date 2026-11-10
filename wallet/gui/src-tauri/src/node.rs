@@ -785,7 +785,7 @@ impl NodeManager {
                 height,
                 proposer_addr,
                 None, // pouw_miner not tracked in manual mine
-                &[],   // no post_farmers in manual mine
+                &[],  // no post_farmers in manual mine
             )
             .map_err(|e| format!("block reward distribution failed: {e}"))?;
         }
