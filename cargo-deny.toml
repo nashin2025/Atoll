@@ -7,6 +7,9 @@ name = "Unicode-3.0"
 # Allow BSD-3-Clause (used by zstd/zstd-safe/zstd-sys via wasmtime)
 name = "BSD-3-Clause"
 
+[licenses.deny]
+with = { notice = true }
+
 # Advisory allowlist for unmaintained crates with no safe upgrade available
 [[advisories]]
 # fxhash - no maintained replacement without significant refactoring
