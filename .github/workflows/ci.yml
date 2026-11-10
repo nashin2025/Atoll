@@ -282,6 +282,10 @@ jobs:
         run: npm ci
         working-directory: explorer/frontend
 
+      - name: Run frontend lint
+        run: npm run lint
+        working-directory: explorer/frontend
+
       - name: Build frontend
         run: npm run build
         working-directory: explorer/frontend
