@@ -4,6 +4,7 @@ import { Dashboard } from '@/views/Dashboard';
 import { Send } from '@/views/Send';
 import { History } from '@/views/History';
 import { DeriveAddress } from '@/views/DeriveAddress';
+import { Staking } from '@/views/Staking';
 import {
   nodeStart,
   nodeStop,
@@ -17,7 +18,7 @@ import {
   NodeAutoMineResponse,
   NodeAddPeerResponse,
 } from '@/tauri';
-import { Staking } from '@/views/Staking';
+import { NavLink, AddressDisplay } from '@/components/ui';
 
 type View = 'welcome' | 'dashboard' | 'send' | 'history' | 'derive-address' | 'staking';
 
@@ -39,6 +40,14 @@ interface AppState {
     version: string;
   } | null;
 }
+
+const VIEWS: { id: View; label: string; icon: string }[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: '🏠' },
+  { id: 'send', label: 'Send', icon: '📤' },
+  { id: 'history', label: 'History', icon: '📜' },
+  { id: 'derive-address', label: 'Derive Address', icon: '🔗' },
+  { id: 'staking', label: 'Staking', icon: '📊' },
+];
 
 export default function App() {
   const [state, setState] = useState<AppState>({
@@ -132,7 +141,6 @@ export default function App() {
     }
   }, []);
 
-  /** Clears the passphrase from React state once an operation is finished. */
   const clearPassphrase = useCallback(() => {
     setState((prev) => ({ ...prev, passphrase: '' }));
   }, []);
@@ -150,7 +158,6 @@ export default function App() {
             }
           : prev.nodeInfo,
       }));
-      // Refresh to get updated mempool size and other state
       await handleRefreshNodeStatus();
     } catch (err) {
       console.error('Mine failed:', err);
@@ -190,60 +197,128 @@ export default function App() {
 
   const selectedAddress = state.selectedAddress;
   const passphrase = state.passphrase;
+  const activeView = state.view;
+
+  // Welcome view — full screen, no sidebar
+  if (state.view === 'welcome') {
+    return (
+      <div className="min-h-screen bg-slate-900">
+        <Welcome onUnlocked={handleUnlocked} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950">
-      {state.view === 'welcome' && (
-        <Welcome onUnlocked={handleUnlocked} />
-      )}
+      {/* Sidebar */}
+      <aside className="fixed left-0 top-0 h-full w-16 bg-slate-900/80 border-r border-slate-800/50 backdrop-blur-sm z-50 flex flex-col">
+        <div className="flex items-center justify-center h-16 px-2">
+          <span className="text-xl">🪙</span>
+        </div>
+        <nav className="flex-1 px-2 py-4 space-y-1">
+          {VIEWS.map((v) => (
+            <NavLink
+              key={v.id}
+              active={activeView === v.id}
+              onClick={() =>
+                setState((prev) => ({ ...prev, view: v.id }))
+              }
+              icon={<span className="text-xs">{v.icon}</span>}
+            >
+              {v.label}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="px-2 py-4">
+          <NavLink
+            active={false}
+            onClick={handleLock}
+            icon={<span className="text-xs">🔒</span>}
+          >
+            Lock
+          </NavLink>
+        </div>
+      </aside>
 
-      {state.view === 'dashboard' && selectedAddress && (
-        <Dashboard
-          address={selectedAddress}
-          passphrase={passphrase}
-          onLock={handleLock}
-          onSend={() => setState((prev) => ({ ...prev, view: 'send' }))}
-          onHistory={() => setState((prev) => ({ ...prev, view: 'history' }))}
-          onDeriveAddress={() => setState((prev) => ({ ...prev, view: 'derive-address' }))}
-          nodeConnected={state.nodeConnected}
-          nodeInfo={state.nodeInfo}
-          onStartNode={handleStartNode}
-          onStopNode={handleStopNode}
-          onRefreshNodeStatus={handleRefreshNodeStatus}
-          onMine={handleMine}
-          onAutoMine={handleAutoMine}
-          onAddPeer={handleAddPeer}
-        />
-      )}
+      {/* Main content */}
+      <div className="ml-16 p-6">
+        <header className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-xl font-bold text-white tracking-tight">
+              {VIEWS.find((v) => v.id === activeView)?.label}
+            </h1>
+            {selectedAddress && (
+              <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span>Wallet unlocked</span>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <AddressDisplay
+              address={selectedAddress}
+              shorten={true}
+              onCopy={() => navigator.clipboard.writeText(selectedAddress ?? '')}
+            />
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${
+                state.nodeConnected ? 'bg-emerald-400' : 'bg-slate-500'
+              }`} />
+              <span className="text-xs text-slate-400">
+                {state.nodeConnected ? 'Node online' : 'Node offline'}
+              </span>
+            </div>
+          </div>
+        </header>
 
-      {state.view === 'send' && selectedAddress && (
-        <Send
-          from={selectedAddress}
-          passphrase={passphrase}
-          onBack={handleLock}
-          onSendComplete={clearPassphrase}
-          nodeConnected={state.nodeConnected}
-        />
-      )}
+        {state.view === 'dashboard' && selectedAddress && (
+          <Dashboard
+            address={selectedAddress}
+            passphrase={passphrase}
+            onLock={handleLock}
+            onSend={() => setState((prev) => ({ ...prev, view: 'send' }))}
+            onHistory={() => setState((prev) => ({ ...prev, view: 'history' }))}
+            onDeriveAddress={() => setState((prev) => ({ ...prev, view: 'derive-address' }))}
+            nodeConnected={state.nodeConnected}
+            nodeInfo={state.nodeInfo}
+            onStartNode={handleStartNode}
+            onStopNode={handleStopNode}
+            onRefreshNodeStatus={handleRefreshNodeStatus}
+            onMine={handleMine}
+            onAutoMine={handleAutoMine}
+            onAddPeer={handleAddPeer}
+          />
+        )}
 
-      {state.view === 'history' && (
-        <History
-          onBack={() => setState((prev) => ({ ...prev, view: 'dashboard' }))}
-          nodeConnected={state.nodeConnected}
-        />
-      )}
+        {state.view === 'send' && selectedAddress && (
+          <Send
+            from={selectedAddress}
+            passphrase={passphrase}
+            onBack={handleLock}
+            onSendComplete={clearPassphrase}
+            nodeConnected={state.nodeConnected}
+          />
+        )}
 
-      {state.view === 'derive-address' && (
-        <DeriveAddress onBack={() => setState((prev) => ({ ...prev, view: 'dashboard' }))} />
-      )}
+        {state.view === 'history' && (
+          <History
+            onBack={() => setState((prev) => ({ ...prev, view: 'dashboard' }))}
+            nodeConnected={state.nodeConnected}
+          />
+        )}
 
-      {state.view === 'staking' && selectedAddress && (
-        <Staking
-          address={selectedAddress}
-          passphrase={passphrase}
-          onBack={() => setState((prev) => ({ ...prev, view: 'dashboard' }))}
-        />
-      )}
+        {state.view === 'derive-address' && (
+          <DeriveAddress onBack={() => setState((prev) => ({ ...prev, view: 'dashboard' }))} />
+        )}
+
+        {state.view === 'staking' && selectedAddress && (
+          <Staking
+            address={selectedAddress}
+            passphrase={passphrase}
+            onBack={() => setState((prev) => ({ ...prev, view: 'dashboard' }))}
+          />
+        )}
+      </div>
     </div>
   );
 }

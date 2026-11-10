@@ -5,6 +5,10 @@ import {
   Input,
   AddressDisplay,
   Loading,
+  Card,
+  CardHeader,
+  Badge,
+  SuccessDisplay,
 } from '@/components/ui';
 import { walletStake, walletUnstake, walletStakeInfo } from '@/tauri';
 
@@ -17,7 +21,7 @@ interface StakingProps {
 export function Staking({ address, passphrase, onBack }: StakingProps) {
   const [stakeAmount, setStakeAmount] = useState('');
   const [unstakeAmount, setUnstakeAmount] = useState('');
-  [stakedAmount, setStakedAmount] = useState<string | null>(null);
+  const [stakedAmount, setStakedAmount] = useState<string | null>(null);
   const [rewards, setRewards] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,66 +94,52 @@ export function Staking({ address, passphrase, onBack }: StakingProps) {
           <Button variant="secondary" onClick={onBack} className="flex items-center gap-2 text-sm h-9 px-3">
             ← Back
           </Button>
-          <h1 className="text-2xl font-bold text-white">Staking</h1>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Staking</h1>
         </header>
 
         {error && <ErrorDisplay message={error} />}
-        {success && (
-          <div className="mb-6 p-4 rounded-xl border border-emerald-500/50 bg-emerald-500/10 text-emerald-200">
-            {success}
-          </div>
-        )}
+        {success && <SuccessDisplay message={success} />}
 
-        {/* Staking Info */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="card">
-            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              Staked ATOLL
-            </h2>
+          <Card>
+            <CardHeader title="Staked ATOLL" />
             <div className="flex items-baseline gap-2">
               {loading ? (
                 <Loading className="h-6 w-6" />
               ) : (
-                <span className="text-2xl font-bold text-white">
+                <span className="text-2xl font-bold text-white font-mono">
                   {stakedAmount === null ? '–' : stakedAmount}
                 </span>
               )}
               <span className="text-slate-500 text-sm">ATOLL</span>
             </div>
-          </div>
+          </Card>
 
-          <div className="card">
-            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              Pending Rewards
-            </h2>
+          <Card>
+            <CardHeader title="Pending rewards" />
             <div className="flex items-baseline gap-2">
               {loading ? (
                 <Loading className="h-6 w-6" />
               ) : (
-                <span className="text-2xl font-bold text-emerald-400">
+                <span className="text-2xl font-bold text-emerald-400 font-mono">
                   {rewards === null ? '–' : rewards}
                 </span>
               )}
               <span className="text-slate-500 text-sm">ATOLL</span>
             </div>
-          </div>
+          </Card>
 
-          <div className="card">
-            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              Estimated APR
-            </h2>
+          <Card>
+            <CardHeader title="Estimated APR" />
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-white">~8.5%</span>
+              <span className="text-2xl font-bold text-white font-mono">~8.5%</span>
               <span className="text-slate-500 text-sm">APY</span>
             </div>
-          </div>
+          </Card>
         </div>
 
-        {/* Stake Form */}
-        <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-6 mb-6">
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-            Stake ATOLL
-          </h2>
+        <Card>
+          <CardHeader title="Stake ATOLL" />
           <form onSubmit={handleStake} className="space-y-4">
             <Input
               label="Amount (ATOLL)"
@@ -159,20 +149,16 @@ export function Staking({ address, passphrase, onBack }: StakingProps) {
               onChange={(e) => setStakeAmount(e.target.value)}
             />
             <Button type="submit" variant="primary" disabled={loading || !stakeAmount}>
-              {loading ? 'Staking...' : 'Stake ATOLL'}
+              {loading ? 'Staking…' : 'Stake ATOLL'}
             </Button>
             <p className="text-xs text-slate-500 mt-2">
-              Staked ATOLL earns rewards and contributes to network security.
-              Funds are locked during the staking period.
+              Staked ATOLL earns rewards and contributes to network security. Funds are locked during the staking period.
             </p>
           </form>
-        </div>
+        </Card>
 
-        {/* Unstake Form */}
-        <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-6">
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-            Unstake ATOLL
-          </h2>
+        <Card className="mt-6">
+          <CardHeader title="Unstake ATOLL" />
           <form onSubmit={handleUnstake} className="space-y-4">
             <Input
               label="Amount (ATOLL)"
@@ -182,20 +168,16 @@ export function Staking({ address, passphrase, onBack }: StakingProps) {
               onChange={(e) => setUnstakeAmount(e.target.value)}
             />
             <Button type="submit" variant="secondary" disabled={loading || !unstakeAmount}>
-              {loading ? 'Unstaking...' : 'Unstake ATOLL'}
+              {loading ? 'Unstaking…' : 'Unstake ATOLL'}
             </Button>
             <p className="text-xs text-slate-500 mt-2">
-              Unstaked ATOLL will be available after the unbonding period.
-              Rewards stop accruing once unstaking begins.
+              Unstaked ATOLL will be available after the unbonding period. Rewards stop accruing once unstaking begins.
             </p>
           </form>
-        </div>
+        </Card>
 
-        {/* Info */}
-        <div className="mt-6 bg-slate-900/50 border border-slate-700/50 rounded-xl p-6">
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
-            About Staking
-          </h2>
+        <Card className="mt-6">
+          <CardHeader title="About staking" />
           <ul className="space-y-2 text-sm text-slate-400">
             <li className="flex items-start gap-2">
               <span className="text-emerald-400">✓</span>
@@ -214,7 +196,7 @@ export function Staking({ address, passphrase, onBack }: StakingProps) {
               Unstaking has a cooldown period
             </li>
           </ul>
-        </div>
+        </Card>
       </div>
     </div>
   );

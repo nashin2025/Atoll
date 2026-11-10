@@ -1,10 +1,6 @@
 import { useState } from 'react';
-import {
-  walletSend,
-  nodeSendTx,
-  formatInvokeError,
-} from '@/tauri';
-import { Button, ErrorDisplay, Input, AddressDisplay } from '@/components/ui';
+import { walletSend, nodeSendTx, formatInvokeError } from '@/tauri';
+import { Button, ErrorDisplay, Input, AddressDisplay, Card, CardHeader, Badge } from '@/components/ui';
 
 interface SendProps {
   from: string;
@@ -44,7 +40,6 @@ export function Send({
         passphrase,
       });
       setSignedTx(response.signed_tx);
-      // The passphrase is no longer needed once the transaction is signed.
       onSendComplete?.();
     } catch (err) {
       setError(formatInvokeError(err));
@@ -77,16 +72,14 @@ export function Send({
           <Button variant="secondary" onClick={onBack} className="flex items-center gap-2 text-sm h-9 px-3">
             ← Back
           </Button>
-          <h1 className="text-2xl font-bold text-white">Send ATOLL</h1>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Send ATOLL</h1>
         </header>
 
         {error && <ErrorDisplay message={error} />}
 
         <form onSubmit={handleSend} className="space-y-6">
-          <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-6">
-            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-              Transaction
-            </h2>
+          <Card>
+            <CardHeader title="Transaction" />
             <Input
               label="From"
               value={from}
@@ -94,10 +87,12 @@ export function Send({
               readOnly
               className="bg-slate-950"
             />
-            <AddressDisplay address={from} shorten={false} />
+            <div className="flex items-center gap-3">
+              <AddressDisplay address={from} shorten={false} />
+            </div>
             <Input
               label="To address"
-              placeholder="0x… recipient address"
+              placeholder="Recipient address"
               value={to}
               onChange={(e) => setTo(e.target.value)}
             />
@@ -116,27 +111,23 @@ export function Send({
               />
             </div>
             {!nodeConnected && (
-              <p className="text-xs text-slate-500 mt-2">
-                Offline signing only — signed transaction hex is produced for
-                manual submission. Balance is validated against the offline
-                ChainState.
-              </p>
+              <Badge variant="muted" className="mt-3 inline-flex">
+                Offline signing only — signed hex produced for manual submission
+              </Badge>
             )}
             {nodeConnected && (
-              <p className="text-xs text-slate-500 mt-2">
-                Sign offline, then submit to the connected node below.
-              </p>
+              <Badge variant="success" className="mt-3 inline-flex">
+                Online — sign offline, then submit to connected node
+              </Badge>
             )}
-            <Button type="submit" variant="primary" disabled={loading || !to || !amount}>
+            <Button type="submit" variant="primary" disabled={loading || !to || !amount} className="mt-3 w-full">
               Sign transaction
             </Button>
-          </div>
+          </Card>
 
           {signedTx && (
-            <div className="bg-slate-900/50 border border-indigo-500/50 rounded-xl p-6">
-              <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
-                Signed transaction hex
-              </h2>
+            <Card>
+              <CardHeader title="Signed transaction hex" />
               <div className="relative mb-4">
                 <input
                   readOnly
@@ -173,7 +164,7 @@ export function Send({
                   Submit this hex via a node RPC or block explorer when ready.
                 </p>
               )}
-            </div>
+            </Card>
           )}
         </form>
       </div>
