@@ -211,11 +211,11 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-16 bg-slate-900/80 border-r border-slate-800/50 backdrop-blur-sm z-50 flex flex-col">
-        <div className="flex items-center justify-center h-16 px-2">
+      <aside className="fixed left-0 top-0 h-full w-20 bg-slate-900/80 border-r border-slate-800/50 backdrop-blur-sm z-50 flex flex-col">
+        <div className="flex items-center justify-center h-16 px-1">
           <span className="text-xl">🪙</span>
         </div>
-        <nav className="flex-1 px-2 py-4 space-y-1">
+        <nav className="flex-1 px-1 py-4 space-y-1">
           {VIEWS.map((v) => (
             <NavLink
               key={v.id}
@@ -224,8 +224,9 @@ export default function App() {
                 setState((prev) => ({ ...prev, view: v.id }))
               }
               icon={<span className="text-xs">{v.icon}</span>}
+              title={v.label}
             >
-              {v.label}
+              <span className="truncate">{v.label}</span>
             </NavLink>
           ))}
         </nav>

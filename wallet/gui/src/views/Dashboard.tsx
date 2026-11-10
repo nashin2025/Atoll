@@ -184,10 +184,15 @@ export function Dashboard({
 
         {/* Status overview cards */}
         {nodeConnected && nodeInfo && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <StatCard
               title="Tip height"
               value={`#${nodeInfo.tipHeight}`}
+              variant="default"
+            />
+            <StatCard
+              title="Block count"
+              value={nodeInfo.blockCount.toLocaleString()}
               variant="default"
             />
             <StatCard
@@ -247,7 +252,7 @@ export function Dashboard({
             </div>
             <div className="flex items-center justify-between pt-4 border-t border-slate-700/50">
               <div className="flex items-center gap-2">
-                <Badge variant={nodeInfo.autoMine ? 'success' : 'muted'}>
+                <Badge variant={nodeInfo.autoMine ? 'success' : 'warning'}>
                   {nodeInfo.autoMine ? 'Auto-mine on' : 'Auto-mine off'}
                 </Badge>
               </div>
