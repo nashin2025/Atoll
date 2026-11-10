@@ -17,7 +17,6 @@ hex = "0.4"
 rand = "0.8"
 zeroize = "1"
 tokio = { version = "1", features = ["rt", "net", "time", "macros"] }
-bincode = "1"
 
 [build-dependencies]
 tauri-build = { version = "2.7.4" }

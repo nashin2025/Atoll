@@ -455,9 +455,10 @@ fn do_node_send_tx(
     let tx_bytes = hex::decode(&request.signed_tx).map_err(|e| {
         GuiError::Crypto(format!("invalid transaction hex: {e}"))
     })?;
-    let tx: Transaction = bincode::deserialize(&tx_bytes).map_err(|e| {
-        GuiError::Crypto(format!("failed to deserialize transaction: {e}"))
-    })?;
+    let tx: Transaction =
+        Transaction::deserialize_bytes(&tx_bytes).map_err(|e| {
+            GuiError::Crypto(format!("failed to deserialize transaction: {e}"))
+        })?;
 
     // Basic validation: non-zero value
     if tx.value == 0 {
