@@ -36,6 +36,8 @@ interface AppState {
     peerCount: number;
     mempoolSize: number;
     autoMine: boolean;
+    lastBlockTxCount: number;
+    genesisHash: string;
     syncing: boolean;
     version: string;
   } | null;
@@ -96,6 +98,8 @@ export default function App() {
           peerCount: 0,
           mempoolSize: 0,
           autoMine: true,
+          lastBlockTxCount: 0,
+          genesisHash: '',
           syncing: false,
           version: result.version,
         },
@@ -132,6 +136,8 @@ export default function App() {
           peerCount: result.peer_count,
           mempoolSize: result.mempool_size,
           autoMine: result.auto_mine,
+          lastBlockTxCount: result.last_block_tx_count,
+          genesisHash: result.genesis_hash,
           syncing: result.syncing,
           version: result.version,
         },
@@ -213,7 +219,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-24 bg-slate-900/80 border-r border-slate-800/50 backdrop-blur-sm z-50 flex flex-col">
+      <aside className="fixed left-0 top-0 h-full w-36 bg-slate-900/80 border-r border-slate-800/50 backdrop-blur-sm z-50 flex flex-col">
         <div className="flex items-center justify-center h-16 px-1">
           <span className="text-xl">🪙</span>
         </div>
@@ -244,7 +250,7 @@ export default function App() {
       </aside>
 
       {/* Main content */}
-      <div className="ml-16 p-6">
+      <div className="ml-36 p-6">
         <header className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-xl font-bold text-white tracking-tight">

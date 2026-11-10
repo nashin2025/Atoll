@@ -173,8 +173,32 @@ pub struct NodeStatusResponse {
     pub finalized_height: u64,
     pub block_count: u64,
     pub peer_count: usize,
+    pub mempool_size: usize,
+    pub auto_mine: bool,
+    pub last_block_tx_count: usize,
+    pub genesis_hash: String,
     pub syncing: bool,
     pub version: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HistoryEntry {
+    pub height: u64,
+    pub hash: String,
+    pub from: String,
+    pub to: Option<String>,
+    pub value: u128,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NodeGetHistoryRequest {
+    pub address: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NodeGetHistoryResponse {
+    pub address: String,
+    pub transactions: Vec<HistoryEntry>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -430,6 +454,10 @@ fn do_node_status(node_mgr: &NodeManager) -> Result<NodeStatusResponse, GuiError
         finalized_height: status.finalized_height,
         block_count: status.block_count,
         peer_count: status.peer_count,
+        mempool_size: status.mempool_size,
+        auto_mine: status.auto_mine,
+        last_block_tx_count: status.last_block_tx_count,
+        genesis_hash: status.genesis_hash,
         syncing: status.syncing,
         version: status.version,
     })
@@ -445,6 +473,54 @@ fn do_node_get_balance(
     Ok(NodeGetBalanceResponse {
         address: request.address.clone(),
         balance,
+    })
+}
+
+fn do_node_get_history(
+    node_mgr: &NodeManager,
+    request: &NodeGetHistoryRequest,
+) -> Result<NodeGetHistoryResponse, GuiError> {
+    let addr = Address::from_hex(&request.address)
+        .map_err(|e| GuiError::Address(format!("invalid address '{}': {e}", request.address)))?;
+
+    let blockchain = node_mgr
+        .blockchain
+        .read()
+        .map_err(|e| GuiError::Io(format!("blockchain lock poisoned: {e}")))?;
+
+    let tip_height = blockchain.tip_height();
+    let mut entries: Vec<HistoryEntry> = Vec::new();
+    let limit: usize = 50;
+
+    for h in (0..=tip_height).rev() {
+        if entries.len() >= limit {
+            break;
+        }
+        let Some(block) = blockchain.get_block_by_height(h) else {
+            continue;
+        };
+        let block_hash = blockchain
+            .block_hash_by_height(h)
+            .unwrap_or_default()
+            .to_hex();
+        for tx in &block.body.transactions {
+            if tx.from == addr
+                || tx.to.as_ref().map(|t| *t == addr).unwrap_or(false)
+            {
+                entries.push(HistoryEntry {
+                    height: block.header.height,
+                    hash: block_hash.clone(),
+                    from: tx.from.to_hex(),
+                    to: tx.to.as_ref().map(|t| t.to_hex()),
+                    value: tx.value,
+                });
+            }
+        }
+    }
+
+    Ok(NodeGetHistoryResponse {
+        address: request.address.clone(),
+        transactions: entries,
     })
 }
 
@@ -808,6 +884,19 @@ pub fn node_get_balance(
         .read()
         .map_err(|e| GuiError::Io(format!("node manager lock poisoned: {e}")))?;
     do_node_get_balance(&*guard, &request)
+}
+
+/// Returns the transaction history for an address from the embedded node.
+#[tauri::command(name = "node-get-history")]
+pub fn node_get_history(
+    node_mgr: State<'_, RwLock<NodeManager>>,
+    request: NodeGetHistoryRequest,
+) -> Result<NodeGetHistoryResponse, GuiError> {
+    let mgr = node_mgr.inner();
+    let guard = mgr
+        .read()
+        .map_err(|e| GuiError::Io(format!("node manager lock poisoned: {e}")))?;
+    do_node_get_history(&*guard, &request)
 }
 
 /// Submits a signed transaction hex to the embedded node.

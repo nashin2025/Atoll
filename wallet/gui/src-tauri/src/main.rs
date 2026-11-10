@@ -28,6 +28,7 @@ fn main() {
             commands::node_stop,
             commands::node_status,
             commands::node_get_balance,
+            commands::node_get_history,
             commands::node_send_tx,
             commands::node_sync,
             commands::node_add_peer,

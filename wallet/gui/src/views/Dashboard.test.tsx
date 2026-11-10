@@ -76,6 +76,8 @@ describe('Dashboard', () => {
       peerCount: 3,
       mempoolSize: 0,
       autoMine: true,
+      lastBlockTxCount: 0,
+      genesisHash: '0x' + '0'.repeat(64),
       syncing: false,
       version: '1.0.0',
     }} />);

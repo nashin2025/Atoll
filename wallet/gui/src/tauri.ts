@@ -86,6 +86,8 @@ export interface NodeStatusResponse {
   peer_count: number;
   mempool_size: number;
   auto_mine: boolean;
+  last_block_tx_count: number;
+  genesis_hash: string;
   syncing: boolean;
   version: string;
 }
@@ -135,6 +137,22 @@ export interface NodeAddPeerRequest {
 export interface NodeAddPeerResponse {
   added: boolean;
   message: string;
+}
+
+export interface HistoryEntry {
+  height: number;
+  hash: string;
+  from: string;
+  to: string | null;
+  value: number;
+}
+
+export interface NodeGetHistoryRequest {
+  address: string;
+}
+export interface NodeGetHistoryResponse {
+  address: string;
+  transactions: HistoryEntry[];
 }
 
 // ---------------------------------------------------------------------------
@@ -214,6 +232,12 @@ export async function nodeAddPeer(
   req: NodeAddPeerRequest,
 ): Promise<NodeAddPeerResponse> {
   return invoke('node_add_peer', { request: req });
+}
+
+export async function nodeGetHistory(
+  req: NodeGetHistoryRequest,
+): Promise<NodeGetHistoryResponse> {
+  return invoke('node_get_history', { request: req });
 }
 
 // ---------------------------------------------------------------------------

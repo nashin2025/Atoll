@@ -79,8 +79,10 @@ pub struct NodeStatus {
     pub block_count: u64,
     pub peer_count: usize,
     pub mempool_size: usize,
-    pub syncing: bool,
     pub auto_mine: bool,
+    pub last_block_tx_count: usize,
+    pub genesis_hash: String,
+    pub syncing: bool,
     pub version: String,
 }
 
@@ -114,6 +116,7 @@ pub struct NodeManager {
     pub data_dir: Option<PathBuf>,
     pub block_producer_interval_ms: u64,
     pub auto_mine: RwLock<bool>,
+    pub genesis_hash: String,
     #[allow(dead_code)]
     pub block_producer_handle: RwLock<Option<std::thread::ThreadId>>,
 }
@@ -169,6 +172,7 @@ impl NodeManager {
     /// Creates a new NodeManager with default (genesis) state.
     pub fn new() -> Self {
         let config = load_or_create_genesis();
+        let genesis_hash = GenesisLoader::genesis_hash(&config).to_hex();
 
         let blockchain = Arc::new(RwLock::new(Blockchain::new(&config)));
         let chain_state = Arc::new(RwLock::new(ChainState::new()));
@@ -188,6 +192,7 @@ impl NodeManager {
             data_dir: None,
             block_producer_interval_ms: 10_000, // 10 second blocks
             auto_mine: RwLock::new(true),       // auto-mine by default for solo validator
+            genesis_hash,
             block_producer_handle: RwLock::new(None),
         }
     }
@@ -581,6 +586,11 @@ impl NodeManager {
             mempool_size: mempool.len(),
             syncing,
             auto_mine,
+            last_block_tx_count: blockchain
+                .get_block_by_height(blockchain.tip_height())
+                .map(|b| b.body.transactions.len())
+                .unwrap_or(0),
+            genesis_hash: self.genesis_hash.clone(),
             version: env!("CARGO_PKG_VERSION").to_string(),
         })
     }

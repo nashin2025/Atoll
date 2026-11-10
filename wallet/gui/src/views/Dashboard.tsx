@@ -32,6 +32,8 @@ interface DashboardProps {
     peerCount: number;
     mempoolSize: number;
     autoMine: boolean;
+    lastBlockTxCount: number;
+    genesisHash: string;
     syncing: boolean;
     version: string;
   } | null;
@@ -65,7 +67,6 @@ export function Dashboard({
   const [success, setSuccess] = useState<string | null>(null);
   const [mineLoading, setMineLoading] = useState(false);
   const [autoMineLoading, setAutoMineLoading] = useState(false);
-  const [txsIncluded, setTxsIncluded] = useState<number | null>(null);
   const [addPeerLoading, setAddPeerLoading] = useState(false);
   const [addPeerError, setAddPeerError] = useState<string | null>(null);
   const [peerAddress, setPeerAddress] = useState('127.0.0.1:30333');
@@ -93,8 +94,7 @@ export function Dashboard({
     setMineLoading(true);
     setError(null);
     try {
-      const txs = await onMine();
-      setTxsIncluded(txs);
+      await onMine();
       await fetchBalance();
       await onRefreshNodeStatus();
       setSuccess('Block mined successfully');
@@ -195,8 +195,8 @@ export function Dashboard({
             />
             <StatCard
               title="Block TXs"
-              value={txsIncluded === null ? '–' : txsIncluded}
-              variant={txsIncluded === null || txsIncluded === 0 ? 'warning' : 'success'}
+              value={nodeInfo.lastBlockTxCount}
+              variant={nodeInfo.lastBlockTxCount === 0 ? 'warning' : 'success'}
             />
             <StatCard
               title="Peers"
@@ -261,6 +261,18 @@ export function Dashboard({
               </div>
               <div className="text-xs text-slate-500">
                 v{nodeInfo.version}
+              </div>
+            </div>
+            <div className="flex items-center justify-between pt-3 border-t border-slate-700/50">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  Genesis hash
+                </span>
+              </div>
+              <div className="flex-1 text-right">
+                <code className="text-xs font-mono text-slate-300 truncate max-w-xs block">
+                  {nodeInfo.genesisHash.slice(0, 12)}…{nodeInfo.genesisHash.slice(-12)}
+                </code>
               </div>
             </div>
           </Card>

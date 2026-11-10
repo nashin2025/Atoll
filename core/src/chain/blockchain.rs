@@ -78,6 +78,11 @@ impl Blockchain {
             .and_then(|h| self.blocks.get(h))
     }
 
+    /// Returns the block hash for a given height
+    pub fn block_hash_by_height(&self, height: u64) -> Option<Hash512> {
+        self.blocks_by_height.get(&height).copied()
+    }
+
     /// Inserts a new block into the chain
     pub fn insert_block(
         &mut self,
