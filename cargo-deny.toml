@@ -11,14 +11,27 @@ name = "BSD-3-Clause"
 with = { notice = true }
 
 # Advisory allowlist for unmaintained crates with no safe upgrade available
+#
+# These are TIME-BOUND exceptions. Each crate below has a known security
+# advisory or is unmaintained. They are allowlisted only while a migration
+# path is evaluated. Review every 30 days and remove once remediated.
+#
+# Remediation plan:
+#   fxhash      → Replace with ahash or fxhash's maintained fork (affects tauri internal hashing)
+#   proc-macro-error → Replace glib-macros dependency or patch proc-macro-error (used by tauri)
+#   unsafe-libyaml → Replace serde_yaml with serde_json or audit serde_yaml usage (used by atoll-core config)
+
 [[advisories]]
-# fxhash - no maintained replacement without significant refactoring
+# fxhash - unmaintained, no safe replacement without refactoring tauri internals
+# EXPIRES: 2026-12-10 — replace or patch by this date
 crate = "fxhash"
 
 [[advisories]]
 # proc-macro-error - used by glib-macros via tauri, no safe upgrade
+# EXPIRES: 2026-12-10 — replace or patch by this date
 crate = "proc-macro-error"
 
 [[advisories]]
 # unsafe-libyaml - used by serde_yaml via atoll-core, no safe upgrade
+# EXPIRES: 2026-12-10 — replace serde_yaml or patch by this date
 crate = "unsafe-libyaml"

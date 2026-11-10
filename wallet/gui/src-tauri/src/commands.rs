@@ -465,16 +465,23 @@ fn do_node_send_tx(
 
 /// Mines a single block immediately from pending mempool transactions.
 fn do_node_mine(node_mgr: &NodeManager) -> Result<NodeMineResponse, GuiError> {
-    let height_before = {
-        let bc = node_mgr.blockchain.read().map_err(|e| {
-            GuiError::Io(format!("blockchain lock poisoned: {e}"))
+    let mempool_before = {
+        let mp = node_mgr.mempool.read().map_err(|e| {
+            GuiError::Io(format!("mempool lock poisoned: {e}"))
         })?;
-        bc.tip_height()
+        mp.len()
     };
 
     let _hash = node_mgr.mine_block().map_err(|e| {
         GuiError::Io(format!("block production failed: {e}"))
     })?;
+
+    let mempool_after = {
+        let mp = node_mgr.mempool.read().map_err(|e| {
+            GuiError::Io(format!("mempool lock poisoned: {e}"))
+        })?;
+        mp.len()
+    };
 
     let height_after = {
         let bc = node_mgr.blockchain.read().map_err(|e| {
@@ -483,13 +490,7 @@ fn do_node_mine(node_mgr: &NodeManager) -> Result<NodeMineResponse, GuiError> {
         bc.tip_height()
     };
 
-    let txs_included = if height_after > height_before {
-        // We can't easily know how many txs were in the block without re-reading,
-        // but we can estimate from mempool delta
-        0 // placeholder
-    } else {
-        0
-    };
+    let txs_included = mempool_before.saturating_sub(mempool_after);
 
     Ok(NodeMineResponse {
         mined: true,

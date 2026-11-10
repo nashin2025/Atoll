@@ -162,6 +162,7 @@ impl MultiSigTreasury {
         &mut self,
         executor: Address,
         tx_id: u64,
+        current_block: u64,
         state: &mut ChainState,
     ) -> Result<(), String> {
         // Only owners can execute
@@ -184,50 +185,55 @@ impl MultiSigTreasury {
             return Err("Insufficient treasury balance".to_string());
         }
 
-        // Execute the transfer
+        // Execute the transfer atomically: burn from treasury, then mint to recipient.
+        // If mint fails after burn, compensate by re-minting to treasury.
         state.burn_atoll(&self.treasury_address, tx.value)?;
-        state.mint_atoll(tx.to, tx.value)?;
+        if let Err(e) = state.mint_atoll(tx.to, tx.value) {
+            // Compensating transaction: refund the burn if mint fails
+            let _ = state.mint_atoll(self.treasury_address, tx.value);
+            return Err(e);
+        }
 
         // Mark as executed
         tx.status = TxStatus::Executed;
-        tx.executed_at = Some(current_block());
+        tx.executed_at = Some(current_block);
 
         Ok(())
     }
 
-/// Reject a proposed transaction
-pub fn reject_transaction(
-    &mut self,
-    owner: Address,
-    tx_id: u64,
-) -> Result<(), String> {
-    // Only owners can reject
-    if !self.owners.contains(&owner) {
-        return Err("Only owners can reject transactions".to_string());
+    /// Reject a proposed transaction
+    pub fn reject_transaction(
+        &mut self,
+        owner: Address,
+        tx_id: u64,
+    ) -> Result<(), String> {
+        // Only owners can reject
+        if !self.owners.contains(&owner) {
+            return Err("Only owners can reject transactions".to_string());
+        }
+
+        // Get transaction and check conditions before mutable borrow
+        let tx = self.transactions.get(&tx_id).ok_or_else(|| {
+            format!("Transaction {} not found", tx_id)
+        })?;
+
+        // Only proposer or owner can reject
+        if tx.proposer != owner && !self.is_owner(&owner) {
+            return Err("Only proposer or owner can reject".to_string());
+        }
+
+        // Cannot reject executed transactions
+        if tx.status == TxStatus::Executed {
+            return Err("Cannot reject executed transaction".to_string());
+        }
+
+        // Now get mutable borrow and reject
+        let tx = self.transactions.get_mut(&tx_id).ok_or_else(|| {
+            format!("Transaction {} not found", tx_id)
+        })?;
+        tx.status = TxStatus::Rejected;
+        Ok(())
     }
-
-    // Get transaction and check conditions before mutable borrow
-    let tx = self.transactions.get(&tx_id).ok_or_else(|| {
-        format!("Transaction {} not found", tx_id)
-    })?;
-
-    // Only proposer or owner can reject
-    if tx.proposer != owner && !self.is_owner(&owner) {
-        return Err("Only proposer or owner can reject".to_string());
-    }
-
-    // Cannot reject executed transactions
-    if tx.status == TxStatus::Executed {
-        return Err("Cannot reject executed transaction".to_string());
-    }
-
-    // Now get mutable borrow and reject
-    let tx = self.transactions.get_mut(&tx_id).ok_or_else(|| {
-        format!("Transaction {} not found", tx_id)
-    })?;
-    tx.status = TxStatus::Rejected;
-    Ok(())
-}
 
     /// Add a new owner
     pub fn add_owner(&mut self, new_owner: Address) -> Result<(), String> {
@@ -304,13 +310,6 @@ pub fn reject_transaction(
         state.balance(&self.treasury_address)
     }
 }
-
-/// Get current block height (placeholder - in production this comes from the chain)
-fn current_block() -> u64 {
-    // In production, this would read from the chain state
-    0
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -434,7 +433,7 @@ mod tests {
         treasury.confirm_transaction(owner3, tx_id).unwrap();
 
         // Execute
-        treasury.execute_transaction(owner1, tx_id, &mut state).unwrap();
+        treasury.execute_transaction(owner1, tx_id, 0, &mut state).unwrap();
 
         // Verify balances
         assert_eq!(state.balance(&recipient), 1000);
@@ -465,8 +464,105 @@ mod tests {
         treasury.confirm_transaction(owner3, tx_id).unwrap();
 
         // Should fail due to insufficient balance
-        let result = treasury.execute_transaction(owner1, tx_id, &mut state);
+        let result = treasury.execute_transaction(owner1, tx_id, 0, &mut state);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_reject_transaction() {
+        let mut treasury = create_test_treasury();
+        let owner1 = Address::from_bytes([1u8; 20]);
+        let owner2 = Address::from_bytes([2u8; 20]);
+        let owner3 = Address::from_bytes([3u8; 20]);
+        let recipient = Address::from_bytes([5u8; 20]);
+
+        // Owner 1 proposes a transaction
+        let tx_id = treasury.propose_transaction(
+            owner1,
+            recipient,
+            1000,
+            vec![],
+            0,
+        ).unwrap();
+
+        // Owner 3 (non-proposer, non-owner is owner3? owner3 IS an owner) can reject
+        // Actually owner3 is an owner, so can reject
+        treasury.reject_transaction(owner3, tx_id).unwrap();
+        let tx = treasury.get_transaction(tx_id).unwrap();
+        assert_eq!(tx.status, TxStatus::Rejected);
+    }
+
+    #[test]
+    fn test_reject_transaction_non_owner_cannot_reject() {
+        let mut treasury = create_test_treasury();
+        let owner1 = Address::from_bytes([1u8; 20]);
+        let owner2 = Address::from_bytes([2u8; 20]);
+        let owner3 = Address::from_bytes([3u8; 20]);
+        let non_owner = Address::from_bytes([9u8; 20]);
+        let recipient = Address::from_bytes([5u8; 20]);
+
+        let tx_id = treasury.propose_transaction(
+            owner1,
+            recipient,
+            1000,
+            vec![],
+            0,
+        ).unwrap();
+
+        // Non-owner cannot reject
+        let result = treasury.reject_transaction(non_owner, tx_id);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Only owners can reject transactions".to_string());
+    }
+
+    #[test]
+    fn test_reject_transaction_proposer_can_reject() {
+        let mut treasury = create_test_treasury();
+        let owner1 = Address::from_bytes([1u8; 20]);
+        let owner2 = Address::from_bytes([2u8; 20]);
+        let owner3 = Address::from_bytes([3u8; 20]);
+        let recipient = Address::from_bytes([5u8; 20]);
+
+        let tx_id = treasury.propose_transaction(
+            owner1,
+            recipient,
+            1000,
+            vec![],
+            0,
+        ).unwrap();
+
+        // Proposer (owner1) can reject their own transaction
+        treasury.reject_transaction(owner1, tx_id).unwrap();
+        let tx = treasury.get_transaction(tx_id).unwrap();
+        assert_eq!(tx.status, TxStatus::Rejected);
+    }
+
+    #[test]
+    fn test_reject_executed_transaction_fails() {
+        let mut state = ChainState::new();
+        let mut treasury = create_test_treasury();
+        let owner1 = Address::from_bytes([1u8; 20]);
+        let owner2 = Address::from_bytes([2u8; 20]);
+        let owner3 = Address::from_bytes([3u8; 20]);
+        let recipient = Address::from_bytes([5u8; 20]);
+
+        state.mint_atoll(treasury.treasury_address, 10000).unwrap();
+
+        let tx_id = treasury.propose_transaction(
+            owner1,
+            recipient,
+            1000,
+            vec![],
+            0,
+        ).unwrap();
+        treasury.confirm_transaction(owner2, tx_id).unwrap();
+        treasury.confirm_transaction(owner3, tx_id).unwrap();
+        treasury.execute_transaction(owner1, tx_id, 0, &mut state).unwrap();
+
+        // Cannot reject executed transaction
+        let result = treasury.reject_transaction(owner2, tx_id);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Cannot reject executed transaction".to_string());
     }
 
     #[test]

@@ -79,7 +79,11 @@ export function SearchBar() {
         <h2 className="text-lg font-semibold mb-4">Global Search</h2>
         <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 min-w-0">
+            <label htmlFor="search-input" className="block text-xs font-semibold text-slate-400 mb-1">
+              Search query
+            </label>
             <input
+              id="search-input"
               type="text"
               className="input"
               placeholder="Search by block hash, transaction hash, or address"
@@ -87,22 +91,28 @@ export function SearchBar() {
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
-          <select
-            className="input"
-            value={type}
-            onChange={(e) => setType(e.target.value as 'block' | 'address' | 'transaction')}
-          >
-            <option value="block">Block hash</option>
-            <option value="transaction">Transaction hash</option>
-            <option value="address">Address</option>
-          </select>
+          <div className="flex-1 min-w-0">
+            <label htmlFor="search-type" className="block text-xs font-semibold text-slate-400 mb-1">
+              Search type
+            </label>
+            <select
+              id="search-type"
+              className="input"
+              value={type}
+              onChange={(e) => setType(e.target.value as 'block' | 'address' | 'transaction')}
+            >
+              <option value="block">Block hash</option>
+              <option value="transaction">Transaction hash</option>
+              <option value="address">Address</option>
+            </select>
+          </div>
           <button type="submit" className="btn-primary">
             Search
           </button>
         </form>
         {hasError && query && (
-          <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded text-sm text-red-400">
-            No results found for &ldquo;{query}&rdquo;
+          <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded text-sm text-red-400" role="alert">
+            No results found for "{query}"
           </div>
         )}
       </div>

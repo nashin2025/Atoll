@@ -430,4 +430,42 @@ mod tests {
     fn cross_vm_fuzz_test() {
         test_cross_vm_fuzz(50);
     }
+
+    #[test]
+    fn test_cross_vm_determinism() {
+        // Same input through VMRouter should produce identical results
+        let input = vec![0x00, 0x60, 0x80, 0x52]; // EVM prefix + PUSH1 0x80, MSTORE
+        let mut results = Vec::new();
+        for _ in 0..5 {
+            let result = VMRouter::execute(test_context(), &input);
+            results.push(result);
+        }
+        let first = &results[0];
+        for (i, result) in results.iter().enumerate().skip(1) {
+            assert_eq!(
+                first, result,
+                "Cross-VM determinism violation on iteration {}: results differ",
+                i
+            );
+        }
+    }
+
+    #[test]
+    fn test_router_fuzz() {
+        // Random inputs through VMRouter should not panic and respect gas limits
+        test_cross_vm_fuzz(100);
+    }
+
+    #[test]
+    fn test_route_with_magic_mismatch() {
+        // Input with a magic byte that matches no VM should return Error, not panic
+        let input = vec![0xFF, 0x00, 0x00, 0x00]; // 0xFF is not a valid VM prefix
+        let result = VMRouter::execute(test_context(), &input);
+        match result {
+            ExecutionResult::Error { .. } => {} // Expected: unknown route returns error
+            ExecutionResult::Success { .. } | ExecutionResult::Revert { .. } => {
+                panic!("Expected Error for unknown magic byte, got success/revert");
+            }
+        }
+    }
 }

@@ -1,6 +1,5 @@
 import { Routes, Route } from 'react-router-dom';
 import { Layout } from './components/Layout';
-import { SearchBar } from './components/SearchBar';
 import { Home } from './pages/Home';
 import { BlocksList, BlockDetail } from './pages/Blocks';
 import { TransactionsList, TransactionDetail } from './pages/Transactions';
@@ -12,7 +11,6 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Home />}>
-        <Route index element={<SearchBar />} />
       </Route>
       <Route path="/blocks" element={<BlocksList />} />
       <Route path="/blocks/:hash" element={<BlockDetail />} />
