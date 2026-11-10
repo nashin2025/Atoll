@@ -150,7 +150,9 @@ export default function App() {
 
   const handleMine = useCallback(async () => {
     try {
-      const result: NodeMineResponse = await nodeMine({});
+      const result: NodeMineResponse = await nodeMine({
+        proposer: state.selectedAddress ?? undefined,
+      });
       setState((prev) => ({
         ...prev,
         nodeInfo: prev.nodeInfo
@@ -167,7 +169,7 @@ export default function App() {
       console.error("Mine failed:", err);
       return null;
     }
-  }, []);
+  }, [state.selectedAddress]);
 
   const handleAutoMine = useCallback(async (enabled: boolean) => {
     try {

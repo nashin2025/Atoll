@@ -35,6 +35,7 @@ use atoll_core::{
     primitives::block::{Block, BlockBody, BlockHeader},
     primitives::hash::Hash512,
     primitives::transaction::Transaction,
+    tokens::chimera_token::apply_block_rewards,
     CHAIN_ID, GENESIS_TIMESTAMP, INITIAL_DIFFICULTY,
 };
 use serde::{Deserialize, Serialize};
@@ -678,7 +679,9 @@ impl NodeManager {
     }
 
     /// Mines a single block immediately (manual mine).
-    pub fn mine_block(&self) -> Result<Hash512, String> {
+    /// `proposer` is the address that receives the block proposer reward share;
+    /// if `None`, rewards go to the zero address (removed from circulation).
+    pub fn mine_block(&self, proposer: Option<Address>) -> Result<Hash512, String> {
         let pending_txs: Vec<Transaction> = {
             let mut mp = self
                 .mempool
@@ -699,6 +702,7 @@ impl NodeManager {
         let height = bc.tip_height() + 1;
         drop(bc);
 
+        let proposer_addr = proposer.unwrap_or(Address::zero());
         let header = BlockHeader {
             version: 1,
             height,
@@ -712,7 +716,7 @@ impl NodeManager {
             prev_hash,
             state_root: Hash512::zero(),
             transaction_root: Hash512::zero(),
-            proposer: Address::zero(),
+            proposer: proposer_addr,
             difficulty: INITIAL_DIFFICULTY as u128,
         };
 
@@ -765,8 +769,28 @@ impl NodeManager {
             .blockchain
             .write()
             .map_err(|e| format!("blockchain lock poisoned: {e}"))?;
-        bc.insert_block(block, &val)
-            .map_err(|e| format!("insert failed: {e}"))
+        let block_hash = bc
+            .insert_block(block, &val)
+            .map_err(|e| format!("insert failed: {e}"))?;
+
+        // Apply block rewards to ChainState so the proposer (and other
+        // recipients) receive their share of the block subsidy.
+        {
+            let mut state = self
+                .chain_state
+                .write()
+                .map_err(|e| format!("chain_state lock poisoned: {e}"))?;
+            apply_block_rewards(
+                &mut *state,
+                height,
+                proposer_addr,
+                None, // pouw_miner not tracked in manual mine
+                &[],   // no post_farmers in manual mine
+            )
+            .map_err(|e| format!("block reward distribution failed: {e}"))?;
+        }
+
+        Ok(block_hash)
     }
 
     /// Toggles auto-mining on/off.

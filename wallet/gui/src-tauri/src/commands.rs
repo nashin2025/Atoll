@@ -236,7 +236,9 @@ pub struct NodeAddPeerResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct NodeMineRequest {}
+pub struct NodeMineRequest {
+    pub proposer: Option<String>,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NodeMineResponse {
@@ -550,7 +552,10 @@ fn do_node_send_tx(
 }
 
 /// Mines a single block immediately from pending mempool transactions.
-fn do_node_mine(node_mgr: &NodeManager) -> Result<NodeMineResponse, GuiError> {
+fn do_node_mine(
+    node_mgr: &NodeManager,
+    request: &NodeMineRequest,
+) -> Result<NodeMineResponse, GuiError> {
     let mempool_before = {
         let mp = node_mgr
             .mempool
@@ -559,8 +564,13 @@ fn do_node_mine(node_mgr: &NodeManager) -> Result<NodeMineResponse, GuiError> {
         mp.len()
     };
 
+    let proposer = request
+        .proposer
+        .as_deref()
+        .and_then(|s| Address::from_hex(s).ok());
+
     let _hash = node_mgr
-        .mine_block()
+        .mine_block(proposer)
         .map_err(|e| GuiError::Io(format!("block production failed: {e}")))?;
 
     let mempool_after = {
@@ -946,13 +956,13 @@ pub fn node_add_peer(
 #[tauri::command(name = "node-mine")]
 pub fn node_mine(
     node_mgr: State<'_, RwLock<NodeManager>>,
-    _request: NodeMineRequest,
+    request: NodeMineRequest,
 ) -> Result<NodeMineResponse, GuiError> {
     let mgr = node_mgr.inner();
     let guard = mgr
         .read()
         .map_err(|e| GuiError::Io(format!("node manager lock poisoned: {e}")))?;
-    do_node_mine(&*guard)
+    do_node_mine(&*guard, &request)
 }
 
 /// Toggles auto-mining on/off.

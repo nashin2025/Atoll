@@ -108,7 +108,9 @@ export interface NodeSendTxResponse {
   message: string;
 }
 
-export interface NodeMineRequest {}
+export interface NodeMineRequest {
+  proposer?: string;
+}
 export interface NodeMineResponse {
   mined: boolean;
   height: number;
@@ -212,8 +214,8 @@ export async function nodeSendTx(req: NodeSendTxRequest): Promise<NodeSendTxResp
   return invoke("node_send_tx", { request: req });
 }
 
-export async function nodeMine(_req: NodeMineRequest): Promise<NodeMineResponse> {
-  return invoke("node_mine", { request: _req });
+export async function nodeMine(req: NodeMineRequest): Promise<NodeMineResponse> {
+  return invoke("node_mine", { request: req });
 }
 
 export async function nodeAutoMine(req: NodeAutoMineRequest): Promise<NodeAutoMineResponse> {
