@@ -118,15 +118,57 @@ pub struct NodeManager {
     pub block_producer_handle: RwLock<Option<std::thread::ThreadId>>,
 }
 
+// ---------------------------------------------------------------------------
+// Genesis persistence: load genesis.json on first run, create and save it if
+// missing. This ensures the embedded node shares the same genesis block
+// across restarts and keeps a persistent record on disk.
+// ---------------------------------------------------------------------------
+
+const GENESIS_PATH: &str = "genesis.json";
+
+fn load_or_create_genesis() -> GenesisConfig {
+    let path = std::path::Path::new(GENESIS_PATH);
+
+    if path.exists() {
+        let content = std::fs::read_to_string(path).unwrap_or_default();
+        if let Ok(config) = serde_json::from_str::<GenesisConfig>(&content) {
+            log_msg!("Loaded existing genesis from {}", path.display());
+            return config;
+        }
+    }
+
+    let config = GenesisConfig {
+        chain_id: CHAIN_ID,
+        genesis_timestamp: GENESIS_TIMESTAMP,
+        initial_difficulty: INITIAL_DIFFICULTY as u64,
+        initial_distribution: HashMap::new(),
+    };
+
+    let block = GenesisLoader::build_genesis_block(&config);
+    let genesis_hash = GenesisLoader::genesis_hash(&config);
+
+    let genesis_json = serde_json::json!({
+        "config": config,
+        "block": block,
+        "genesis_hash": genesis_hash.to_hex(),
+    });
+    let genesis_json = serde_json::to_string_pretty(&genesis_json)
+        .expect("genesis JSON serialization should not fail");
+
+    if let Err(e) = std::fs::write(path, &genesis_json) {
+        log_msg!("Failed to write genesis.json: {}", e);
+    } else {
+        log_msg!("Generated genesis block at {}", path.display());
+        log_msg!("  Genesis hash: {}", genesis_hash.to_hex());
+    }
+
+    config
+}
+
 impl NodeManager {
     /// Creates a new NodeManager with default (genesis) state.
     pub fn new() -> Self {
-        let config = GenesisConfig {
-            chain_id: CHAIN_ID,
-            genesis_timestamp: GENESIS_TIMESTAMP,
-            initial_difficulty: INITIAL_DIFFICULTY as u64,
-            initial_distribution: HashMap::new(),
-        };
+        let config = load_or_create_genesis();
 
         let blockchain = Arc::new(RwLock::new(Blockchain::new(&config)));
         let chain_state = Arc::new(RwLock::new(ChainState::new()));

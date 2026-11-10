@@ -54,6 +54,11 @@ enum Commands {
     },
 }
 
+/// Path to the genesis record file. Created on first run and reused on
+/// subsequent runs so every node start shares the same genesis block.
+const GENESIS_PATH: &str = "genesis.json";
+
+/// Default token distribution: seed address gets 21M ATOLL.
 fn default_distribution() -> HashMap<Address, u128> {
     let mut dist = HashMap::new();
     // Seed address: blake3 of the zero public key, first 20 bytes
@@ -61,6 +66,39 @@ fn default_distribution() -> HashMap<Address, u128> {
     // 21 million ATOLL (6 decimals) to the seed/treasury address
     dist.insert(seed, 21_000_000_000_000);
     dist
+}
+
+/// Loads genesis config from `genesis.json` if it exists, otherwise generates
+/// a default config, builds the genesis block, writes `genesis.json`, and
+/// returns the config. This ensures every node start uses the same genesis
+/// block and a persistent record is kept on disk.
+fn load_or_create_genesis() -> Result<GenesisConfig, Box<dyn std::error::Error>> {
+    let path = PathBuf::from(GENESIS_PATH);
+
+    if path.exists() {
+        let content = fs::read_to_string(&path)?;
+        let config: GenesisConfig = serde_json::from_str(&content)?;
+        tracing::info!("Loaded existing genesis from {}", path.display());
+        Ok(config)
+    } else {
+        let config = GenesisConfig::default();
+        let block = GenesisLoader::build_genesis_block(&config);
+        let genesis_hash = GenesisLoader::genesis_hash(&config);
+
+        let genesis_json = json!({
+            "config": config,
+            "block": block,
+            "genesis_hash": genesis_hash.to_hex(),
+        });
+        fs::write(&path, serde_json::to_string_pretty(&genesis_json)?)?;
+
+        tracing::info!("Generated genesis block at {}", path.display());
+        tracing::info!("  Genesis hash: {}", genesis_hash.to_hex());
+        tracing::info!("  Chain ID: {}", config.chain_id);
+        tracing::info!("  Timestamp: {}", config.genesis_timestamp);
+
+        Ok(config)
+    }
 }
 
 fn run_genesis(
@@ -148,9 +186,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     tracing::debug!("Configuration file: {}", cli.config);
 
-    // Initialise protocol state. Genesis finalisation (Task 5) will replace
-    // Blockchain::default() with a block built from GenesisConfig.
-    let blockchain = Arc::new(RwLock::new(Blockchain::default()));
+    // Initialise protocol state. Load genesis from disk (creating it on first
+    // run) so every node start shares the same genesis block.
+    let genesis_config = load_or_create_genesis()?;
+    let blockchain = Arc::new(RwLock::new(Blockchain::new(&genesis_config)));
     let chain_state = Arc::new(RwLock::new(ChainState::new()));
     let peer_manager = Arc::new(RwLock::new(PeerManager::new(256)));
 
