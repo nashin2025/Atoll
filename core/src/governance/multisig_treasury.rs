@@ -68,7 +68,11 @@ pub struct MultiSigTreasury {
 
 impl MultiSigTreasury {
     /// Create a new multi-signature treasury
-    pub fn new(treasury_address: Address, owners: Vec<Address>, threshold: u64) -> Result<Self, String> {
+    pub fn new(
+        treasury_address: Address,
+        owners: Vec<Address>,
+        threshold: u64,
+    ) -> Result<Self, String> {
         if owners.is_empty() {
             return Err("Treasury must have at least one owner".to_string());
         }
@@ -122,19 +126,16 @@ impl MultiSigTreasury {
     }
 
     /// Confirm a proposed transaction
-    pub fn confirm_transaction(
-        &mut self,
-        owner: Address,
-        tx_id: u64,
-    ) -> Result<(), String> {
+    pub fn confirm_transaction(&mut self, owner: Address, tx_id: u64) -> Result<(), String> {
         // Only owners can confirm
         if !self.owners.contains(&owner) {
             return Err("Only owners can confirm transactions".to_string());
         }
 
-        let tx = self.transactions.get_mut(&tx_id).ok_or_else(|| {
-            format!("Transaction {} not found", tx_id)
-        })?;
+        let tx = self
+            .transactions
+            .get_mut(&tx_id)
+            .ok_or_else(|| format!("Transaction {} not found", tx_id))?;
 
         // Cannot confirm executed or rejected transactions
         if tx.status != TxStatus::Proposed {
@@ -170,9 +171,10 @@ impl MultiSigTreasury {
             return Err("Only owners can execute transactions".to_string());
         }
 
-        let tx = self.transactions.get_mut(&tx_id).ok_or_else(|| {
-            format!("Transaction {} not found", tx_id)
-        })?;
+        let tx = self
+            .transactions
+            .get_mut(&tx_id)
+            .ok_or_else(|| format!("Transaction {} not found", tx_id))?;
 
         // Must be confirmed before execution
         if tx.status != TxStatus::Confirmed {
@@ -202,20 +204,17 @@ impl MultiSigTreasury {
     }
 
     /// Reject a proposed transaction
-    pub fn reject_transaction(
-        &mut self,
-        owner: Address,
-        tx_id: u64,
-    ) -> Result<(), String> {
+    pub fn reject_transaction(&mut self, owner: Address, tx_id: u64) -> Result<(), String> {
         // Only owners can reject
         if !self.owners.contains(&owner) {
             return Err("Only owners can reject transactions".to_string());
         }
 
         // Get transaction and check conditions before mutable borrow
-        let tx = self.transactions.get(&tx_id).ok_or_else(|| {
-            format!("Transaction {} not found", tx_id)
-        })?;
+        let tx = self
+            .transactions
+            .get(&tx_id)
+            .ok_or_else(|| format!("Transaction {} not found", tx_id))?;
 
         // Only proposer or owner can reject
         if tx.proposer != owner && !self.is_owner(&owner) {
@@ -228,9 +227,10 @@ impl MultiSigTreasury {
         }
 
         // Now get mutable borrow and reject
-        let tx = self.transactions.get_mut(&tx_id).ok_or_else(|| {
-            format!("Transaction {} not found", tx_id)
-        })?;
+        let tx = self
+            .transactions
+            .get_mut(&tx_id)
+            .ok_or_else(|| format!("Transaction {} not found", tx_id))?;
         tx.status = TxStatus::Rejected;
         Ok(())
     }
@@ -354,13 +354,9 @@ mod tests {
         let recipient = Address::from_bytes([5u8; 20]);
 
         // Owner 1 proposes transaction
-        let tx_id = treasury.propose_transaction(
-            owner1,
-            recipient,
-            1000,
-            vec![],
-            0,
-        ).unwrap();
+        let tx_id = treasury
+            .propose_transaction(owner1, recipient, 1000, vec![], 0)
+            .unwrap();
         assert_eq!(tx_id, 1);
 
         let tx = treasury.get_transaction(tx_id).unwrap();
@@ -388,13 +384,9 @@ mod tests {
         let owner2 = Address::from_bytes([2u8; 20]);
         let recipient = Address::from_bytes([5u8; 20]);
 
-        let tx_id = treasury.propose_transaction(
-            owner1,
-            recipient,
-            1000,
-            vec![],
-            0,
-        ).unwrap();
+        let tx_id = treasury
+            .propose_transaction(owner1, recipient, 1000, vec![], 0)
+            .unwrap();
 
         // Owner 1 cannot confirm their own transaction
         let result = treasury.confirm_transaction(owner1, tx_id);
@@ -420,20 +412,18 @@ mod tests {
         state.mint_atoll(treasury.treasury_address, 10000).unwrap();
 
         // Propose transaction
-        let tx_id = treasury.propose_transaction(
-            owner1,
-            recipient,
-            1000,
-            vec![],
-            0,
-        ).unwrap();
+        let tx_id = treasury
+            .propose_transaction(owner1, recipient, 1000, vec![], 0)
+            .unwrap();
 
         // Confirm with two owners (threshold = 2)
         treasury.confirm_transaction(owner2, tx_id).unwrap();
         treasury.confirm_transaction(owner3, tx_id).unwrap();
 
         // Execute
-        treasury.execute_transaction(owner1, tx_id, 0, &mut state).unwrap();
+        treasury
+            .execute_transaction(owner1, tx_id, 0, &mut state)
+            .unwrap();
 
         // Verify balances
         assert_eq!(state.balance(&recipient), 1000);
@@ -453,13 +443,15 @@ mod tests {
         let owner3 = Address::from_bytes([3u8; 20]);
         let recipient = Address::from_bytes([5u8; 20]);
 
-        let tx_id = treasury.propose_transaction(
-            owner1,
-            recipient,
-            1000000, // More than treasury has
-            vec![],
-            0,
-        ).unwrap();
+        let tx_id = treasury
+            .propose_transaction(
+                owner1,
+                recipient,
+                1000000, // More than treasury has
+                vec![],
+                0,
+            )
+            .unwrap();
         treasury.confirm_transaction(owner2, tx_id).unwrap();
         treasury.confirm_transaction(owner3, tx_id).unwrap();
 
@@ -477,13 +469,9 @@ mod tests {
         let recipient = Address::from_bytes([5u8; 20]);
 
         // Owner 1 proposes a transaction
-        let tx_id = treasury.propose_transaction(
-            owner1,
-            recipient,
-            1000,
-            vec![],
-            0,
-        ).unwrap();
+        let tx_id = treasury
+            .propose_transaction(owner1, recipient, 1000, vec![], 0)
+            .unwrap();
 
         // Owner 3 (non-proposer, non-owner is owner3? owner3 IS an owner) can reject
         // Actually owner3 is an owner, so can reject
@@ -501,18 +489,17 @@ mod tests {
         let non_owner = Address::from_bytes([9u8; 20]);
         let recipient = Address::from_bytes([5u8; 20]);
 
-        let tx_id = treasury.propose_transaction(
-            owner1,
-            recipient,
-            1000,
-            vec![],
-            0,
-        ).unwrap();
+        let tx_id = treasury
+            .propose_transaction(owner1, recipient, 1000, vec![], 0)
+            .unwrap();
 
         // Non-owner cannot reject
         let result = treasury.reject_transaction(non_owner, tx_id);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Only owners can reject transactions".to_string());
+        assert_eq!(
+            result.unwrap_err(),
+            "Only owners can reject transactions".to_string()
+        );
     }
 
     #[test]
@@ -523,13 +510,9 @@ mod tests {
         let owner3 = Address::from_bytes([3u8; 20]);
         let recipient = Address::from_bytes([5u8; 20]);
 
-        let tx_id = treasury.propose_transaction(
-            owner1,
-            recipient,
-            1000,
-            vec![],
-            0,
-        ).unwrap();
+        let tx_id = treasury
+            .propose_transaction(owner1, recipient, 1000, vec![], 0)
+            .unwrap();
 
         // Proposer (owner1) can reject their own transaction
         treasury.reject_transaction(owner1, tx_id).unwrap();
@@ -548,21 +531,22 @@ mod tests {
 
         state.mint_atoll(treasury.treasury_address, 10000).unwrap();
 
-        let tx_id = treasury.propose_transaction(
-            owner1,
-            recipient,
-            1000,
-            vec![],
-            0,
-        ).unwrap();
+        let tx_id = treasury
+            .propose_transaction(owner1, recipient, 1000, vec![], 0)
+            .unwrap();
         treasury.confirm_transaction(owner2, tx_id).unwrap();
         treasury.confirm_transaction(owner3, tx_id).unwrap();
-        treasury.execute_transaction(owner1, tx_id, 0, &mut state).unwrap();
+        treasury
+            .execute_transaction(owner1, tx_id, 0, &mut state)
+            .unwrap();
 
         // Cannot reject executed transaction
         let result = treasury.reject_transaction(owner2, tx_id);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Cannot reject executed transaction".to_string());
+        assert_eq!(
+            result.unwrap_err(),
+            "Cannot reject executed transaction".to_string()
+        );
     }
 
     #[test]
@@ -604,8 +588,12 @@ mod tests {
         let recipient = Address::from_bytes([5u8; 20]);
 
         // Propose two transactions
-        let tx1 = treasury.propose_transaction(owner1, recipient, 1000, vec![], 0).unwrap();
-        let tx2 = treasury.propose_transaction(owner1, recipient, 2000, vec![], 0).unwrap();
+        let tx1 = treasury
+            .propose_transaction(owner1, recipient, 1000, vec![], 0)
+            .unwrap();
+        let tx2 = treasury
+            .propose_transaction(owner1, recipient, 2000, vec![], 0)
+            .unwrap();
 
         // Both should be pending
         let pending = treasury.get_pending_transactions();
@@ -629,8 +617,12 @@ mod tests {
         let owner3 = Address::from_bytes([3u8; 20]);
         let recipient = Address::from_bytes([5u8; 20]);
 
-        let tx1 = treasury.propose_transaction(owner1, recipient, 1000, vec![], 0).unwrap();
-        let tx2 = treasury.propose_transaction(owner1, recipient, 2000, vec![], 0).unwrap();
+        let tx1 = treasury
+            .propose_transaction(owner1, recipient, 1000, vec![], 0)
+            .unwrap();
+        let tx2 = treasury
+            .propose_transaction(owner1, recipient, 2000, vec![], 0)
+            .unwrap();
 
         // Confirm tx1 with two owners
         treasury.confirm_transaction(owner2, tx1).unwrap();

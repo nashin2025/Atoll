@@ -43,11 +43,8 @@ pub fn test_context() -> ExecutionContext {
 ///
 /// # Panics
 /// Panics if any execution returns an error or if outputs differ across instances.
-pub fn test_determinism<F>(
-    execute_fn: F,
-    input: &[u8],
-    iterations: usize,
-) where
+pub fn test_determinism<F>(execute_fn: F, input: &[u8], iterations: usize)
+where
     F: Fn(&[u8]) -> ExecutionResult + Clone,
 {
     let mut first_result: Option<ExecutionResult> = None;
@@ -80,11 +77,8 @@ pub fn test_determinism<F>(
 ///
 /// # Panics
 /// Panics if any execution panics, exceeds gas limit, or returns an unexpected variant.
-pub fn test_fuzz<F, G>(
-    execute_fn: F,
-    mut input_gen: G,
-    iterations: usize,
-) where
+pub fn test_fuzz<F, G>(execute_fn: F, mut input_gen: G, iterations: usize)
+where
     F: Fn(&[u8]) -> ExecutionResult,
     G: FnMut() -> Vec<u8>,
 {
@@ -315,21 +309,22 @@ mod tests {
     fn wasm_determinism_test() {
         // WASM VM expects ELF64 header
         let input = vec![
-            0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00, // magic, class, data, version, osabi
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,       // abiversion, pad
-            0x02, 0x00,                                     // e_type = ET_EXEC
-            0xf3, 0x00,                                     // e_machine = EM_RISCV
-            0x01, 0x00, 0x00, 0x00,                         // e_version
+            0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01,
+            0x00, // magic, class, data, version, osabi
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // abiversion, pad
+            0x02, 0x00, // e_type = ET_EXEC
+            0xf3, 0x00, // e_machine = EM_RISCV
+            0x01, 0x00, 0x00, 0x00, // e_version
             0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // e_entry
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // e_phoff
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // e_shoff
-            0x00, 0x00, 0x00, 0x00,                         // e_flags
-            0x40, 0x00,                                     // e_ehsize
-            0x00, 0x00,                                     // e_phentsize
-            0x00, 0x00,                                     // e_phnum
-            0x00, 0x00,                                     // e_shentsize
-            0x00, 0x00,                                     // e_shnum
-            0x00, 0x00,                                     // e_shstrndx
+            0x00, 0x00, 0x00, 0x00, // e_flags
+            0x40, 0x00, // e_ehsize
+            0x00, 0x00, // e_phentsize
+            0x00, 0x00, // e_phnum
+            0x00, 0x00, // e_shentsize
+            0x00, 0x00, // e_shnum
+            0x00, 0x00, // e_shstrndx
         ];
         test_determinism(
             |input| {
@@ -371,7 +366,9 @@ mod tests {
 
     #[test]
     fn ai_determinism_test() {
-        let input = vec![0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        let input = vec![
+            0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
         test_determinism(
             |input| {
                 let mut ai = AIVMExecutor::new(test_context(), DEFAULT_GAS_LIMIT);
@@ -384,7 +381,9 @@ mod tests {
 
     #[test]
     fn zk_determinism_test() {
-        let input = vec![0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        let input = vec![
+            0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
         test_determinism(
             |input| {
                 let mut zk = ZKVMExecutor::new(test_context(), DEFAULT_GAS_LIMIT);

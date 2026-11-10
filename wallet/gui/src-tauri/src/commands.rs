@@ -452,23 +452,22 @@ fn do_node_send_tx(
     node_mgr: &NodeManager,
     request: &NodeSendTxRequest,
 ) -> Result<NodeSendTxResponse, GuiError> {
-    let tx_bytes = hex::decode(&request.signed_tx).map_err(|e| {
-        GuiError::Crypto(format!("invalid transaction hex: {e}"))
-    })?;
-    let tx: Transaction =
-        Transaction::deserialize_bytes(&tx_bytes).map_err(|e| {
-            GuiError::Crypto(format!("failed to deserialize transaction: {e}"))
-        })?;
+    let tx_bytes = hex::decode(&request.signed_tx)
+        .map_err(|e| GuiError::Crypto(format!("invalid transaction hex: {e}")))?;
+    let tx: Transaction = Transaction::deserialize_bytes(&tx_bytes)
+        .map_err(|e| GuiError::Crypto(format!("failed to deserialize transaction: {e}")))?;
 
     // Basic validation: non-zero value
     if tx.value == 0 {
-        return Err(GuiError::Amount("transaction value must be greater than zero".to_string()));
+        return Err(GuiError::Amount(
+            "transaction value must be greater than zero".to_string(),
+        ));
     }
 
     // Add to mempool for inclusion in next block
-    node_mgr.add_to_mempool(tx).map_err(|e| {
-        GuiError::Io(format!("failed to add to mempool: {e}"))
-    })?;
+    node_mgr
+        .add_to_mempool(tx)
+        .map_err(|e| GuiError::Io(format!("failed to add to mempool: {e}")))?;
 
     Ok(NodeSendTxResponse {
         accepted: true,
@@ -479,27 +478,30 @@ fn do_node_send_tx(
 /// Mines a single block immediately from pending mempool transactions.
 fn do_node_mine(node_mgr: &NodeManager) -> Result<NodeMineResponse, GuiError> {
     let mempool_before = {
-        let mp = node_mgr.mempool.read().map_err(|e| {
-            GuiError::Io(format!("mempool lock poisoned: {e}"))
-        })?;
+        let mp = node_mgr
+            .mempool
+            .read()
+            .map_err(|e| GuiError::Io(format!("mempool lock poisoned: {e}")))?;
         mp.len()
     };
 
-    let _hash = node_mgr.mine_block().map_err(|e| {
-        GuiError::Io(format!("block production failed: {e}"))
-    })?;
+    let _hash = node_mgr
+        .mine_block()
+        .map_err(|e| GuiError::Io(format!("block production failed: {e}")))?;
 
     let mempool_after = {
-        let mp = node_mgr.mempool.read().map_err(|e| {
-            GuiError::Io(format!("mempool lock poisoned: {e}"))
-        })?;
+        let mp = node_mgr
+            .mempool
+            .read()
+            .map_err(|e| GuiError::Io(format!("mempool lock poisoned: {e}")))?;
         mp.len()
     };
 
     let height_after = {
-        let bc = node_mgr.blockchain.read().map_err(|e| {
-            GuiError::Io(format!("blockchain lock poisoned: {e}"))
-        })?;
+        let bc = node_mgr
+            .blockchain
+            .read()
+            .map_err(|e| GuiError::Io(format!("blockchain lock poisoned: {e}")))?;
         bc.tip_height()
     };
 
@@ -514,7 +516,10 @@ fn do_node_mine(node_mgr: &NodeManager) -> Result<NodeMineResponse, GuiError> {
 }
 
 /// Toggles auto-mining on/off.
-fn do_node_auto_mine(node_mgr: &NodeManager, enabled: bool) -> Result<NodeAutoMineResponse, GuiError> {
+fn do_node_auto_mine(
+    node_mgr: &NodeManager,
+    enabled: bool,
+) -> Result<NodeAutoMineResponse, GuiError> {
     node_mgr.set_auto_mine(enabled);
     Ok(NodeAutoMineResponse {
         enabled,
@@ -527,7 +532,9 @@ fn do_node_auto_mine(node_mgr: &NodeManager, enabled: bool) -> Result<NodeAutoMi
 }
 
 /// Returns whether auto-mining is enabled and the block interval.
-fn do_node_auto_mine_status(node_mgr: &NodeManager) -> Result<NodeAutoMineStatusResponse, GuiError> {
+fn do_node_auto_mine_status(
+    node_mgr: &NodeManager,
+) -> Result<NodeAutoMineStatusResponse, GuiError> {
     Ok(NodeAutoMineStatusResponse {
         enabled: node_mgr.is_auto_mine(),
         interval_ms: node_mgr.block_producer_interval_ms,
@@ -540,17 +547,16 @@ fn do_node_auto_mine_status(node_mgr: &NodeManager) -> Result<NodeAutoMineStatus
 /// a height greater than our own, then downloads and applies blocks.
 /// Sets the node state to `Syncing` during the operation.
 fn do_node_sync(node_mgr: &NodeManager) -> Result<(), GuiError> {
-    let peer_manager = node_mgr.peer_manager.read().map_err(|e| {
-        GuiError::Io(format!("peer manager lock poisoned: {e}"))
-    })?;
+    let peer_manager = node_mgr
+        .peer_manager
+        .read()
+        .map_err(|e| GuiError::Io(format!("peer manager lock poisoned: {e}")))?;
 
     let connected_peers = peer_manager.connected_peers();
     drop(peer_manager);
 
     if connected_peers.is_empty() {
-        return Err(GuiError::Io(
-            "no peers connected; cannot sync".to_string(),
-        ));
+        return Err(GuiError::Io("no peers connected; cannot sync".to_string()));
     }
 
     // Set state to Syncing
@@ -577,9 +583,8 @@ fn do_node_add_peer(
 ) -> Result<(), GuiError> {
     // Parse node_id from hex if provided; default to zero if not given
     let node_id: [u8; 32] = if let Some(hex) = node_id_hex {
-        let bytes = hex::decode(hex).map_err(|e| {
-            GuiError::Crypto(format!("invalid node ID hex: {e}"))
-        })?;
+        let bytes =
+            hex::decode(hex).map_err(|e| GuiError::Crypto(format!("invalid node ID hex: {e}")))?;
         if bytes.len() != 32 {
             return Err(GuiError::Crypto(
                 "node ID must be 32 bytes (64 hex characters)".to_string(),
@@ -606,11 +611,16 @@ fn do_node_add_peer(
 
     // Register with PeerManager
     {
-        let mut pm = node_mgr.peer_manager.write().map_err(|e| {
-            GuiError::Io(format!("peer manager lock poisoned: {e}"))
-        })?;
+        let mut pm = node_mgr
+            .peer_manager
+            .write()
+            .map_err(|e| GuiError::Io(format!("peer manager lock poisoned: {e}")))?;
         if pm.add_peer(peer_info.node_id, peer_info.clone()) {
-            log_msg!("Added peer {} ({})", address, hex::encode(&peer_info.node_id));
+            log_msg!(
+                "Added peer {} ({})",
+                address,
+                hex::encode(&peer_info.node_id)
+            );
         } else {
             return Err(GuiError::Io(
                 "failed to add peer (at max peers or banned)".to_string(),
@@ -620,9 +630,10 @@ fn do_node_add_peer(
 
     // Register with DiscoveryProtocol
     {
-        let mut disc = node_mgr.discovery.write().map_err(|e| {
-            GuiError::Io(format!("discovery lock poisoned: {e}"))
-        })?;
+        let mut disc = node_mgr
+            .discovery
+            .write()
+            .map_err(|e| GuiError::Io(format!("discovery lock poisoned: {e}")))?;
         if let Some(disc) = disc.as_mut() {
             disc.register_peer(peer_info);
         }
@@ -815,9 +826,7 @@ pub fn node_send_tx(
 /// Sync blocks from connected peers. Sets node state to Syncing during
 /// the operation. The frontend should poll `node-status` to track progress.
 #[tauri::command(name = "node-sync")]
-pub fn node_sync(
-    node_mgr: State<'_, RwLock<NodeManager>>,
-) -> Result<(), GuiError> {
+pub fn node_sync(node_mgr: State<'_, RwLock<NodeManager>>) -> Result<(), GuiError> {
     let mgr = node_mgr.inner();
     let guard = mgr
         .read()

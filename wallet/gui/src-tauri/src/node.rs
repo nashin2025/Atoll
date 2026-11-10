@@ -26,16 +26,10 @@ use atoll_core::{
     chain::blockchain::Blockchain,
     chain::genesis::{GenesisConfig, GenesisLoader},
     chain::state::ChainState,
-    consensus::penta::{
-        poh, por, pos_vrf, post, pouw, PentaConsensus,
-    },
+    consensus::penta::{poh, por, pos_vrf, post, pouw, PentaConsensus},
     network::{
-        bootstrap::BootstrapClient,
-        discovery::DiscoveryProtocol,
-        node_identity::NodeIdentity,
-        p2p::PeerListener,
-        peer_manager::PeerManager,
-        sync::SyncManager,
+        bootstrap::BootstrapClient, discovery::DiscoveryProtocol, node_identity::NodeIdentity,
+        p2p::PeerListener, peer_manager::PeerManager, sync::SyncManager,
     },
     primitives::address::Address,
     primitives::block::{Block, BlockBody, BlockHeader},
@@ -306,7 +300,11 @@ impl NodeManager {
                         Ok(conn) => {
                             let peer_id = conn.node_id();
                             let addr = conn.address().to_string();
-                            log_msg!("Inbound connection from {} ({})", addr, hex::encode(&peer_id));
+                            log_msg!(
+                                "Inbound connection from {} ({})",
+                                addr,
+                                hex::encode(&peer_id)
+                            );
                             // Phase 1: accept and immediately close.
                             // Phase 2: maintain connection for gossip/block sync.
                             drop(conn);
@@ -357,7 +355,10 @@ impl NodeManager {
                                     }
                                 };
                                 let count = mp.len().min(100); // max 100 txs per block
-                                (0..count).filter_map(|_| mp.pop_front()).map(|mt| mt.tx).collect()
+                                (0..count)
+                                    .filter_map(|_| mp.pop_front())
+                                    .map(|mt| mt.tx)
+                                    .collect()
                             };
 
                             if pending_txs.is_empty() {
@@ -383,7 +384,9 @@ impl NodeManager {
                                 version: 1,
                                 height,
                                 shard_id: 0,
-                                timestamp: match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                                timestamp: match SystemTime::now()
+                                    .duration_since(SystemTime::UNIX_EPOCH)
+                                {
                                     Ok(d) => d.as_secs(),
                                     Err(e) => {
                                         log_msg!("system time error: {e}");
@@ -393,7 +396,7 @@ impl NodeManager {
                                 prev_hash,
                                 state_root: Hash512::zero(), // Phase 2: compute from state
                                 transaction_root: Hash512::zero(), // Phase 2: compute from txs
-                                proposer: Address::zero(), // Phase 2: set to validator address
+                                proposer: Address::zero(),   // Phase 2: set to validator address
                                 difficulty: INITIAL_DIFFICULTY as u128,
                             };
 
@@ -459,7 +462,10 @@ impl NodeManager {
                                             }
                                         }
                                     } else {
-                                        log_msg!("Block validation failed: composite={:.3}", val.composite_score);
+                                        log_msg!(
+                                            "Block validation failed: composite={:.3}",
+                                            val.composite_score
+                                        );
                                     }
                                 }
                                 Err(e) => {
@@ -627,7 +633,10 @@ impl NodeManager {
                 .write()
                 .map_err(|e| format!("mempool lock poisoned: {e}"))?;
             let count = mp.len().min(100);
-            (0..count).filter_map(|_| mp.pop_front()).map(|mt| mt.tx).collect()
+            (0..count)
+                .filter_map(|_| mp.pop_front())
+                .map(|mt| mt.tx)
+                .collect()
         };
 
         let bc = self
@@ -704,7 +713,8 @@ impl NodeManager {
             .blockchain
             .write()
             .map_err(|e| format!("blockchain lock poisoned: {e}"))?;
-        bc.insert_block(block, &val).map_err(|e| format!("insert failed: {e}"))
+        bc.insert_block(block, &val)
+            .map_err(|e| format!("insert failed: {e}"))
     }
 
     /// Toggles auto-mining on/off.
