@@ -1,1 +1,1 @@
-export { Staking } from './Staking';
+export { Staking } from "./Staking";

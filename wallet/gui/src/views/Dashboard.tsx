@@ -1,9 +1,5 @@
-import { useEffect, useState } from 'react';
-import {
-  walletBalance,
-  nodeGetBalance,
-  formatInvokeError,
-} from '@/tauri';
+import { useEffect, useState } from "react";
+import { walletBalance, nodeGetBalance, formatInvokeError } from "@/tauri";
 import {
   Button,
   ErrorDisplay,
@@ -14,7 +10,7 @@ import {
   Badge,
   Skeleton,
   SuccessDisplay,
-} from '@/components/ui';
+} from "@/components/ui";
 
 interface DashboardProps {
   address: string;
@@ -69,8 +65,8 @@ export function Dashboard({
   const [autoMineLoading, setAutoMineLoading] = useState(false);
   const [addPeerLoading, setAddPeerLoading] = useState(false);
   const [addPeerError, setAddPeerError] = useState<string | null>(null);
-  const [peerAddress, setPeerAddress] = useState('127.0.0.1:30333');
-  const [peerNodeId, setPeerNodeId] = useState('');
+  const [peerAddress, setPeerAddress] = useState("127.0.0.1:30333");
+  const [peerNodeId, setPeerNodeId] = useState("");
 
   const fetchBalance = async () => {
     setLoading(true);
@@ -97,7 +93,7 @@ export function Dashboard({
       await onMine();
       await fetchBalance();
       await onRefreshNodeStatus();
-      setSuccess('Block mined successfully');
+      setSuccess("Block mined successfully");
     } catch (err) {
       setError(formatInvokeError(err));
     } finally {
@@ -111,7 +107,7 @@ export function Dashboard({
     try {
       await onAutoMine(enabled);
       await onRefreshNodeStatus();
-      setSuccess(`Auto-mine ${enabled ? 'enabled' : 'disabled'}`);
+      setSuccess(`Auto-mine ${enabled ? "enabled" : "disabled"}`);
     } catch (err) {
       setError(formatInvokeError(err));
     } finally {
@@ -124,9 +120,9 @@ export function Dashboard({
     setAddPeerError(null);
     try {
       await onAddPeer(peerAddress, peerNodeId || undefined);
-      setSuccess('Peer added successfully');
-      setPeerAddress('');
-      setPeerNodeId('');
+      setSuccess("Peer added successfully");
+      setPeerAddress("");
+      setPeerNodeId("");
     } catch (err) {
       setAddPeerError(formatInvokeError(err));
     } finally {
@@ -155,7 +151,7 @@ export function Dashboard({
           <div>
             <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>
             <p className="text-slate-400 text-sm">
-              {nodeConnected ? 'Embedded node running' : 'Offline wallet'}
+              {nodeConnected ? "Embedded node running" : "Offline wallet"}
             </p>
           </div>
           <div className="flex gap-3">
@@ -183,11 +179,7 @@ export function Dashboard({
         {/* Status overview cards */}
         {nodeConnected && nodeInfo && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <StatCard
-              title="Tip height"
-              value={`#${nodeInfo.tipHeight}`}
-              variant="default"
-            />
+            <StatCard title="Tip height" value={`#${nodeInfo.tipHeight}`} variant="default" />
             <StatCard
               title="Block count"
               value={nodeInfo.blockCount.toLocaleString()}
@@ -196,21 +188,17 @@ export function Dashboard({
             <StatCard
               title="Block TXs"
               value={nodeInfo.lastBlockTxCount}
-              variant={nodeInfo.lastBlockTxCount === 0 ? 'warning' : 'success'}
+              variant={nodeInfo.lastBlockTxCount === 0 ? "warning" : "success"}
             />
             <StatCard
               title="Peers"
               value={nodeInfo.peerCount}
-              variant={nodeInfo.peerCount > 0 ? 'success' : 'warning'}
+              variant={nodeInfo.peerCount > 0 ? "success" : "warning"}
             />
-            <StatCard
-              title="Mempool"
-              value={nodeInfo.mempoolSize}
-              variant="default"
-            />
+            <StatCard title="Mempool" value={nodeInfo.mempoolSize} variant="default" />
             <StatCard
               title="Balance"
-              value={balance === null ? '–' : balance}
+              value={balance === null ? "–" : balance}
               variant="success"
               change="ATOLL"
             />
@@ -220,7 +208,10 @@ export function Dashboard({
         {/* Node status panel */}
         {nodeConnected && nodeInfo && (
           <Card>
-            <CardHeader title="Node status" description="Live metrics from the embedded Atoll node" />
+            <CardHeader
+              title="Node status"
+              description="Live metrics from the embedded Atoll node"
+            />
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               <div className="bg-slate-800/50 rounded-lg p-4">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
@@ -238,30 +229,28 @@ export function Dashboard({
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
                   Finalized height
                 </p>
-                <p className="text-sm font-mono text-white">
-                  #{nodeInfo.finalizedHeight}
-                </p>
+                <p className="text-sm font-mono text-white">#{nodeInfo.finalizedHeight}</p>
               </div>
               <div className="bg-slate-800/50 rounded-lg p-4">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
                   Syncing
                 </p>
-                <p className={`text-sm font-mono ${
-                  nodeInfo.syncing ? 'text-amber-400' : 'text-emerald-400'
-                }`}>
-                  {nodeInfo.syncing ? 'Yes' : 'No'}
+                <p
+                  className={`text-sm font-mono ${
+                    nodeInfo.syncing ? "text-amber-400" : "text-emerald-400"
+                  }`}
+                >
+                  {nodeInfo.syncing ? "Yes" : "No"}
                 </p>
               </div>
             </div>
             <div className="flex items-center justify-between pt-4 border-t border-slate-700/50">
               <div className="flex items-center gap-2">
-                <Badge variant={nodeInfo.autoMine ? 'success' : 'warning'}>
-                  {nodeInfo.autoMine ? 'Auto-mine on' : 'Auto-mine off'}
+                <Badge variant={nodeInfo.autoMine ? "success" : "warning"}>
+                  {nodeInfo.autoMine ? "Auto-mine on" : "Auto-mine off"}
                 </Badge>
               </div>
-              <div className="text-xs text-slate-500">
-                v{nodeInfo.version}
-              </div>
+              <div className="text-xs text-slate-500">v{nodeInfo.version}</div>
             </div>
             <div className="flex items-center justify-between pt-3 border-t border-slate-700/50">
               <div className="flex items-center gap-2">
@@ -284,7 +273,7 @@ export function Dashboard({
             <CardHeader title="Node controls" />
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <Button
-                variant={nodeInfo.autoMine ? 'primary' : 'secondary'}
+                variant={nodeInfo.autoMine ? "primary" : "secondary"}
                 onClick={handleMine}
                 className="w-full"
                 disabled={mineLoading}
@@ -295,26 +284,24 @@ export function Dashboard({
                     Mining…
                   </span>
                 ) : (
-                  'Mine block'
+                  "Mine block"
                 )}
               </Button>
               <Button
-                variant={nodeInfo.autoMine ? 'secondary' : 'primary'}
+                variant={nodeInfo.autoMine ? "secondary" : "primary"}
                 onClick={() => handleAutoMine(!nodeInfo.autoMine)}
                 className="w-full"
                 disabled={autoMineLoading}
               >
                 {autoMineLoading ? (
                   <Skeleton className="h-5 w-5 border-none rounded-full border-2 border-t-transparent border-indigo-500 animate-spin" />
+                ) : nodeInfo.autoMine ? (
+                  "Disable auto-mine"
                 ) : (
-                  nodeInfo.autoMine ? 'Disable auto-mine' : 'Enable auto-mine'
+                  "Enable auto-mine"
                 )}
               </Button>
-              <Button
-                variant="secondary"
-                onClick={refreshNodeStatus}
-                className="w-full"
-              >
+              <Button variant="secondary" onClick={refreshNodeStatus} className="w-full">
                 Refresh status
               </Button>
             </div>
@@ -357,7 +344,7 @@ export function Dashboard({
                 className="w-full"
                 disabled={addPeerLoading}
               >
-                {addPeerLoading ? 'Adding…' : 'Add peer'}
+                {addPeerLoading ? "Adding…" : "Add peer"}
               </Button>
             </div>
           </Card>
@@ -387,7 +374,7 @@ export function Dashboard({
                 <Skeleton className="h-8 w-24" />
               ) : (
                 <span className="text-4xl font-bold text-indigo-400 font-mono">
-                  {balance === null ? '–' : balance}
+                  {balance === null ? "–" : balance}
                 </span>
               )}
               <span className="text-slate-500 text-sm">ATOLL</span>
@@ -412,9 +399,8 @@ export function Dashboard({
           <Card className="mt-6">
             <CardHeader title="Embedded node" />
             <p className="text-xs text-slate-500 mb-4">
-              The GUI wallet runs a full Atoll node in-process. Start it to
-              validate the chain, see real balances, and submit transactions
-              directly — no separate node process required.
+              The GUI wallet runs a full Atoll node in-process. Start it to validate the chain, see
+              real balances, and submit transactions directly — no separate node process required.
             </p>
             <Button variant="primary" onClick={onStartNode} className="w-full">
               Start embedded node

@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { walletHistory, nodeGetHistory, nodeGetBalance, formatInvokeError } from '@/tauri';
-import { Button, ErrorDisplay, Input, Loading, Card, CardHeader } from '@/components/ui';
+import { useState } from "react";
+import { walletHistory, nodeGetHistory, nodeGetBalance, formatInvokeError } from "@/tauri";
+import { Button, ErrorDisplay, Input, Loading, Card, CardHeader } from "@/components/ui";
 
 interface HistoryProps {
   onBack: () => void;
@@ -8,14 +8,16 @@ interface HistoryProps {
 }
 
 export function History({ onBack, nodeConnected }: HistoryProps) {
-  const [address, setAddress] = useState('');
-  const [transactions, setTransactions] = useState<Array<{
-    height: number;
-    hash: string;
-    from: string;
-    to: string | null;
-    value: number;
-  }>>([]);
+  const [address, setAddress] = useState("");
+  const [transactions, setTransactions] = useState<
+    Array<{
+      height: number;
+      hash: string;
+      from: string;
+      to: string | null;
+      value: number;
+    }>
+  >([]);
   const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +59,11 @@ export function History({ onBack, nodeConnected }: HistoryProps) {
     <div className="min-h-screen bg-slate-950 p-6">
       <div className="max-w-2xl mx-auto">
         <header className="flex items-center justify-between mb-8">
-          <Button variant="secondary" onClick={onBack} className="flex items-center gap-2 text-sm h-9 px-3">
+          <Button
+            variant="secondary"
+            onClick={onBack}
+            className="flex items-center gap-2 text-sm h-9 px-3"
+          >
             ← Back
           </Button>
           <h1 className="text-2xl font-bold text-white tracking-tight">History</h1>
@@ -67,7 +73,9 @@ export function History({ onBack, nodeConnected }: HistoryProps) {
 
         <form onSubmit={handleLookup} className="mb-6">
           <Card>
-            <CardHeader title={nodeConnected ? 'Address history (live node)' : 'Transaction history'} />
+            <CardHeader
+              title={nodeConnected ? "Address history (live node)" : "Transaction history"}
+            />
             <Input
               label="Address"
               placeholder="Address to look up"
@@ -75,7 +83,7 @@ export function History({ onBack, nodeConnected }: HistoryProps) {
               onChange={(e) => setAddress(e.target.value)}
             />
             <Button type="submit" variant="secondary" disabled={loading || !address}>
-              {nodeConnected ? 'Look up history' : 'Look up history'}
+              {nodeConnected ? "Look up history" : "Look up history"}
             </Button>
           </Card>
         </form>
@@ -91,9 +99,7 @@ export function History({ onBack, nodeConnected }: HistoryProps) {
                   Address: {address.slice(0, 8)}…{address.slice(-4)}
                 </h3>
                 {balance !== null && (
-                  <span className="text-xs text-slate-400">
-                    Balance: {balance} ATOLL
-                  </span>
+                  <span className="text-xs text-slate-400">Balance: {balance} ATOLL</span>
                 )}
               </div>
               {transactions.length === 0 ? (
@@ -124,7 +130,10 @@ export function History({ onBack, nodeConnected }: HistoryProps) {
                     </thead>
                     <tbody>
                       {transactions.map((tx) => (
-                        <tr key={`${tx.height}-${tx.hash}`} className="border-b border-slate-700/20 hover:bg-slate-800/30">
+                        <tr
+                          key={`${tx.height}-${tx.hash}`}
+                          className="border-b border-slate-700/20 hover:bg-slate-800/30"
+                        >
                           <td className="px-3 py-2 text-xs font-mono text-slate-300">
                             {tx.height}
                           </td>
@@ -135,7 +144,7 @@ export function History({ onBack, nodeConnected }: HistoryProps) {
                             {tx.from}
                           </td>
                           <td className="px-3 py-2 text-xs font-mono text-slate-300 truncate">
-                            {tx.to ?? '—'}
+                            {tx.to ?? "—"}
                           </td>
                           <td className="px-3 py-2 text-xs font-mono text-slate-300 text-right">
                             {tx.value}
@@ -148,9 +157,7 @@ export function History({ onBack, nodeConnected }: HistoryProps) {
               )}
             </div>
           ) : (
-            <p className="text-slate-500 text-sm">
-              Enter an address above to check history.
-            </p>
+            <p className="text-slate-500 text-sm">Enter an address above to check history.</p>
           )}
         </Card>
       </div>

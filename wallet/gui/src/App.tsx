@@ -1,10 +1,10 @@
-import { useState, useCallback } from 'react';
-import { Welcome } from '@/views/Welcome';
-import { Dashboard } from '@/views/Dashboard';
-import { Send } from '@/views/Send';
-import { History } from '@/views/History';
-import { DeriveAddress } from '@/views/DeriveAddress';
-import { Staking } from '@/views/Staking';
+import { useState, useCallback } from "react";
+import { Welcome } from "@/views/Welcome";
+import { Dashboard } from "@/views/Dashboard";
+import { Send } from "@/views/Send";
+import { History } from "@/views/History";
+import { DeriveAddress } from "@/views/DeriveAddress";
+import { Staking } from "@/views/Staking";
 import {
   nodeStart,
   nodeStop,
@@ -17,10 +17,10 @@ import {
   NodeMineResponse,
   NodeAutoMineResponse,
   NodeAddPeerResponse,
-} from '@/tauri';
-import { NavLink, AddressDisplay } from '@/components/ui';
+} from "@/tauri";
+import { NavLink, AddressDisplay } from "@/components/ui";
 
-type View = 'welcome' | 'dashboard' | 'send' | 'history' | 'derive-address' | 'staking';
+type View = "welcome" | "dashboard" | "send" | "history" | "derive-address" | "staking";
 
 interface AppState {
   view: View;
@@ -44,43 +44,40 @@ interface AppState {
 }
 
 const VIEWS: { id: View; label: string; icon: string }[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: '🏠' },
-  { id: 'send', label: 'Send', icon: '📤' },
-  { id: 'history', label: 'History', icon: '📜' },
-  { id: 'derive-address', label: 'Derive Address', icon: '🔗' },
-  { id: 'staking', label: 'Staking', icon: '📊' },
+  { id: "dashboard", label: "Dashboard", icon: "🏠" },
+  { id: "send", label: "Send", icon: "📤" },
+  { id: "history", label: "History", icon: "📜" },
+  { id: "derive-address", label: "Derive Address", icon: "🔗" },
+  { id: "staking", label: "Staking", icon: "📊" },
 ];
 
 export default function App() {
   const [state, setState] = useState<AppState>({
-    view: 'welcome',
+    view: "welcome",
     addresses: [],
     selectedAddress: null,
-    passphrase: '',
+    passphrase: "",
     nodeConnected: false,
     nodeInfo: null,
   });
 
-  const handleUnlocked = useCallback(
-    (addresses: string[], passphrase: string) => {
-      setState((prev) => ({
-        ...prev,
-        view: 'dashboard',
-        addresses,
-        selectedAddress: addresses[0] ?? null,
-        passphrase,
-      }));
-    },
-    [],
-  );
+  const handleUnlocked = useCallback((addresses: string[], passphrase: string) => {
+    setState((prev) => ({
+      ...prev,
+      view: "dashboard",
+      addresses,
+      selectedAddress: addresses[0] ?? null,
+      passphrase,
+    }));
+  }, []);
 
   const handleLock = useCallback(() => {
     setState((prev) => ({
       ...prev,
-      view: 'welcome',
+      view: "welcome",
       addresses: [],
       selectedAddress: null,
-      passphrase: '',
+      passphrase: "",
     }));
   }, []);
 
@@ -99,13 +96,13 @@ export default function App() {
           mempoolSize: 0,
           autoMine: true,
           lastBlockTxCount: 0,
-          genesisHash: '',
+          genesisHash: "",
           syncing: false,
           version: result.version,
         },
       }));
     } catch (err) {
-      console.error('Node start failed:', err);
+      console.error("Node start failed:", err);
     }
   }, []);
 
@@ -143,12 +140,12 @@ export default function App() {
         },
       }));
     } catch (err) {
-      console.error('Node status refresh failed:', err);
+      console.error("Node status refresh failed:", err);
     }
   }, []);
 
   const clearPassphrase = useCallback(() => {
-    setState((prev) => ({ ...prev, passphrase: '' }));
+    setState((prev) => ({ ...prev, passphrase: "" }));
   }, []);
 
   const handleMine = useCallback(async () => {
@@ -167,7 +164,7 @@ export default function App() {
       await handleRefreshNodeStatus();
       return result.txs_included;
     } catch (err) {
-      console.error('Mine failed:', err);
+      console.error("Mine failed:", err);
       return null;
     }
   }, []);
@@ -177,38 +174,33 @@ export default function App() {
       const result: NodeAutoMineResponse = await nodeAutoMine({ enabled });
       setState((prev) => ({
         ...prev,
-        nodeInfo: prev.nodeInfo
-          ? { ...prev.nodeInfo, autoMine: result.enabled }
-          : prev.nodeInfo,
+        nodeInfo: prev.nodeInfo ? { ...prev.nodeInfo, autoMine: result.enabled } : prev.nodeInfo,
       }));
     } catch (err) {
-      console.error('Auto-mine toggle failed:', err);
+      console.error("Auto-mine toggle failed:", err);
     }
   }, []);
 
-  const handleAddPeer = useCallback(
-    async (address: string, nodeId?: string) => {
-      try {
-        const result: NodeAddPeerResponse = await nodeAddPeer({
-          address,
-          node_id: nodeId,
-        });
-        if (result.added) {
-          await handleRefreshNodeStatus();
-        }
-      } catch (err) {
-        console.error('Add peer failed:', err);
+  const handleAddPeer = useCallback(async (address: string, nodeId?: string) => {
+    try {
+      const result: NodeAddPeerResponse = await nodeAddPeer({
+        address,
+        node_id: nodeId,
+      });
+      if (result.added) {
+        await handleRefreshNodeStatus();
       }
-    },
-    []
-  );
+    } catch (err) {
+      console.error("Add peer failed:", err);
+    }
+  }, []);
 
   const selectedAddress = state.selectedAddress;
   const passphrase = state.passphrase;
   const activeView = state.view;
 
   // Welcome view — full screen, no sidebar
-  if (state.view === 'welcome') {
+  if (state.view === "welcome") {
     return (
       <div className="min-h-screen bg-slate-900">
         <Welcome onUnlocked={handleUnlocked} />
@@ -228,9 +220,7 @@ export default function App() {
             <NavLink
               key={v.id}
               active={activeView === v.id}
-              onClick={() =>
-                setState((prev) => ({ ...prev, view: v.id }))
-              }
+              onClick={() => setState((prev) => ({ ...prev, view: v.id }))}
               icon={<span className="text-xs">{v.icon}</span>}
               title={v.label}
             >
@@ -239,11 +229,7 @@ export default function App() {
           ))}
         </nav>
         <div className="px-2 py-4">
-          <NavLink
-            active={false}
-            onClick={handleLock}
-            icon={<span className="text-xs">🔒</span>}
-          >
+          <NavLink active={false} onClick={handleLock} icon={<span className="text-xs">🔒</span>}>
             Lock
           </NavLink>
         </div>
@@ -265,29 +251,31 @@ export default function App() {
           </div>
           <div className="flex items-center gap-3">
             <AddressDisplay
-              address={selectedAddress ?? ''}
+              address={selectedAddress ?? ""}
               shorten={true}
-              onCopy={() => navigator.clipboard.writeText(selectedAddress ?? '')}
+              onCopy={() => navigator.clipboard.writeText(selectedAddress ?? "")}
             />
             <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${
-                state.nodeConnected ? 'bg-emerald-400' : 'bg-slate-500'
-              }`} />
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  state.nodeConnected ? "bg-emerald-400" : "bg-slate-500"
+                }`}
+              />
               <span className="text-xs text-slate-400">
-                {state.nodeConnected ? 'Node online' : 'Node offline'}
+                {state.nodeConnected ? "Node online" : "Node offline"}
               </span>
             </div>
           </div>
         </header>
 
-        {state.view === 'dashboard' && selectedAddress && (
+        {state.view === "dashboard" && selectedAddress && (
           <Dashboard
             address={selectedAddress}
             passphrase={passphrase}
             onLock={handleLock}
-            onSend={() => setState((prev) => ({ ...prev, view: 'send' }))}
-            onHistory={() => setState((prev) => ({ ...prev, view: 'history' }))}
-            onDeriveAddress={() => setState((prev) => ({ ...prev, view: 'derive-address' }))}
+            onSend={() => setState((prev) => ({ ...prev, view: "send" }))}
+            onHistory={() => setState((prev) => ({ ...prev, view: "history" }))}
+            onDeriveAddress={() => setState((prev) => ({ ...prev, view: "derive-address" }))}
             nodeConnected={state.nodeConnected}
             nodeInfo={state.nodeInfo}
             onStartNode={handleStartNode}
@@ -299,7 +287,7 @@ export default function App() {
           />
         )}
 
-        {state.view === 'send' && selectedAddress && (
+        {state.view === "send" && selectedAddress && (
           <Send
             from={selectedAddress}
             passphrase={passphrase}
@@ -309,22 +297,22 @@ export default function App() {
           />
         )}
 
-        {state.view === 'history' && (
+        {state.view === "history" && (
           <History
-            onBack={() => setState((prev) => ({ ...prev, view: 'dashboard' }))}
+            onBack={() => setState((prev) => ({ ...prev, view: "dashboard" }))}
             nodeConnected={state.nodeConnected}
           />
         )}
 
-        {state.view === 'derive-address' && (
-          <DeriveAddress onBack={() => setState((prev) => ({ ...prev, view: 'dashboard' }))} />
+        {state.view === "derive-address" && (
+          <DeriveAddress onBack={() => setState((prev) => ({ ...prev, view: "dashboard" }))} />
         )}
 
-        {state.view === 'staking' && selectedAddress && (
+        {state.view === "staking" && selectedAddress && (
           <Staking
             address={selectedAddress}
             passphrase={passphrase}
-            onBack={() => setState((prev) => ({ ...prev, view: 'dashboard' }))}
+            onBack={() => setState((prev) => ({ ...prev, view: "dashboard" }))}
           />
         )}
       </div>

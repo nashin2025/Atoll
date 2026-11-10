@@ -504,9 +504,7 @@ fn do_node_get_history(
             .unwrap_or_default()
             .to_hex();
         for tx in &block.body.transactions {
-            if tx.from == addr
-                || tx.to.as_ref().map(|t| *t == addr).unwrap_or(false)
-            {
+            if tx.from == addr || tx.to.as_ref().map(|t| *t == addr).unwrap_or(false) {
                 entries.push(HistoryEntry {
                     height: block.header.height,
                     hash: block_hash.clone(),

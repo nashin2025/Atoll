@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
   Button,
   ErrorDisplay,
@@ -7,8 +7,8 @@ import {
   Card,
   CardHeader,
   SuccessDisplay,
-} from '@/components/ui';
-import { walletStake, walletUnstake, walletStakeInfo, formatInvokeError } from '@/tauri';
+} from "@/components/ui";
+import { walletStake, walletUnstake, walletStakeInfo, formatInvokeError } from "@/tauri";
 
 interface StakingProps {
   address: string;
@@ -17,8 +17,8 @@ interface StakingProps {
 }
 
 export function Staking({ address, passphrase, onBack }: StakingProps) {
-  const [stakeAmount, setStakeAmount] = useState('');
-  const [unstakeAmount, setUnstakeAmount] = useState('');
+  const [stakeAmount, setStakeAmount] = useState("");
+  const [unstakeAmount, setUnstakeAmount] = useState("");
   const [stakedAmount, setStakedAmount] = useState<string | null>(null);
   const [rewards, setRewards] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -54,8 +54,8 @@ export function Staking({ address, passphrase, onBack }: StakingProps) {
         amount: stakeAmount,
         passphrase,
       });
-      setSuccess('Staked successfully');
-      setStakeAmount('');
+      setSuccess("Staked successfully");
+      setStakeAmount("");
       await fetchStakeInfo();
     } catch (err) {
       setError(formatInvokeError(err));
@@ -75,8 +75,8 @@ export function Staking({ address, passphrase, onBack }: StakingProps) {
         amount: unstakeAmount,
         passphrase,
       });
-      setSuccess('Unstaked successfully');
-      setUnstakeAmount('');
+      setSuccess("Unstaked successfully");
+      setUnstakeAmount("");
       await fetchStakeInfo();
     } catch (err) {
       setError(formatInvokeError(err));
@@ -89,7 +89,11 @@ export function Staking({ address, passphrase, onBack }: StakingProps) {
     <div className="min-h-screen bg-slate-950 p-6">
       <div className="max-w-2xl mx-auto">
         <header className="flex items-center justify-between mb-8">
-          <Button variant="secondary" onClick={onBack} className="flex items-center gap-2 text-sm h-9 px-3">
+          <Button
+            variant="secondary"
+            onClick={onBack}
+            className="flex items-center gap-2 text-sm h-9 px-3"
+          >
             ← Back
           </Button>
           <h1 className="text-2xl font-bold text-white tracking-tight">Staking</h1>
@@ -106,7 +110,7 @@ export function Staking({ address, passphrase, onBack }: StakingProps) {
                 <Loading className="h-6 w-6" />
               ) : (
                 <span className="text-2xl font-bold text-white font-mono">
-                  {stakedAmount === null ? '–' : stakedAmount}
+                  {stakedAmount === null ? "–" : stakedAmount}
                 </span>
               )}
               <span className="text-slate-500 text-sm">ATOLL</span>
@@ -120,7 +124,7 @@ export function Staking({ address, passphrase, onBack }: StakingProps) {
                 <Loading className="h-6 w-6" />
               ) : (
                 <span className="text-2xl font-bold text-emerald-400 font-mono">
-                  {rewards === null ? '–' : rewards}
+                  {rewards === null ? "–" : rewards}
                 </span>
               )}
               <span className="text-slate-500 text-sm">ATOLL</span>
@@ -147,10 +151,11 @@ export function Staking({ address, passphrase, onBack }: StakingProps) {
               onChange={(e) => setStakeAmount(e.target.value)}
             />
             <Button type="submit" variant="primary" disabled={loading || !stakeAmount}>
-              {loading ? 'Staking…' : 'Stake ATOLL'}
+              {loading ? "Staking…" : "Stake ATOLL"}
             </Button>
             <p className="text-xs text-slate-500 mt-2">
-              Staked ATOLL earns rewards and contributes to network security. Funds are locked during the staking period.
+              Staked ATOLL earns rewards and contributes to network security. Funds are locked
+              during the staking period.
             </p>
           </form>
         </Card>
@@ -166,10 +171,11 @@ export function Staking({ address, passphrase, onBack }: StakingProps) {
               onChange={(e) => setUnstakeAmount(e.target.value)}
             />
             <Button type="submit" variant="secondary" disabled={loading || !unstakeAmount}>
-              {loading ? 'Unstaking…' : 'Unstake ATOLL'}
+              {loading ? "Unstaking…" : "Unstake ATOLL"}
             </Button>
             <p className="text-xs text-slate-500 mt-2">
-              Unstaked ATOLL will be available after the unbonding period. Rewards stop accruing once unstaking begins.
+              Unstaked ATOLL will be available after the unbonding period. Rewards stop accruing
+              once unstaking begins.
             </p>
           </form>
         </Card>

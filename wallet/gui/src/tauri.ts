@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from "@tauri-apps/api/core";
 
 // ---------------------------------------------------------------------------
 // Request / response types mirroring the Rust command definitions
@@ -163,81 +163,75 @@ export interface NodeGetHistoryResponse {
 // ---------------------------------------------------------------------------
 
 export async function walletUnlock(req: UnlockRequest): Promise<UnlockResponse> {
-  return invoke('wallet_unlock', { request: req });
+  return invoke("wallet_unlock", { request: req });
 }
 
 export async function walletNew(req: NewRequest): Promise<NewResponse> {
-  return invoke('wallet_new', { request: req });
+  return invoke("wallet_new", { request: req });
 }
 
 export async function walletImport(req: ImportRequest): Promise<ImportResponse> {
-  return invoke('wallet_import', { request: req });
+  return invoke("wallet_import", { request: req });
 }
 
 export async function walletBalance(req: BalanceRequest): Promise<BalanceResponse> {
-  return invoke('wallet_balance', { request: req });
+  return invoke("wallet_balance", { request: req });
 }
 
 export async function walletSend(req: SendRequest): Promise<SendResponse> {
-  return invoke('wallet_send', { request: req });
+  return invoke("wallet_send", { request: req });
 }
 
 export async function walletHistory(req: HistoryRequest): Promise<HistoryResponse> {
-  return invoke('wallet_history', { request: req });
+  return invoke("wallet_history", { request: req });
 }
 
 export async function walletDeriveAddress(
   req: DeriveAddressRequest,
 ): Promise<DeriveAddressResponse> {
-  return invoke('wallet_derive_address', { request: req });
+  return invoke("wallet_derive_address", { request: req });
 }
 
 export async function nodeStart(_req: NodeStartRequest): Promise<NodeStartResponse> {
-  return invoke('node_start', { request: _req });
+  return invoke("node_start", { request: _req });
 }
 
 export async function nodeStop(_req: NodeStopRequest): Promise<NodeStopResponse> {
-  return invoke('node_stop', { request: _req });
+  return invoke("node_stop", { request: _req });
 }
 
 export async function nodeStatus(_req: NodeStopRequest): Promise<NodeStatusResponse> {
-  return invoke('node_status', { request: _req });
+  return invoke("node_status", { request: _req });
 }
 
-export async function nodeGetBalance(
-  req: NodeGetBalanceRequest,
-): Promise<NodeGetBalanceResponse> {
-  return invoke('node_get_balance', { request: req });
+export async function nodeGetBalance(req: NodeGetBalanceRequest): Promise<NodeGetBalanceResponse> {
+  return invoke("node_get_balance", { request: req });
 }
 
 export async function nodeSendTx(req: NodeSendTxRequest): Promise<NodeSendTxResponse> {
-  return invoke('node_send_tx', { request: req });
+  return invoke("node_send_tx", { request: req });
 }
 
 export async function nodeMine(_req: NodeMineRequest): Promise<NodeMineResponse> {
-  return invoke('node_mine', { request: _req });
+  return invoke("node_mine", { request: _req });
 }
 
 export async function nodeAutoMine(req: NodeAutoMineRequest): Promise<NodeAutoMineResponse> {
-  return invoke('node_auto_mine', { request: req });
+  return invoke("node_auto_mine", { request: req });
 }
 
 export async function nodeAutoMineStatus(
   _req: NodeAutoMineStatusRequest,
 ): Promise<NodeAutoMineStatusResponse> {
-  return invoke('node_auto_mine_status', { request: _req });
+  return invoke("node_auto_mine_status", { request: _req });
 }
 
-export async function nodeAddPeer(
-  req: NodeAddPeerRequest,
-): Promise<NodeAddPeerResponse> {
-  return invoke('node_add_peer', { request: req });
+export async function nodeAddPeer(req: NodeAddPeerRequest): Promise<NodeAddPeerResponse> {
+  return invoke("node_add_peer", { request: req });
 }
 
-export async function nodeGetHistory(
-  req: NodeGetHistoryRequest,
-): Promise<NodeGetHistoryResponse> {
-  return invoke('node_get_history', { request: req });
+export async function nodeGetHistory(req: NodeGetHistoryRequest): Promise<NodeGetHistoryResponse> {
+  return invoke("node_get_history", { request: req });
 }
 
 // ---------------------------------------------------------------------------
@@ -272,17 +266,15 @@ export interface StakeInfoResponse {
 }
 
 export async function walletStake(req: StakeRequest): Promise<StakeResponse> {
-  return invoke('wallet_stake', { request: req });
+  return invoke("wallet_stake", { request: req });
 }
 
 export async function walletUnstake(req: UnstakeRequest): Promise<UnstakeResponse> {
-  return invoke('wallet_unstake', { request: req });
+  return invoke("wallet_unstake", { request: req });
 }
 
-export async function walletStakeInfo(
-  req: StakeInfoRequest,
-): Promise<StakeInfoResponse> {
-  return invoke('wallet_stake_info', { request: req });
+export async function walletStakeInfo(req: StakeInfoRequest): Promise<StakeInfoResponse> {
+  return invoke("wallet_stake_info", { request: req });
 }
 
 // ---------------------------------------------------------------------------
@@ -293,15 +285,15 @@ export async function walletStakeInfo(
 export function formatInvokeError(error: unknown): string {
   if (error instanceof Error) {
     const message = error.message;
-    if (message && (message.startsWith('{') || message.includes('"kind"'))) {
+    if (message && (message.startsWith("{") || message.includes('"kind"'))) {
       try {
         const parsed = JSON.parse(message) as Record<string, unknown>;
         const key = Object.keys(parsed)[0];
         const value = parsed[key];
-        if (typeof value === 'string') {
+        if (typeof value === "string") {
           return value;
         }
-        if (value && typeof value === 'object' && 'message' in value) {
+        if (value && typeof value === "object" && "message" in value) {
           return String((value as Record<string, unknown>).message);
         }
         return JSON.stringify(parsed);

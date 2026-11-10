@@ -1,18 +1,18 @@
-import { useState } from 'react';
-import { walletUnlock, walletNew, walletImport, formatInvokeError } from '@/tauri';
-import { Button, ErrorDisplay, Input, Card, CardHeader } from '@/components/ui';
+import { useState } from "react";
+import { walletUnlock, walletNew, walletImport, formatInvokeError } from "@/tauri";
+import { Button, ErrorDisplay, Input, Card, CardHeader } from "@/components/ui";
 
-type View = 'unlock' | 'create' | 'import';
+type View = "unlock" | "create" | "import";
 
 interface WelcomeProps {
   onUnlocked: (addresses: string[], passphrase: string) => void;
 }
 
 export function Welcome({ onUnlocked }: WelcomeProps) {
-  const [view, setView] = useState<View>('unlock');
-  const [passphrase, setPassphrase] = useState('');
-  const [newPassphrase, setNewPassphrase] = useState('');
-  const [secretKey, setSecretKey] = useState('');
+  const [view, setView] = useState<View>("unlock");
+  const [passphrase, setPassphrase] = useState("");
+  const [newPassphrase, setNewPassphrase] = useState("");
+  const [secretKey, setSecretKey] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,7 +76,7 @@ export function Welcome({ onUnlocked }: WelcomeProps) {
 
         {error && <ErrorDisplay message={error} />}
 
-        {view === 'unlock' && (
+        {view === "unlock" && (
           <>
             <Card>
               <CardHeader title="Unlock wallet" />
@@ -89,7 +89,12 @@ export function Welcome({ onUnlocked }: WelcomeProps) {
                   onChange={(e) => setPassphrase(e.target.value)}
                   disabled={loading}
                 />
-                <Button type="submit" variant="primary" disabled={loading || !passphrase} className="w-full">
+                <Button
+                  type="submit"
+                  variant="primary"
+                  disabled={loading || !passphrase}
+                  className="w-full"
+                >
                   Unlock wallet
                 </Button>
               </form>
@@ -102,7 +107,7 @@ export function Welcome({ onUnlocked }: WelcomeProps) {
               <Button
                 variant="secondary"
                 onClick={() => {
-                  setView('create');
+                  setView("create");
                   setError(null);
                 }}
                 className="w-full"
@@ -113,7 +118,7 @@ export function Welcome({ onUnlocked }: WelcomeProps) {
               <Button
                 variant="secondary"
                 onClick={() => {
-                  setView('import');
+                  setView("import");
                   setError(null);
                 }}
                 className="w-full"
@@ -125,7 +130,7 @@ export function Welcome({ onUnlocked }: WelcomeProps) {
           </>
         )}
 
-        {view === 'create' && (
+        {view === "create" && (
           <Card>
             <CardHeader title="Create new wallet" />
             <p className="text-sm text-slate-400 mb-4">
@@ -140,14 +145,19 @@ export function Welcome({ onUnlocked }: WelcomeProps) {
                 onChange={(e) => setNewPassphrase(e.target.value)}
                 disabled={loading}
               />
-              <Button type="submit" variant="primary" disabled={loading || !newPassphrase} className="w-full">
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={loading || !newPassphrase}
+                className="w-full"
+              >
                 Create wallet
               </Button>
             </form>
             <Button
               variant="secondary"
               onClick={() => {
-                setView('unlock');
+                setView("unlock");
                 setError(null);
               }}
               className="w-full mt-4"
@@ -158,7 +168,7 @@ export function Welcome({ onUnlocked }: WelcomeProps) {
           </Card>
         )}
 
-        {view === 'import' && (
+        {view === "import" && (
           <Card>
             <CardHeader title="Import wallet" />
             <p className="text-sm text-slate-400 mb-4">
@@ -181,14 +191,19 @@ export function Welcome({ onUnlocked }: WelcomeProps) {
                 onChange={(e) => setNewPassphrase(e.target.value)}
                 disabled={loading}
               />
-              <Button type="submit" variant="primary" disabled={loading || !secretKey || !newPassphrase} className="w-full">
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={loading || !secretKey || !newPassphrase}
+                className="w-full"
+              >
                 Import wallet
               </Button>
             </form>
             <Button
               variant="secondary"
               onClick={() => {
-                setView('unlock');
+                setView("unlock");
                 setError(null);
               }}
               className="w-full mt-4"

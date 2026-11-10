@@ -1,6 +1,14 @@
-import { useState } from 'react';
-import { walletSend, nodeSendTx, formatInvokeError } from '@/tauri';
-import { Button, ErrorDisplay, Input, AddressDisplay, Card, CardHeader, Badge } from '@/components/ui';
+import { useState } from "react";
+import { walletSend, nodeSendTx, formatInvokeError } from "@/tauri";
+import {
+  Button,
+  ErrorDisplay,
+  Input,
+  AddressDisplay,
+  Card,
+  CardHeader,
+  Badge,
+} from "@/components/ui";
 
 interface SendProps {
   from: string;
@@ -10,16 +18,10 @@ interface SendProps {
   nodeConnected: boolean;
 }
 
-export function Send({
-  from,
-  passphrase,
-  onBack,
-  onSendComplete,
-  nodeConnected,
-}: SendProps) {
-  const [to, setTo] = useState('');
-  const [amount, setAmount] = useState('');
-  const [token, setToken] = useState('ATOLL');
+export function Send({ from, passphrase, onBack, onSendComplete, nodeConnected }: SendProps) {
+  const [to, setTo] = useState("");
+  const [amount, setAmount] = useState("");
+  const [token, setToken] = useState("ATOLL");
   const [signedTx, setSignedTx] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -69,7 +71,11 @@ export function Send({
     <div className="min-h-screen bg-slate-950 p-6">
       <div className="max-w-2xl mx-auto">
         <header className="flex items-center justify-between mb-8">
-          <Button variant="secondary" onClick={onBack} className="flex items-center gap-2 text-sm h-9 px-3">
+          <Button
+            variant="secondary"
+            onClick={onBack}
+            className="flex items-center gap-2 text-sm h-9 px-3"
+          >
             ← Back
           </Button>
           <h1 className="text-2xl font-bold text-white tracking-tight">Send ATOLL</h1>
@@ -104,11 +110,7 @@ export function Send({
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
               />
-              <Input
-                label="Token"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-              />
+              <Input label="Token" value={token} onChange={(e) => setToken(e.target.value)} />
             </div>
             {!nodeConnected && (
               <Badge variant="muted" className="mt-3 inline-flex">
@@ -120,7 +122,12 @@ export function Send({
                 Online — sign offline, then submit to connected node
               </Badge>
             )}
-            <Button type="submit" variant="primary" disabled={loading || !to || !amount} className="mt-3 w-full">
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={loading || !to || !amount}
+              className="mt-3 w-full"
+            >
               Sign transaction
             </Button>
           </Card>
@@ -150,12 +157,10 @@ export function Send({
                     disabled={loading || submitted}
                     className="w-full"
                   >
-                    {loading ? 'Submitting…' : submitted ? 'Submitted' : 'Submit to node'}
+                    {loading ? "Submitting…" : submitted ? "Submitted" : "Submit to node"}
                   </Button>
                   {submitted && (
-                    <p className="text-xs text-emerald-400">
-                      Transaction accepted by node.
-                    </p>
+                    <p className="text-xs text-emerald-400">Transaction accepted by node.</p>
                   )}
                 </div>
               )}
