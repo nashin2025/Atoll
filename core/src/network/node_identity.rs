@@ -46,6 +46,7 @@ const SECRET_KEY_LEN: usize = 32;
 const PUBLIC_KEY_LEN: usize = 32;
 
 /// Node identity: a Curve25519 static keypair plus its BLAKE3 fingerprint.
+#[derive(Clone)]
 pub struct NodeIdentity {
     /// The node's static Curve25519 secret key.
     secret_key: [u8; 32],

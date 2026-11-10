@@ -26,6 +26,11 @@ pub struct BootstrapNode {
 ///
 /// Operators maintain this list. Replace the example addresses below with the
 /// operator-maintained mainnet seed list before launch.
+///
+/// NOTE: These addresses are placeholders. The GUI wallet will start its
+/// P2P listener on port 30333 and accept inbound connections even if no
+/// bootstrap nodes are reachable. To connect to other nodes, replace these
+/// with real mainnet seed node addresses.
 pub const BOOTSTRAP_NODES: &[BootstrapNode] = &[
     BootstrapNode {
         address: "127.0.0.1:30333",

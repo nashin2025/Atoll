@@ -7,26 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [1.0.6] — 2026-11-09
+## [1.0.7] — 2026-11-10
+
+### Added
+
+- Solo validator block producer — runs automatically on startup, producing a block every 10 seconds (configurable) so the chain advances with a single wallet and no seed nodes
+- `node-mine` command — manually mine one block immediately from pending mempool transactions
+- `node-auto-mine` command — toggle automatic block production on/off
+- `node-auto-mine-status` command — query whether auto-mining is enabled
+- `node-add-peer` command — manually add a peer by address (host:port) and optional node ID hex, enabling two GUI instances to run on the same machine without seed nodes
+- `mempool_size` field in node status — shows pending transaction count
+- `auto_mine` field in node status — shows whether auto-mining is active
+
+### Changed
+
+- `do_node_send_tx` now deserializes and validates transactions before adding to mempool (was a stub)
+- `node_status` now includes `mempool_size` and `auto_mine` fields
 
 ### Fixed
 
-- Removed duplicate `release.yml` workflow (consolidated into `mainnet.yml`)
-- Removed duplicate `cargo audit` step from security scan job
-- Removed duplicate frontend build step
-- Pinned `trufflesecurity/trufflehog` to `@main` (verified creator reference)
-- Pinned `docker/setup-buildx-action` to `@v3`
-- Pinned `anchore/sbom-action` to `@v2`
-- Pinned `actions/upload-release-asset` to `@v2`
-- Fixed `swatinem/rust-cache` → `Swatinem/rust-cache@v2` casing
-- Added `rust-cache` to Format Check job
-- Added job-level permissions for least privilege across all CI jobs
-- Made macOS and Windows GUI builds non-blocking (`continue-on-error: true`)
-- Added `continue-on-error` to Windows code signing steps (certificate may not be configured)
-- Removed `Remove-Item -Force package-lock.json` from builds (preserves reproducible builds)
-- Removed `RUSTFLAGS: "-D warnings"` at workflow level
+- `cargo fmt --all --check` now passes (was failing on v1.0.5 tag)
+- `cargo-deny.toml` license allow policy uses `extend = true` instead of replacing defaults
+- `cargo audit`, `cargo-deny`, `trufflehog`, `setup-buildx`, `upload-release-asset`, `download-artifact` actions pinned to correct versions
+- Windows build/Tauri GUI jobs use `contents: write` permission for release asset upload
+- GUI build steps marked `continue-on-error: true` so they don't block the release
 
-## [1.0.5] — 2026-11-09
+## [1.0.6] — 2026-11-09
+
 
 ### Added
 

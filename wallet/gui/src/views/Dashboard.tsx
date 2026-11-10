@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import {
   walletBalance,
   nodeGetBalance,
+  nodeMine,
+  nodeAutoMine,
+  nodeAddPeer,
   formatInvokeError,
 } from '@/tauri';
 import { Button, ErrorDisplay, Loading, AddressDisplay } from '@/components/ui';
@@ -20,12 +23,17 @@ interface DashboardProps {
     finalizedHeight: number;
     blockCount: number;
     peerCount: number;
+    mempoolSize: number;
+    autoMine: boolean;
     syncing: boolean;
     version: string;
   } | null;
   onStartNode: () => void;
   onStopNode: () => void;
   onRefreshNodeStatus: () => void;
+  onMine: () => Promise<void>;
+  onAutoMine: (enabled: boolean) => Promise<void>;
+  onAddPeer: (address: string, nodeId?: string) => Promise<void>;
 }
 
 export function Dashboard({
@@ -44,6 +52,12 @@ export function Dashboard({
   const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mineLoading, setMineLoading] = useState(false);
+  const [autoMineLoading, setAutoMineLoading] = useState(false);
+  const [addPeerLoading, setAddPeerLoading] = useState(false);
+  const [addPeerError, setAddPeerError] = useState<string | null>(null);
+  const [peerAddress, setPeerAddress] = useState('127.0.0.1:30333');
+  const [peerNodeId, setPeerNodeId] = useState('');
 
   const fetchBalance = async () => {
     setLoading(true);
@@ -60,6 +74,52 @@ export function Dashboard({
       setError(formatInvokeError(err));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleMine = async () => {
+    setMineLoading(true);
+    try {
+      await nodeMine({});
+      await fetchBalance();
+      await refreshNodeStatus();
+    } catch (err) {
+      setAddPeerError(formatInvokeError(err));
+    } finally {
+      setMineLoading(false);
+    }
+  };
+
+  const handleAutoMine = async (enabled: boolean) => {
+    setAutoMineLoading(true);
+    try {
+      await nodeAutoMine({ enabled });
+      await refreshNodeStatus();
+    } catch (err) {
+      setAddPeerError(formatInvokeError(err));
+    } finally {
+      setAutoMineLoading(false);
+    }
+  };
+
+  const handleAddPeer = async () => {
+    setAddPeerLoading(true);
+    setAddPeerError(null);
+    try {
+      await nodeAddPeer({ address: peerAddress, node_id: peerNodeId || undefined });
+      setAddPeerError(null);
+    } catch (err) {
+      setAddPeerError(formatInvokeError(err));
+    } finally {
+      setAddPeerLoading(false);
+    }
+  };
+
+  const refreshNodeStatus = async () => {
+    try {
+      await onRefreshNodeStatus();
+    } catch {
+      // ignore refresh errors
     }
   };
 
@@ -141,6 +201,26 @@ export function Dashboard({
               </div>
               <div className="bg-slate-800/50 rounded-lg p-3">
                 <p className="text-xs text-slate-400 uppercase tracking-wider">
+                  Mempool
+                </p>
+                <p className="text-sm text-white font-mono">
+                  {nodeInfo.mempoolSize}
+                </p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">
+                  Auto-mine
+                </p>
+                <p className={`text-sm font-mono ${
+                  nodeInfo.autoMine
+                    ? 'text-emerald-400'
+                    : 'text-slate-400'
+                }`}>
+                  {nodeInfo.autoMine ? 'on' : 'off'}
+                </p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg p-3">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">
                   Syncing
                 </p>
                 <p className={`text-sm font-mono ${
@@ -151,6 +231,94 @@ export function Dashboard({
                   {nodeInfo.syncing ? 'yes' : 'no'}
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {nodeConnected && nodeInfo && (
+          <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-6">
+            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
+              Node controls
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <Button
+                variant={nodeInfo.autoMine ? 'primary' : 'secondary'}
+                onClick={handleMine}
+                className="w-full"
+                disabled={mineLoading}
+              >
+                {mineLoading ? (
+                  <span className="flex items-center gap-2">
+                    <Loading className="h-4 w-4" />
+                    Mining...
+                  </span>
+                ) : (
+                  'Mine block'
+                )}
+              </Button>
+              <Button
+                variant={nodeInfo.autoMine ? 'secondary' : 'secondary'}
+                onClick={() => handleAutoMine(!nodeInfo.autoMine)}
+                className="w-full"
+                disabled={autoMineLoading}
+              >
+                {autoMineLoading ? (
+                  <span className="flex items-center gap-2">
+                    <Loading className="h-4 w-4" />
+                  </span>
+                ) : (
+                  nodeInfo.autoMine ? 'Disable auto-mine' : 'Enable auto-mine'
+                )}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={onRefreshNodeStatus}
+                className="w-full"
+              >
+                Refresh status
+              </Button>
+            </div>
+
+            {addPeerError && (
+              <div className="mb-4 p-3 rounded bg-red-500/10 text-red-400 text-xs">
+                {addPeerError}
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-slate-400 uppercase tracking-wider mb-2 block">
+                  Peer address (host:port)
+                </label>
+                <input
+                  type="text"
+                  value={peerAddress}
+                  onChange={(e) => setPeerAddress(e.target.value)}
+                  placeholder="127.0.0.1:30333"
+                  className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm text-white"
+                  disabled={addPeerLoading}
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 uppercase tracking-wider mb-2 block">
+                  Node ID (hex, optional)
+                </label>
+                <input
+                  type="text"
+                  value={peerNodeId}
+                  onChange={(e) => setPeerNodeId(e.target.value)}
+                  placeholder="64 hex chars"
+                  className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm text-white"
+                  disabled={addPeerLoading}
+                />
+              </div>
+              <Button
+                variant="primary"
+                onClick={handleAddPeer}
+                className="w-full"
+                disabled={addPeerLoading}
+              >
+                {addPeerLoading ? 'Adding...' : 'Add peer'}
+              </Button>
             </div>
           </div>
         )}
