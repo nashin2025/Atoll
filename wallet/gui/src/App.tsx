@@ -159,8 +159,10 @@ export default function App() {
           : prev.nodeInfo,
       }));
       await handleRefreshNodeStatus();
+      return result.txs_included;
     } catch (err) {
       console.error('Mine failed:', err);
+      return null;
     }
   }, []);
 
@@ -211,7 +213,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-20 bg-slate-900/80 border-r border-slate-800/50 backdrop-blur-sm z-50 flex flex-col">
+      <aside className="fixed left-0 top-0 h-full w-24 bg-slate-900/80 border-r border-slate-800/50 backdrop-blur-sm z-50 flex flex-col">
         <div className="flex items-center justify-center h-16 px-1">
           <span className="text-xl">🪙</span>
         </div>
@@ -226,7 +228,7 @@ export default function App() {
               icon={<span className="text-xs">{v.icon}</span>}
               title={v.label}
             >
-              <span className="truncate">{v.label}</span>
+              <span className="whitespace-nowrap">{v.label}</span>
             </NavLink>
           ))}
         </nav>

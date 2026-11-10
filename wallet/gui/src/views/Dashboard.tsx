@@ -38,7 +38,7 @@ interface DashboardProps {
   onStartNode: () => void;
   onStopNode: () => void;
   onRefreshNodeStatus: () => void;
-  onMine: () => Promise<void>;
+  onMine: () => Promise<number | null>;
   onAutoMine: (enabled: boolean) => Promise<void>;
   onAddPeer: (address: string, nodeId?: string) => Promise<void>;
 }
@@ -65,6 +65,7 @@ export function Dashboard({
   const [success, setSuccess] = useState<string | null>(null);
   const [mineLoading, setMineLoading] = useState(false);
   const [autoMineLoading, setAutoMineLoading] = useState(false);
+  const [txsIncluded, setTxsIncluded] = useState<number | null>(null);
   const [addPeerLoading, setAddPeerLoading] = useState(false);
   const [addPeerError, setAddPeerError] = useState<string | null>(null);
   const [peerAddress, setPeerAddress] = useState('127.0.0.1:30333');
@@ -92,7 +93,8 @@ export function Dashboard({
     setMineLoading(true);
     setError(null);
     try {
-      await onMine();
+      const txs = await onMine();
+      setTxsIncluded(txs);
       await fetchBalance();
       await onRefreshNodeStatus();
       setSuccess('Block mined successfully');
@@ -190,6 +192,11 @@ export function Dashboard({
               title="Block count"
               value={nodeInfo.blockCount.toLocaleString()}
               variant="default"
+            />
+            <StatCard
+              title="Block TXs"
+              value={txsIncluded === null ? '–' : txsIncluded}
+              variant={txsIncluded === null || txsIncluded === 0 ? 'warning' : 'success'}
             />
             <StatCard
               title="Peers"
