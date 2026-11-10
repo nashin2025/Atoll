@@ -192,24 +192,14 @@ jobs:
           if ($env:PFX_PATH -and (Test-Path $env:PFX_PATH)) { Remove-Item -Force $env:PFX_PATH }
 
       - name: Upload atoll-node.exe to release
-        uses: actions/upload-release-asset@v1
+        run: gh release upload ${{ github.ref_name }} target/release/atoll-node.exe --clobber
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        with:
-          upload_url: ${{ needs.release.outputs.upload_url }}
-          asset_path: target/release/atoll-node.exe
-          asset_name: atoll-node.exe
-          asset_content_type: application/octet-stream
 
       - name: Upload wallet-cli.exe to release
-        uses: actions/upload-release-asset@v1
+        run: gh release upload ${{ github.ref_name }} target/release/wallet-cli.exe --clobber
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        with:
-          upload_url: ${{ needs.release.outputs.upload_url }}
-          asset_path: target/release/wallet-cli.exe
-          asset_name: wallet-cli.exe
-          asset_content_type: application/octet-stream
 
   # ============================================================================
   # WINDOWS GUI BUILD + CODE SIGNING
@@ -301,14 +291,9 @@ jobs:
           if ($env:PFX_PATH -and (Test-Path $env:PFX_PATH)) { Remove-Item -Force $env:PFX_PATH }
 
       - name: Upload atoll-gui.exe to release
-        uses: actions/upload-release-asset@v1
+        run: gh release upload ${{ github.ref_name }} target/release/atoll-gui.exe --clobber
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        with:
-          upload_url: ${{ needs.release.outputs.upload_url }}
-          asset_path: target/release/atoll-gui.exe
-          asset_name: atoll-gui.exe
-          asset_content_type: application/octet-stream
 
   # ============================================================================
   # MACOS BUILD (ad-hoc signing - notarization requires paid cert)
@@ -374,15 +359,10 @@ jobs:
           fi
 
       - name: Upload macOS app to release
-        uses: actions/upload-release-asset@v1
-        continue-on-error: true
+        run: gh release upload ${{ github.ref_name }} target/release/bundle/macos/Atoll\ GUI\ Wallet.app --clobber
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        with:
-          upload_url: ${{ needs.release.outputs.upload_url }}
-          asset_path: target/release/bundle/macos/Atoll GUI Wallet.app
-          asset_name: Atoll-GUI-Wallet-macOS.zip
-          asset_content_type: application/zip
+        continue-on-error: true
 
   # ============================================================================
   # GENERATE SBOM
@@ -456,12 +436,7 @@ jobs:
           prerelease: false
 
       - name: Upload SBOM to release
-        uses: actions/upload-release-asset@v1
-        continue-on-error: true
+        run: gh release upload ${{ github.ref_name }} sbom.atoll-node.json --clobber
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        with:
-          upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: sbom.atoll-node.json
-          asset_name: sbom.atoll-node.json
-          asset_content_type: application/json
+        continue-on-error: true
