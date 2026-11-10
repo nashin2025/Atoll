@@ -154,9 +154,11 @@ export function AddressDisplay({
 export function Badge({
   children,
   variant = 'default',
+  className = '',
 }: {
   children: ReactNode;
   variant?: 'default' | 'success' | 'warning' | 'error' | 'muted';
+  className?: string;
 }) {
   const variants: Record<string, string> = {
     default: 'bg-slate-700 text-slate-300',
@@ -167,7 +169,7 @@ export function Badge({
   };
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border ${variants[variant]}`}
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border ${variants[variant]} ${className}`}
     >
       {children}
     </span>

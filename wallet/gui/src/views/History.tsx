@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { walletHistory, nodeGetBalance, formatInvokeError } from '@/tauri';
-import { Button, ErrorDisplay, Input, Loading, Card, CardHeader, Badge } from '@/components/ui';
+import { Button, ErrorDisplay, Input, Loading, Card, CardHeader } from '@/components/ui';
 
 interface HistoryProps {
   onBack: () => void;

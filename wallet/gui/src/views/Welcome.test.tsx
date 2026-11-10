@@ -1,3 +1,4 @@
+/// <reference types="@testing-library/jest-dom" />
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Welcome } from '@/views/Welcome';
@@ -18,9 +19,9 @@ beforeEach(() => {
 describe('Welcome', () => {
   it('renders the unlock form by default', () => {
     render(<Welcome onUnlocked={vi.fn()} />);
-    expect(screen.getByRole('heading', { name: /atoll wallet/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/passphrase/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /unlock wallet/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /atoll wallet/i })).not.toBeNull();
+    expect(screen.queryByLabelText(/passphrase/i)).not.toBeNull();
+    expect(screen.queryByRole('button', { name: /unlock wallet/i })).not.toBeNull();
   });
 
   it('calls wallet-unlock with the passphrase and notifies parent', async () => {
@@ -81,7 +82,7 @@ describe('Welcome', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /unlock wallet/i }));
     await vi.waitFor(() => {
-      expect(screen.getByText(/wrong passphrase/i)).toBeInTheDocument();
+      expect(screen.queryByText(/wrong passphrase/i)).not.toBeNull();
     });
   });
 });

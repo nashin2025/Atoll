@@ -1,3 +1,4 @@
+/// <reference types="@testing-library/jest-dom" />
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Dashboard } from '@/views/Dashboard';
@@ -35,18 +36,18 @@ describe('Dashboard', () => {
   it('renders address and balance', async () => {
     vi.mocked(walletBalance).mockResolvedValue({ address: '0xabc123', balance: 1234 });
     render(<Dashboard {...defaultProps} />);
-    expect(screen.getByRole('heading', { name: /dashboard/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /dashboard/i })).not.toBeNull();
     await waitFor(() => {
-      expect(screen.getByText(/1234/)).toBeInTheDocument();
+      expect(screen.queryByText(/1234/)).not.toBeNull();
     });
-    expect(screen.getByText(/^ATOLL$/)).toBeInTheDocument();
+    expect(screen.queryByText(/^ATOLL$/)).not.toBeNull();
   });
 
   it('shows offline-mode hint when balance is zero', async () => {
     vi.mocked(walletBalance).mockResolvedValue({ address: '0xabc123', balance: 0 });
     render(<Dashboard {...defaultProps} />);
     await waitFor(() => {
-      expect(screen.getByText(/start the embedded node/i)).toBeInTheDocument();
+      expect(screen.queryByText(/start the embedded node/i)).not.toBeNull();
     });
   });
 
@@ -56,11 +57,11 @@ describe('Dashboard', () => {
       .mockResolvedValueOnce({ address: '0xabc123', balance: 42 });
     render(<Dashboard {...defaultProps} />);
     await waitFor(() => {
-      expect(screen.getByText(/5/)).toBeInTheDocument();
+      expect(screen.queryByText(/5/)).not.toBeNull();
     });
     fireEvent.click(screen.getByRole('button', { name: /refresh balance/i }));
     await waitFor(() => {
-      expect(screen.getByText(/42/)).toBeInTheDocument();
+      expect(screen.queryByText(/42/)).not.toBeNull();
     });
     expect(walletBalance).toHaveBeenCalledTimes(2);
   });
@@ -79,8 +80,8 @@ describe('Dashboard', () => {
       version: '1.0.0',
     }} />);
     await waitFor(() => {
-      expect(screen.getByText(/999/)).toBeInTheDocument();
+      expect(screen.queryByText(/999/)).not.toBeNull();
     });
-    expect(screen.getByText(/777777/i)).toBeInTheDocument();
+    expect(screen.queryByText(/777777/i)).not.toBeNull();
   });
 });

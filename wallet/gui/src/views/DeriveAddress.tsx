@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { walletDeriveAddress, formatInvokeError } from '@/tauri';
-import { Button, ErrorDisplay, Input, AddressDisplay, Card, CardHeader } from '@/components/ui';
+import { Button, ErrorDisplay, Input, Card, CardHeader } from '@/components/ui';
 
 interface DeriveAddressProps {
   onBack: () => void;

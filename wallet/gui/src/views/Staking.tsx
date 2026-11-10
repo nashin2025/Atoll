@@ -3,14 +3,12 @@ import {
   Button,
   ErrorDisplay,
   Input,
-  AddressDisplay,
   Loading,
   Card,
   CardHeader,
-  Badge,
   SuccessDisplay,
 } from '@/components/ui';
-import { walletStake, walletUnstake, walletStakeInfo } from '@/tauri';
+import { walletStake, walletUnstake, walletStakeInfo, formatInvokeError } from '@/tauri';
 
 interface StakingProps {
   address: string;
@@ -32,8 +30,8 @@ export function Staking({ address, passphrase, onBack }: StakingProps) {
     setError(null);
     try {
       const response = await walletStakeInfo({ address });
-      setStakedAmount(response.staked_amount);
-      setRewards(response.rewards);
+      setStakedAmount(String(response.staked_amount));
+      setRewards(String(response.rewards));
     } catch (err) {
       setError(formatInvokeError(err));
     } finally {

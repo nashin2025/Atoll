@@ -257,7 +257,7 @@ export default function App() {
           </div>
           <div className="flex items-center gap-3">
             <AddressDisplay
-              address={selectedAddress}
+              address={selectedAddress ?? ''}
               shorten={true}
               onCopy={() => navigator.clipboard.writeText(selectedAddress ?? '')}
             />

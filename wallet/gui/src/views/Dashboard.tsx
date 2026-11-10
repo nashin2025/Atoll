@@ -2,15 +2,11 @@ import { useEffect, useState } from 'react';
 import {
   walletBalance,
   nodeGetBalance,
-  nodeMine,
-  nodeAutoMine,
-  nodeAddPeer,
   formatInvokeError,
 } from '@/tauri';
 import {
   Button,
   ErrorDisplay,
-  Loading,
   AddressDisplay,
   Card,
   CardHeader,
@@ -170,7 +166,7 @@ export function Dashboard({
                 Start node
               </Button>
             )}
-            <Button variant="secondary" onClick={onRefreshNodeStatus} size="sm" icon>
+            <Button variant="secondary" onClick={onRefreshNodeStatus} size="sm">
               Refresh
             </Button>
             <Button variant="secondary" onClick={onLock} size="sm">

@@ -1,3 +1,4 @@
+/// <reference types="@testing-library/jest-dom" />
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import App from '@/App';
@@ -22,24 +23,24 @@ beforeEach(() => {
 describe('App', () => {
   it('renders the welcome view initially', () => {
     render(<App />);
-    expect(screen.getByRole('heading', { name: /atoll wallet/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /unlock wallet/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /create new wallet/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /import existing key/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /atoll wallet/i })).not.toBeNull();
+    expect(screen.queryByRole('button', { name: /unlock wallet/i })).not.toBeNull();
+    expect(screen.queryByRole('button', { name: /create new wallet/i })).not.toBeNull();
+    expect(screen.queryByRole('button', { name: /import existing key/i })).not.toBeNull();
   });
 
   it('navigates to the create-wallet view', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: /create new wallet/i }));
-    expect(screen.getByRole('heading', { name: /create new wallet/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/passphrase to encrypt keystore/i)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /create new wallet/i })).not.toBeNull();
+    expect(screen.queryByLabelText(/passphrase to encrypt keystore/i)).not.toBeNull();
   });
 
   it('navigates to the import-wallet view', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: /import existing key/i }));
-    expect(screen.getByRole('heading', { name: /import wallet/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/secret key \(hex\)/i)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /import wallet/i })).not.toBeNull();
+    expect(screen.queryByLabelText(/secret key \(hex\)/i)).not.toBeNull();
   });
 
   it('calls wallet-unlock on unlock and switches to dashboard', async () => {
@@ -50,7 +51,7 @@ describe('App', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /unlock wallet/i }));
     await vi.waitFor(() => {
-      expect(screen.getByRole('heading', { name: /dashboard/i })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /dashboard/i })).not.toBeNull();
     });
     expect(walletUnlock).toHaveBeenCalledTimes(1);
   });
