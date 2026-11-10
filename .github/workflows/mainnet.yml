@@ -192,7 +192,7 @@ jobs:
           if ($env:PFX_PATH -and (Test-Path $env:PFX_PATH)) { Remove-Item -Force $env:PFX_PATH }
 
       - name: Upload atoll-node.exe to release
-        uses: actions/upload-release-asset@v3
+        uses: actions/upload-release-asset@v2
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -202,7 +202,7 @@ jobs:
           asset_content_type: application/octet-stream
 
       - name: Upload wallet-cli.exe to release
-        uses: actions/upload-release-asset@v3
+        uses: actions/upload-release-asset@v2
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -301,7 +301,7 @@ jobs:
           if ($env:PFX_PATH -and (Test-Path $env:PFX_PATH)) { Remove-Item -Force $env:PFX_PATH }
 
       - name: Upload atoll-gui.exe to release
-        uses: actions/upload-release-asset@v3
+        uses: actions/upload-release-asset@v2
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -374,7 +374,7 @@ jobs:
           fi
 
       - name: Upload macOS app to release
-        uses: actions/upload-release-asset@v3
+        uses: actions/upload-release-asset@v2
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -440,7 +440,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download SBOM artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         continue-on-error: true
         with:
           name: sbom-atoll-node
@@ -474,7 +474,7 @@ jobs:
           prerelease: false
 
       - name: Upload SBOM to release
-        uses: actions/upload-release-asset@v3
+        uses: actions/upload-release-asset@v2
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
