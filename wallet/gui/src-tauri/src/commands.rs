@@ -38,6 +38,16 @@ use zeroize::{Zeroize, Zeroizing};
 use crate::error::GuiError;
 use crate::node::{NodeManager, NodeState};
 
+// ---------------------------------------------------------------------------
+// Logging: thin wrapper over log_msg! so we can swap in a real logging
+// crate (e.g. `tracing` or `log`) without touching every call site.
+// ---------------------------------------------------------------------------
+macro_rules! log_msg {
+    ($($tt:tt)*) => {
+        eprintln!($($tt)*)
+    };
+}
+
 /// The only token supported by the MVP.
 const ATOLL: &str = "ATOLL";
 
@@ -135,6 +145,7 @@ pub struct DeriveAddressResponse {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct NodeStartRequest {}
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -146,6 +157,7 @@ pub struct NodeStartResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct NodeStopRequest {}
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -597,7 +609,7 @@ fn do_node_add_peer(
             GuiError::Io(format!("peer manager lock poisoned: {e}"))
         })?;
         if pm.add_peer(peer_info.node_id, peer_info.clone()) {
-            eprintln!("Added peer {} ({})", address, hex::encode(&peer_info.node_id));
+            log_msg!("Added peer {} ({})", address, hex::encode(&peer_info.node_id));
         } else {
             return Err(GuiError::Io(
                 "failed to add peer (at max peers or banned)".to_string(),
@@ -615,7 +627,7 @@ fn do_node_add_peer(
         }
     }
 
-    eprintln!("Peer added successfully: {}", address);
+    log_msg!("Peer added successfully: {}", address);
     Ok(())
 }
 
@@ -642,7 +654,7 @@ fn record_failed_unlock(keystore_path: &Path) {
             *attempts.entry(path).or_insert(0) += 1;
         }
         Err(e) => {
-            eprintln!("failed-unlock attempts mutex poisoned: {e}");
+            log_msg!("failed-unlock attempts mutex poisoned: {e}");
         }
     }
 }
@@ -654,7 +666,7 @@ fn reset_unlock_attempts(keystore_path: &Path) {
             attempts.remove(&path);
         }
         Err(e) => {
-            eprintln!("failed-unlock attempts mutex poisoned: {e}");
+            log_msg!("failed-unlock attempts mutex poisoned: {e}");
         }
     }
 }
@@ -664,7 +676,7 @@ fn is_unlock_rate_limited(keystore_path: &Path) -> bool {
     match unlock_attempts().lock() {
         Ok(attempts) => attempts.get(&path).copied().unwrap_or(0) >= MAX_FAILED_UNLOCK_ATTEMPTS,
         Err(e) => {
-            eprintln!("failed-unlock attempts mutex poisoned: {e}");
+            log_msg!("failed-unlock attempts mutex poisoned: {e}");
             true // fail closed: rate-limited on lock error
         }
     }

@@ -38,7 +38,7 @@ hybrid-array = "0.4"
 zeroize = "1.6"
 
 # RandomX (CPU-hard)
-# randomx = "0.2"  # TODO: Add when RandomX Rust bindings available
+# randomx = "0.2"  # Add when RandomX Rust bindings are available
 
 # Encoding
 hex = "0.4"
