@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { walletUnlock, walletNew, walletImport, formatInvokeError } from '@/tauri';
-import { Button, ErrorDisplay, Input } from '@/components/ui';
+import { Button, ErrorDisplay, Input, Card, CardHeader } from '@/components/ui';
 
 type View = 'unlock' | 'create' | 'import';
 
@@ -61,78 +61,41 @@ export function Welcome({ onUnlocked }: WelcomeProps) {
     }
   };
 
-  const renderUnlock = () => (
-    <form onSubmit={handleUnlock} className="space-y-4">
-      <Input
-        label="Passphrase"
-        type="password"
-        placeholder="Enter your wallet passphrase"
-        value={passphrase}
-        onChange={(e) => setPassphrase(e.target.value)}
-        disabled={loading}
-      />
-      <Button type="submit" disabled={loading || !passphrase}>
-        Unlock wallet
-      </Button>
-    </form>
-  );
-
-  const renderCreate = () => (
-    <form onSubmit={handleCreate} className="space-y-4">
-      <Input
-        label="Passphrase to encrypt keystore"
-        type="password"
-        placeholder="Choose a passphrase"
-        value={newPassphrase}
-        onChange={(e) => setNewPassphrase(e.target.value)}
-        disabled={loading}
-      />
-      <Button type="submit" disabled={loading || !newPassphrase}>
-        Create wallet
-      </Button>
-    </form>
-  );
-
-  const renderImport = () => (
-    <form onSubmit={handleImport} className="space-y-4">
-      <Input
-        label="Secret key (hex)"
-        type="text"
-        placeholder="64 hexadecimal characters (32 bytes)"
-        value={secretKey}
-        onChange={(e) => setSecretKey(e.target.value)}
-        disabled={loading}
-      />
-      <Input
-        label="Passphrase to encrypt keystore"
-        type="password"
-        placeholder="Choose a passphrase"
-        value={newPassphrase}
-        onChange={(e) => setNewPassphrase(e.target.value)}
-        disabled={loading}
-      />
-      <Button type="submit" disabled={loading || !secretKey || !newPassphrase}>
-        Import wallet
-      </Button>
-    </form>
-  );
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center">
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <span className="text-3xl">🪙</span>
+          </div>
           <h1 className="text-3xl font-bold text-white tracking-tight">Atoll Wallet</h1>
-          <p className="mt-1 text-slate-400 text-sm">
-            Ed25519 keystore — offline signing — shared with the CLI
+          <p className="mt-2 text-slate-400 text-sm">
+            Ed25519 keystore · Offline signing · Shared with CLI
           </p>
         </div>
 
         {error && <ErrorDisplay message={error} />}
 
         {view === 'unlock' && (
-          <div className="space-y-4">
-            {renderUnlock()}
-            <div className="border-t border-slate-700 pt-4 space-y-3">
+          <>
+            <Card>
+              <CardHeader title="Unlock wallet" />
+              <form onSubmit={handleUnlock} className="space-y-4">
+                <Input
+                  label="Passphrase"
+                  type="password"
+                  placeholder="Enter your wallet passphrase"
+                  value={passphrase}
+                  onChange={(e) => setPassphrase(e.target.value)}
+                  disabled={loading}
+                />
+                <Button type="submit" variant="primary" disabled={loading || !passphrase} className="w-full">
+                  Unlock wallet
+                </Button>
+              </form>
+            </Card>
+
+            <div className="border-t border-slate-700/50 pt-6 space-y-3 mt-6">
               <p className="text-xs text-slate-500">
                 No existing wallet? Create or import one below.
               </p>
@@ -159,49 +122,81 @@ export function Welcome({ onUnlocked }: WelcomeProps) {
                 Import existing key
               </Button>
             </div>
-          </div>
+          </>
         )}
 
         {view === 'create' && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-white">Create new wallet</h2>
-            <p className="text-sm text-slate-400">
+          <Card>
+            <CardHeader title="Create new wallet" />
+            <p className="text-sm text-slate-400 mb-4">
               A new Ed25519 key will be generated and encrypted to your keystore.
             </p>
-            {renderCreate()}
+            <form onSubmit={handleCreate} className="space-y-4">
+              <Input
+                label="Passphrase to encrypt keystore"
+                type="password"
+                placeholder="Choose a passphrase"
+                value={newPassphrase}
+                onChange={(e) => setNewPassphrase(e.target.value)}
+                disabled={loading}
+              />
+              <Button type="submit" variant="primary" disabled={loading || !newPassphrase} className="w-full">
+                Create wallet
+              </Button>
+            </form>
             <Button
               variant="secondary"
               onClick={() => {
                 setView('unlock');
                 setError(null);
               }}
-              className="w-full"
+              className="w-full mt-4"
               disabled={loading}
             >
               Back to unlock
             </Button>
-          </div>
+          </Card>
         )}
 
         {view === 'import' && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-white">Import wallet</h2>
-            <p className="text-sm text-slate-400">
+          <Card>
+            <CardHeader title="Import wallet" />
+            <p className="text-sm text-slate-400 mb-4">
               Paste an existing Ed25519 secret key (hex) to import it.
             </p>
-            {renderImport()}
+            <form onSubmit={handleImport} className="space-y-4">
+              <Input
+                label="Secret key (hex)"
+                type="text"
+                placeholder="64 hexadecimal characters (32 bytes)"
+                value={secretKey}
+                onChange={(e) => setSecretKey(e.target.value)}
+                disabled={loading}
+              />
+              <Input
+                label="Passphrase to encrypt keystore"
+                type="password"
+                placeholder="Choose a passphrase"
+                value={newPassphrase}
+                onChange={(e) => setNewPassphrase(e.target.value)}
+                disabled={loading}
+              />
+              <Button type="submit" variant="primary" disabled={loading || !secretKey || !newPassphrase} className="w-full">
+                Import wallet
+              </Button>
+            </form>
             <Button
               variant="secondary"
               onClick={() => {
                 setView('unlock');
                 setError(null);
               }}
-              className="w-full"
+              className="w-full mt-4"
               disabled={loading}
             >
               Back to unlock
             </Button>
-          </div>
+          </Card>
         )}
       </div>
     </div>

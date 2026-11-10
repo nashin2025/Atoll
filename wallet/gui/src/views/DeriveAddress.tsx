@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { walletDeriveAddress, formatInvokeError } from '@/tauri';
-import { Button, ErrorDisplay, Input } from '@/components/ui';
+import { Button, ErrorDisplay, Input, AddressDisplay, Card, CardHeader } from '@/components/ui';
 
 interface DeriveAddressProps {
   onBack: () => void;
@@ -34,16 +34,14 @@ export function DeriveAddress({ onBack }: DeriveAddressProps) {
           <Button variant="secondary" onClick={onBack} className="flex items-center gap-2 text-sm h-9 px-3">
             ← Back
           </Button>
-          <h1 className="text-2xl font-bold text-white">Derive Address</h1>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Derive Address</h1>
         </header>
 
         {error && <ErrorDisplay message={error} />}
 
         <form onSubmit={handleDerive} className="space-y-6">
-          <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl p-6">
-            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-              Public Key
-            </h2>
+          <Card>
+            <CardHeader title="Public key" />
             <Input
               label="Ed25519 public key (hex)"
               placeholder="64 hexadecimal characters (32 bytes)"
@@ -51,19 +49,16 @@ export function DeriveAddress({ onBack }: DeriveAddressProps) {
               onChange={(e) => setPublicKey(e.target.value)}
             />
             <p className="text-xs text-slate-500 mt-2">
-              Enter a 32-byte Ed25519 public key in hexadecimal to derive the
-              corresponding Atoll address.
+              Enter a 32-byte Ed25519 public key in hexadecimal to derive the corresponding Atoll address.
             </p>
             <Button type="submit" variant="primary" disabled={loading || !publicKey}>
               Derive address
             </Button>
-          </div>
+          </Card>
 
           {address && (
-            <div className="bg-slate-900/50 border border-indigo-500/50 rounded-xl p-6">
-              <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
-                Derived address
-              </h2>
+            <Card>
+              <CardHeader title="Derived address" />
               <div className="relative mb-4">
                 <input
                   readOnly
@@ -81,7 +76,7 @@ export function DeriveAddress({ onBack }: DeriveAddressProps) {
               <p className="text-xs text-slate-500">
                 Share this address to receive ATOLL.
               </p>
-            </div>
+            </Card>
           )}
         </form>
       </div>
