@@ -26,10 +26,16 @@ use atoll_core::{
     chain::blockchain::Blockchain,
     chain::genesis::{GenesisConfig, GenesisLoader},
     chain::state::ChainState,
-    consensus::penta::{poh, por, pos_vrf, post, pouw, PentaConsensus},
+    consensus::penta::{
+        poh, por, pos_vrf, post, pouw, PentaConsensus,
+    },
     network::{
-        bootstrap::BootstrapClient, discovery::DiscoveryProtocol, node_identity::NodeIdentity,
-        p2p::PeerListener, peer_manager::PeerManager, sync::SyncManager,
+        bootstrap::BootstrapClient,
+        discovery::DiscoveryProtocol,
+        node_identity::NodeIdentity,
+        p2p::PeerListener,
+        peer_manager::PeerManager,
+        sync::SyncManager,
     },
     primitives::address::Address,
     primitives::block::{Block, BlockBody, BlockHeader},
@@ -271,11 +277,7 @@ impl NodeManager {
                         Ok(conn) => {
                             let peer_id = conn.node_id();
                             let addr = conn.address().to_string();
-                            eprintln!(
-                                "Inbound connection from {} ({})",
-                                addr,
-                                hex::encode(&peer_id)
-                            );
+                            eprintln!("Inbound connection from {} ({})", addr, hex::encode(&peer_id));
                             // Phase 1: accept and immediately close.
                             // Phase 2: maintain connection for gossip/block sync.
                             drop(conn);
@@ -308,20 +310,14 @@ impl NodeManager {
                             let pending_txs: Vec<Transaction> = {
                                 let mut mp = mempool.write().unwrap();
                                 let count = mp.len().min(100); // max 100 txs per block
-                                (0..count)
-                                    .filter_map(|_| mp.pop_front())
-                                    .map(|mt| mt.tx)
-                                    .collect()
+                                (0..count).filter_map(|_| mp.pop_front()).map(|mt| mt.tx).collect()
                             };
 
                             if pending_txs.is_empty() {
                                 // Still produce empty blocks to keep chain advancing
                                 eprintln!("No transactions in mempool, producing empty block...");
                             } else {
-                                eprintln!(
-                                    "Producing block with {} transactions",
-                                    pending_txs.len()
-                                );
+                                eprintln!("Producing block with {} transactions", pending_txs.len());
                             }
 
                             // Build the new block
@@ -341,7 +337,7 @@ impl NodeManager {
                                 prev_hash,
                                 state_root: Hash512::zero(), // Phase 2: compute from state
                                 transaction_root: Hash512::zero(), // Phase 2: compute from txs
-                                proposer: Address::zero(),   // Phase 2: set to validator address
+                                proposer: Address::zero(), // Phase 2: set to validator address
                                 difficulty: INITIAL_DIFFICULTY as u128,
                             };
 
@@ -401,10 +397,7 @@ impl NodeManager {
                                             }
                                         }
                                     } else {
-                                        eprintln!(
-                                            "Block validation failed: composite={:.3}",
-                                            val.composite_score
-                                        );
+                                        eprintln!("Block validation failed: composite={:.3}", val.composite_score);
                                     }
                                 }
                                 Err(e) => {
@@ -529,10 +522,7 @@ impl NodeManager {
                 .write()
                 .map_err(|e| format!("mempool lock poisoned: {e}"))?;
             let count = mp.len().min(100);
-            (0..count)
-                .filter_map(|_| mp.pop_front())
-                .map(|mt| mt.tx)
-                .collect()
+            (0..count).filter_map(|_| mp.pop_front()).map(|mt| mt.tx).collect()
         };
 
         let bc = self.blockchain.read().unwrap();
@@ -598,8 +588,7 @@ impl NodeManager {
         }
 
         let mut bc = self.blockchain.write().unwrap();
-        bc.insert_block(block, &val)
-            .map_err(|e| format!("insert failed: {e}"))
+        bc.insert_block(block, &val).map_err(|e| format!("insert failed: {e}"))
     }
 
     /// Toggles auto-mining on/off.
