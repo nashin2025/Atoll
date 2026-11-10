@@ -34,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [1.0.6] — 2026-11-09
 
+### Added
+
+- Block Explorer backend (Node.js + Express + GraphQL proxy)
+- Docker Compose infrastructure for Block Explorer
+
+## [1.0.5] — 2026-11-09
 
 ### Added
 

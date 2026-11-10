@@ -255,6 +255,10 @@ jobs:
         run: npm ci
         working-directory: explorer/frontend
 
+      - name: Run frontend build
+        run: npm run build
+        working-directory: explorer/frontend
+
       - name: Build frontend
         run: npm run build
         working-directory: explorer/frontend
@@ -293,6 +297,7 @@ jobs:
              [ "${{ needs.secrets-scan.result }}" != "success" ] || \
              [ "${{ needs.dependency-scan.result }}" != "success" ] || \
              [ "${{ needs.build.result }}" != "success" ] || \
+             [ "${{ needs.benchmarks.result }}" != "success" ] || \
              [ "${{ needs.frontend-test.result }}" != "success" ]; then
             echo "::error::Quality gate failed"
             exit 1
