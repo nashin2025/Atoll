@@ -636,26 +636,37 @@ fn unlock_attempts() -> &'static Mutex<HashMap<String, u32>> {
 
 fn record_failed_unlock(keystore_path: &Path) {
     let path = keystore_path.to_string_lossy().to_string();
-    let mut attempts = unlock_attempts()
-        .lock()
-        .expect("failed-unlock attempts mutex poisoned");
-    *attempts.entry(path).or_insert(0) += 1;
+    match unlock_attempts().lock() {
+        Ok(mut attempts) => {
+            *attempts.entry(path).or_insert(0) += 1;
+        }
+        Err(e) => {
+            eprintln!("failed-unlock attempts mutex poisoned: {e}");
+        }
+    }
 }
 
 fn reset_unlock_attempts(keystore_path: &Path) {
     let path = keystore_path.to_string_lossy().to_string();
-    let mut attempts = unlock_attempts()
-        .lock()
-        .expect("failed-unlock attempts mutex poisoned");
-    attempts.remove(&path);
+    match unlock_attempts().lock() {
+        Ok(mut attempts) => {
+            attempts.remove(&path);
+        }
+        Err(e) => {
+            eprintln!("failed-unlock attempts mutex poisoned: {e}");
+        }
+    }
 }
 
 fn is_unlock_rate_limited(keystore_path: &Path) -> bool {
     let path = keystore_path.to_string_lossy().to_string();
-    let attempts = unlock_attempts()
-        .lock()
-        .expect("failed-unlock attempts mutex poisoned");
-    attempts.get(&path).copied().unwrap_or(0) >= MAX_FAILED_UNLOCK_ATTEMPTS
+    match unlock_attempts().lock() {
+        Ok(attempts) => attempts.get(&path).copied().unwrap_or(0) >= MAX_FAILED_UNLOCK_ATTEMPTS,
+        Err(e) => {
+            eprintln!("failed-unlock attempts mutex poisoned: {e}");
+            true // fail closed: rate-limited on lock error
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

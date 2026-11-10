@@ -49,7 +49,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use tokio::runtime::Runtime;
 
 // ---------------------------------------------------------------------------
@@ -239,7 +239,13 @@ impl NodeManager {
 
         // Spawn background networking thread
         thread::spawn(move || {
-            let rt = Runtime::new().expect("failed to create tokio runtime");
+            let rt = match Runtime::new() {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("failed to create tokio runtime: {e}");
+                    return;
+                }
+            };
             rt.block_on(async move {
                 // Step 1: Bootstrap - connect to seed nodes and discover peers
                 let client = BootstrapClient::new(identity.clone());
@@ -247,7 +253,13 @@ impl NodeManager {
 
                 // Register discovered peers with DiscoveryProtocol and PeerManager
                 {
-                    let mut disc = discovery.write().unwrap();
+                    let mut disc = match discovery.write() {
+                        Ok(d) => d,
+                        Err(e) => {
+                            eprintln!("discovery lock poisoned: {e}");
+                            return;
+                        }
+                    };
                     if let Some(disc) = disc.as_mut() {
                         for peer in &peers {
                             disc.register_peer(peer.clone());
@@ -255,7 +267,13 @@ impl NodeManager {
                     }
                 }
                 {
-                    let mut pm = peer_manager.write().unwrap();
+                    let mut pm = match peer_manager.write() {
+                        Ok(p) => p,
+                        Err(e) => {
+                            eprintln!("peer manager lock poisoned: {e}");
+                            return;
+                        }
+                    };
                     for peer in peers {
                         let _ = pm.add_peer(peer.node_id, peer);
                     }
@@ -292,7 +310,13 @@ impl NodeManager {
 
         // Spawn block producer thread if auto_mine is enabled
         {
-            let auto_mine = *self.auto_mine.read().unwrap();
+            let auto_mine = match self.auto_mine.read() {
+                Ok(a) => *a,
+                Err(e) => {
+                    eprintln!("auto_mine lock poisoned: {e}");
+                    true
+                }
+            };
             if auto_mine {
                 let blockchain = Arc::clone(&self.blockchain);
                 let consensus = Arc::clone(&self.consensus);
@@ -300,7 +324,13 @@ impl NodeManager {
                 let interval_ms = self.block_producer_interval_ms;
 
                 thread::spawn(move || {
-                    let rt = Runtime::new().expect("failed to create tokio runtime");
+                    let rt = match Runtime::new() {
+                        Ok(r) => r,
+                        Err(e) => {
+                            eprintln!("failed to create tokio runtime: {e}");
+                            return;
+                        }
+                    };
                     rt.block_on(async move {
                         loop {
                             // Sleep for the block interval
@@ -308,7 +338,13 @@ impl NodeManager {
 
                             // Take pending transactions from mempool
                             let pending_txs: Vec<Transaction> = {
-                                let mut mp = mempool.write().unwrap();
+                                let mut mp = match mempool.write() {
+                                    Ok(m) => m,
+                                    Err(e) => {
+                                        eprintln!("mempool lock poisoned: {e}");
+                                        break;
+                                    }
+                                };
                                 let count = mp.len().min(100); // max 100 txs per block
                                 (0..count).filter_map(|_| mp.pop_front()).map(|mt| mt.tx).collect()
                             };
@@ -321,7 +357,13 @@ impl NodeManager {
                             }
 
                             // Build the new block
-                            let bc = blockchain.read().unwrap();
+                            let bc = match blockchain.read() {
+                                Ok(b) => b,
+                                Err(e) => {
+                                    eprintln!("blockchain lock poisoned: {e}");
+                                    break;
+                                }
+                            };
                             let prev_hash = bc.tip_hash();
                             let height = bc.tip_height() + 1;
                             drop(bc);
@@ -330,10 +372,13 @@ impl NodeManager {
                                 version: 1,
                                 height,
                                 shard_id: 0,
-                                timestamp: std::time::SystemTime::now()
-                                    .duration_since(std::time::UNIX_EPOCH)
-                                    .unwrap()
-                                    .as_secs(),
+                                timestamp: match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                                    Ok(d) => d.as_secs(),
+                                    Err(e) => {
+                                        eprintln!("system time error: {e}");
+                                        break;
+                                    }
+                                },
                                 prev_hash,
                                 state_root: Hash512::zero(), // Phase 2: compute from state
                                 transaction_root: Hash512::zero(), // Phase 2: compute from txs
@@ -349,7 +394,13 @@ impl NodeManager {
                             };
 
                             // Run Penta-Consensus validation (all layers pass for single validator)
-                            let cs = consensus.read().unwrap();
+                            let cs = match consensus.read() {
+                                Ok(c) => c,
+                                Err(e) => {
+                                    eprintln!("consensus lock poisoned: {e}");
+                                    break;
+                                }
+                            };
                             let pouw_result = pouw::PoUWResult {
                                 valid: true,
                                 usefulness_score: 1.0,
@@ -440,7 +491,13 @@ impl NodeManager {
             .map_err(|e| format!("node state lock poisoned: {e}"))?;
         let running = *state == NodeState::Running;
         let syncing = *state == NodeState::Syncing;
-        let auto_mine = *self.auto_mine.read().unwrap();
+        let auto_mine = match self.auto_mine.read() {
+            Ok(a) => *a,
+            Err(e) => {
+                eprintln!("auto_mine lock poisoned: {e}");
+                false
+            }
+        };
 
         let blockchain = self
             .blockchain
@@ -471,25 +528,49 @@ impl NodeManager {
 
     /// Returns the ATOLL balance of an address from the embedded ChainState.
     pub fn get_balance(&self, address: &Address) -> u128 {
-        let state = self.chain_state.read().unwrap();
+        let state = match self.chain_state.read() {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("chain_state lock poisoned: {e}");
+                return 0;
+            }
+        };
         state.balance(address)
     }
 
     /// Returns the total ATOLL supply from the embedded ChainState.
     pub fn total_supply(&self) -> u128 {
-        let state = self.chain_state.read().unwrap();
+        let state = match self.chain_state.read() {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("chain_state lock poisoned: {e}");
+                return 0;
+            }
+        };
         state.total_supply()
     }
 
     /// Returns the MIND supply from the embedded ChainState.
     pub fn mind_supply(&self) -> u128 {
-        let state = self.chain_state.read().unwrap();
+        let state = match self.chain_state.read() {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("chain_state lock poisoned: {e}");
+                return 0;
+            }
+        };
         state.mind_supply()
     }
 
     /// Returns the PROOF balance of an address.
     pub fn proof_balance(&self, address: &Address) -> u128 {
-        let state = self.chain_state.read().unwrap();
+        let state = match self.chain_state.read() {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("chain_state lock poisoned: {e}");
+                return 0;
+            }
+        };
         state.proof_balance(address)
     }
 
@@ -501,17 +582,26 @@ impl NodeManager {
             .map_err(|e| format!("mempool lock poisoned: {e}"))?;
         mp.push_back(MempoolTx {
             tx,
-            received_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            received_at: match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                Ok(d) => d.as_secs(),
+                Err(e) => {
+                    eprintln!("system time error: {e}");
+                    0
+                }
+            },
         });
         Ok(())
     }
 
     /// Returns the number of transactions in the mempool.
     pub fn mempool_size(&self) -> usize {
-        self.mempool.read().unwrap().len()
+        match self.mempool.read() {
+            Ok(mp) => mp.len(),
+            Err(e) => {
+                eprintln!("mempool lock poisoned: {e}");
+                0
+            }
+        }
     }
 
     /// Mines a single block immediately (manual mine).
@@ -525,7 +615,10 @@ impl NodeManager {
             (0..count).filter_map(|_| mp.pop_front()).map(|mt| mt.tx).collect()
         };
 
-        let bc = self.blockchain.read().unwrap();
+        let bc = self
+            .blockchain
+            .read()
+            .map_err(|e| format!("blockchain lock poisoned: {e}"))?;
         let prev_hash = bc.tip_hash();
         let height = bc.tip_height() + 1;
         drop(bc);
@@ -534,10 +627,12 @@ impl NodeManager {
             version: 1,
             height,
             shard_id: 0,
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            timestamp: match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                Ok(d) => d.as_secs(),
+                Err(e) => {
+                    return Err(format!("system time error: {e}"));
+                }
+            },
             prev_hash,
             state_root: Hash512::zero(),
             transaction_root: Hash512::zero(),
@@ -552,7 +647,10 @@ impl NodeManager {
             },
         };
 
-        let cs = self.consensus.read().unwrap();
+        let cs = self
+            .consensus
+            .read()
+            .map_err(|e| format!("consensus lock poisoned: {e}"))?;
         let pouw_result = pouw::PoUWResult {
             valid: true,
             usefulness_score: 1.0,
@@ -587,25 +685,43 @@ impl NodeManager {
             return Err("Block composite score below threshold".to_string());
         }
 
-        let mut bc = self.blockchain.write().unwrap();
+        let mut bc = self
+            .blockchain
+            .write()
+            .map_err(|e| format!("blockchain lock poisoned: {e}"))?;
         bc.insert_block(block, &val).map_err(|e| format!("insert failed: {e}"))
     }
 
     /// Toggles auto-mining on/off.
     pub fn toggle_auto_mine(&self) -> bool {
-        let mut am = self.auto_mine.write().unwrap();
+        let mut am = match self.auto_mine.write() {
+            Ok(a) => a,
+            Err(e) => {
+                eprintln!("auto_mine lock poisoned: {e}");
+                return false;
+            }
+        };
         *am = !*am;
         *am
     }
 
     /// Sets auto-mining to the specified value.
     pub fn set_auto_mine(&self, enabled: bool) {
-        *self.auto_mine.write().unwrap() = enabled;
+        match self.auto_mine.write() {
+            Ok(mut a) => *a = enabled,
+            Err(e) => eprintln!("auto_mine lock poisoned: {e}"),
+        }
     }
 
     /// Returns whether auto-mine is enabled.
     pub fn is_auto_mine(&self) -> bool {
-        *self.auto_mine.read().unwrap()
+        match self.auto_mine.read() {
+            Ok(a) => *a,
+            Err(e) => {
+                eprintln!("auto_mine lock poisoned: {e}");
+                false
+            }
+        }
     }
 }
 

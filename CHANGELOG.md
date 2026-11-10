@@ -7,7 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-<<<<<<< HEAD
 ## [1.0.7] — 2026-11-10
 
 ### Added
@@ -34,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - GUI build steps marked `continue-on-error: true` so they don't block the release
 
 ## [1.0.6] — 2026-11-09
+
+### Added
+
+- Block Explorer backend (Node.js + Express + GraphQL proxy)
+- Docker Compose infrastructure for Block Explorer
 
 ## [1.0.5] — 2026-11-09
 

@@ -1,6 +1,9 @@
 import { ApolloClient, ApolloLink, InMemoryCache, createHttpLink } from '@apollo/client';
 
-const API_KEY = (import.meta.env as { VITE_API_KEY?: string }).VITE_API_KEY ?? 'atoll-local';
+const API_KEY = (import.meta.env as { VITE_API_KEY?: string }).VITE_API_KEY;
+if (!API_KEY) {
+  throw new Error('VITE_API_KEY environment variable is required');
+}
 
 const httpLink = createHttpLink({
   uri: '/graphql',

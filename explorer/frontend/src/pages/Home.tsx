@@ -55,12 +55,12 @@ export function Home() {
       <SearchBar />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
-        <StatsCard title="Block Height" value={stats?.block_height ?? '--'} />
-        <StatsCard title="Finalized Height" value={stats?.finalized_height ?? '--'} />
-        <StatsCard title="Block Count" value={stats?.block_count?.toLocaleString() ?? '--'} />
-        <StatsCard title="Peer Count" value={stats?.peer_count?.toLocaleString() ?? '--'} />
-        <StatsCard title="Total Supply (ATOLL)" value={stats?.total_supply ?? '--'} />
-        <StatsCard title="Total Supply (MIND)" value={stats?.mind_supply ?? '--'} />
+        <StatsCard title="Block Height" value={stats?.blockHeight ?? '--'} />
+        <StatsCard title="Finalized Height" value={stats?.finalizedHeight ?? '--'} />
+        <StatsCard title="Block Count" value={stats?.blockCount?.toLocaleString() ?? '--'} />
+        <StatsCard title="Peer Count" value={stats?.peerCount?.toLocaleString() ?? '--'} />
+        <StatsCard title="Total Supply (ATOLL)" value={stats?.totalSupply ?? '--'} />
+        <StatsCard title="Total Supply (MIND)" value={stats?.mindSupply ?? '--'} />
       </div>
 
       <div className="mt-8 card">
