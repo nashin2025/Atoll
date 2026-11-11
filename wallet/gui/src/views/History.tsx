@@ -21,6 +21,9 @@ export function History({ onBack, nodeConnected }: HistoryProps) {
   const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [addressError, setAddressError] = useState<string | undefined>(undefined);
+
+  const isValidAddress = (addr: string) => /^[0-9a-fA-F]{40}$/.test(addr);
 
   const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,6 +31,14 @@ export function History({ onBack, nodeConnected }: HistoryProps) {
     setError(null);
     setTransactions([]);
     setBalance(null);
+    setAddressError(undefined);
+
+    if (!isValidAddress(address)) {
+      setAddressError("Address must be 40 hex characters (20 bytes)");
+      setLoading(false);
+      return;
+    }
+
     try {
       if (nodeConnected) {
         const response = await nodeGetHistory({ address });
@@ -81,8 +92,9 @@ export function History({ onBack, nodeConnected }: HistoryProps) {
               placeholder="Address to look up"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
+              error={addressError}
             />
-            <Button type="submit" variant="secondary" disabled={loading || !address}>
+            <Button type="submit" variant="secondary" disabled={loading || !address || !!addressError} ariaBusy={loading}>
               {nodeConnected ? "Look up history" : "Look up history"}
             </Button>
           </Card>
@@ -108,7 +120,11 @@ export function History({ onBack, nodeConnected }: HistoryProps) {
                 </p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                  <table
+                    aria-label="Transaction history"
+                    aria-rowcount={transactions.length}
+                    className="w-full text-left border-collapse"
+                  >
                     <thead>
                       <tr className="border-b border-slate-700/50">
                         <th className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">

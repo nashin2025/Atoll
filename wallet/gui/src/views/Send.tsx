@@ -26,6 +26,14 @@ export function Send({ from, passphrase, onBack, onSendComplete, nodeConnected }
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toError, setToError] = useState<string | undefined>(undefined);
+  const [amountError, setAmountError] = useState<string | undefined>(undefined);
+
+  const isValidAddress = (addr: string) => /^[0-9a-fA-F]{40}$/.test(addr);
+  const isValidAmount = (val: string) => {
+    const n = Number(val);
+    return !Number.isNaN(n) && n > 0 && Number.isFinite(n);
+  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +41,23 @@ export function Send({ from, passphrase, onBack, onSendComplete, nodeConnected }
     setError(null);
     setSignedTx(null);
     setSubmitted(false);
+    setToError(undefined);
+    setAmountError(undefined);
+
+    let valid = true;
+    if (!isValidAddress(to)) {
+      setToError("Address must be 40 hex characters (20 bytes)");
+      valid = false;
+    }
+    if (!isValidAmount(amount)) {
+      setAmountError("Amount must be a positive number");
+      valid = false;
+    }
+    if (!valid) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await walletSend({
         from,
@@ -67,6 +92,14 @@ export function Send({ from, passphrase, onBack, onSendComplete, nodeConnected }
     }
   };
 
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(signedTx ?? "");
+    } catch {
+      // clipboard access may be blocked
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 p-6">
       <div className="max-w-2xl mx-auto">
@@ -89,7 +122,6 @@ export function Send({ from, passphrase, onBack, onSendComplete, nodeConnected }
             <Input
               label="From"
               value={from}
-              onChange={() => {}}
               readOnly
               className="bg-slate-950"
             />
@@ -101,6 +133,7 @@ export function Send({ from, passphrase, onBack, onSendComplete, nodeConnected }
               placeholder="Recipient address"
               value={to}
               onChange={(e) => setTo(e.target.value)}
+              error={toError}
             />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
@@ -109,6 +142,7 @@ export function Send({ from, passphrase, onBack, onSendComplete, nodeConnected }
                 placeholder="e.g. 10.5"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                error={amountError}
               />
               <Input label="Token" value={token} onChange={(e) => setToken(e.target.value)} />
             </div>
@@ -125,7 +159,7 @@ export function Send({ from, passphrase, onBack, onSendComplete, nodeConnected }
             <Button
               type="submit"
               variant="primary"
-              disabled={loading || !to || !amount}
+              disabled={loading || !to || !amount || !!toError || !!amountError}
               className="mt-3 w-full"
             >
               Sign transaction
@@ -144,19 +178,20 @@ export function Send({ from, passphrase, onBack, onSendComplete, nodeConnected }
                 <Button
                   variant="secondary"
                   className="absolute right-2 top-2 h-8 text-xs"
-                  onClick={() => navigator.clipboard.writeText(signedTx)}
+                  onClick={handleCopy}
                 >
                   Copy
                 </Button>
               </div>
               {nodeConnected && (
                 <div className="space-y-3">
-                  <Button
-                    variant="primary"
-                    onClick={handleSubmitToNode}
-                    disabled={loading || submitted}
-                    className="w-full"
-                  >
+                <Button
+                  variant="primary"
+                  onClick={handleSubmitToNode}
+                  disabled={loading || submitted}
+                  className="w-full"
+                  ariaBusy={loading}
+                >
                     {loading ? "Submitting…" : submitted ? "Submitted" : "Submit to node"}
                   </Button>
                   {submitted && (

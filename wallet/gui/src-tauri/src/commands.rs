@@ -356,11 +356,13 @@ fn do_import(
     Ok(address.to_hex())
 }
 
-fn do_balance(keystore_path: &Path, address: &str) -> Result<BalanceResponse, GuiError> {
-    let _ = keystore_path; // balance reads ChainState, not the keystore
+fn do_balance(node_mgr: &NodeManager, address: &str) -> Result<BalanceResponse, GuiError> {
     let addr = Address::from_hex(address)
         .map_err(|e| GuiError::Address(format!("invalid address '{address}': {e}")))?;
-    let state = ChainState::new();
+    let state = node_mgr
+        .chain_state
+        .read()
+        .map_err(|e| GuiError::Io(format!("chain state lock poisoned: {e}")))?;
     let balance = state.balance(&addr);
     Ok(BalanceResponse {
         address: addr.to_hex(),
@@ -1033,10 +1035,17 @@ pub fn wallet_import(mut request: ImportRequest) -> Result<ImportResponse, GuiEr
     Ok(ImportResponse { address })
 }
 
-/// Queries the ATOLL balance of an address using the offline ChainState.
+/// Queries the ATOLL balance of an address using the live ChainState.
 #[tauri::command(name = "wallet-balance")]
-pub fn wallet_balance(request: BalanceRequest) -> Result<BalanceResponse, GuiError> {
-    do_balance(&default_keystore_path(), &request.address)
+pub fn wallet_balance(
+    node_mgr: State<'_, RwLock<NodeManager>>,
+    request: BalanceRequest,
+) -> Result<BalanceResponse, GuiError> {
+    let mgr = node_mgr.inner();
+    let guard = mgr
+        .read()
+        .map_err(|e| GuiError::Io(format!("node manager lock poisoned: {e}")))?;
+    do_balance(&*guard, &request.address)
 }
 
 /// Builds, signs, and outputs an ATOLL transaction as hex (offline signing).
@@ -1309,12 +1318,11 @@ mod tests {
 
     #[test]
     fn balance_is_zero_for_every_address_offline() {
-        let path = temp_keystore("balance_offline");
+        let mgr = NodeManager::new();
         let addr = Address::from_bytes([1u8; 20]);
-        let response = do_balance(&path, &addr.to_hex()).unwrap();
+        let response = do_balance(&mgr, &addr.to_hex()).unwrap();
         assert_eq!(response.balance, 0);
         assert_eq!(response.address, addr.to_hex());
-        let _ = fs::remove_file(&path);
     }
 
     #[test]

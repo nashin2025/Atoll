@@ -225,13 +225,19 @@ export default function App() {
               onClick={() => setState((prev) => ({ ...prev, view: v.id }))}
               icon={<span className="text-xs">{v.icon}</span>}
               title={v.label}
+              ariaLabel={v.label}
             >
               <span className="whitespace-nowrap">{v.label}</span>
             </NavLink>
           ))}
         </nav>
         <div className="px-2 py-4">
-          <NavLink active={false} onClick={handleLock} icon={<span className="text-xs">🔒</span>}>
+          <NavLink
+            active={false}
+            onClick={handleLock}
+            icon={<span className="text-xs">🔒</span>}
+            ariaLabel="Lock wallet"
+          >
             Lock
           </NavLink>
         </div>
@@ -259,6 +265,7 @@ export default function App() {
             />
             <div className="flex items-center gap-2">
               <span
+                aria-label={state.nodeConnected ? "Node online" : "Node offline"}
                 className={`w-2 h-2 rounded-full ${
                   state.nodeConnected ? "bg-emerald-400" : "bg-slate-500"
                 }`}

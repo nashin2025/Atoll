@@ -84,6 +84,7 @@ export function Welcome({ onUnlocked }: WelcomeProps) {
                 <Input
                   label="Passphrase"
                   type="password"
+                  autoComplete="new-password"
                   placeholder="Enter your wallet passphrase"
                   value={passphrase}
                   onChange={(e) => setPassphrase(e.target.value)}
@@ -140,6 +141,7 @@ export function Welcome({ onUnlocked }: WelcomeProps) {
               <Input
                 label="Passphrase to encrypt keystore"
                 type="password"
+                autoComplete="new-password"
                 placeholder="Choose a passphrase"
                 value={newPassphrase}
                 onChange={(e) => setNewPassphrase(e.target.value)}
@@ -186,6 +188,7 @@ export function Welcome({ onUnlocked }: WelcomeProps) {
               <Input
                 label="Passphrase to encrypt keystore"
                 type="password"
+                autoComplete="new-password"
                 placeholder="Choose a passphrase"
                 value={newPassphrase}
                 onChange={(e) => setNewPassphrase(e.target.value)}

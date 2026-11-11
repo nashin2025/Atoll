@@ -24,6 +24,13 @@ export function Staking({ address, passphrase, onBack }: StakingProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [stakeError, setStakeError] = useState<string | undefined>(undefined);
+  const [unstakeError, setUnstakeError] = useState<string | undefined>(undefined);
+
+  const isValidAmount = (val: string) => {
+    const n = Number(val);
+    return !Number.isNaN(n) && n > 0 && Number.isFinite(n);
+  };
 
   const fetchStakeInfo = async () => {
     setLoading(true);
@@ -48,6 +55,12 @@ export function Staking({ address, passphrase, onBack }: StakingProps) {
     setLoading(true);
     setError(null);
     setSuccess(null);
+    setStakeError(undefined);
+    if (!isValidAmount(stakeAmount)) {
+      setStakeError("Amount must be a positive number");
+      setLoading(false);
+      return;
+    }
     try {
       await walletStake({
         from: address,
@@ -69,6 +82,12 @@ export function Staking({ address, passphrase, onBack }: StakingProps) {
     setLoading(true);
     setError(null);
     setSuccess(null);
+    setUnstakeError(undefined);
+    if (!isValidAmount(unstakeAmount)) {
+      setUnstakeError("Amount must be a positive number");
+      setLoading(false);
+      return;
+    }
     try {
       await walletUnstake({
         from: address,
@@ -149,8 +168,9 @@ export function Staking({ address, passphrase, onBack }: StakingProps) {
               placeholder="Enter amount to stake"
               value={stakeAmount}
               onChange={(e) => setStakeAmount(e.target.value)}
+              error={stakeError}
             />
-            <Button type="submit" variant="primary" disabled={loading || !stakeAmount}>
+            <Button type="submit" variant="primary" disabled={loading || !stakeAmount || !!stakeError} ariaBusy={loading}>
               {loading ? "Staking…" : "Stake ATOLL"}
             </Button>
             <p className="text-xs text-slate-500 mt-2">
@@ -169,8 +189,9 @@ export function Staking({ address, passphrase, onBack }: StakingProps) {
               placeholder="Enter amount to unstake"
               value={unstakeAmount}
               onChange={(e) => setUnstakeAmount(e.target.value)}
+              error={unstakeError}
             />
-            <Button type="submit" variant="secondary" disabled={loading || !unstakeAmount}>
+            <Button type="submit" variant="secondary" disabled={loading || !unstakeAmount || !!unstakeError} ariaBusy={loading}>
               {loading ? "Unstaking…" : "Unstake ATOLL"}
             </Button>
             <p className="text-xs text-slate-500 mt-2">

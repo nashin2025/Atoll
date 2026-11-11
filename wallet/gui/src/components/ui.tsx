@@ -10,6 +10,9 @@ export function Button({
   type = "button",
   title,
   size = "md",
+  ariaLabel,
+  ariaPressed,
+  ariaBusy,
 }: {
   children: ReactNode;
   className?: string;
@@ -19,6 +22,9 @@ export function Button({
   type?: "button" | "submit" | "reset";
   title?: string;
   size?: "sm" | "md" | "lg";
+  ariaLabel?: string;
+  ariaPressed?: boolean;
+  ariaBusy?: boolean;
 }) {
   const base =
     "inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:pointer-events-none";
@@ -35,6 +41,8 @@ export function Button({
     md: "h-10 px-4 text-sm",
     lg: "h-12 px-6 text-base",
   };
+  const textChildren =
+    typeof children === "string" ? children.trim() : undefined;
   return (
     <button
       type={type}
@@ -42,6 +50,9 @@ export function Button({
       disabled={disabled}
       onClick={onClick}
       title={title}
+      aria-label={ariaLabel ?? (title && !textChildren ? title : undefined)}
+      aria-pressed={ariaPressed}
+      aria-busy={ariaBusy}
     >
       {children}
     </button>
@@ -56,6 +67,7 @@ export interface InputProps extends Omit<ComponentPropsWithoutRef<"input">, "siz
 
 export function Input({ label, error, id, className = "", ...props }: InputProps) {
   const inputId = id || (label ? `input-${label.toLowerCase().replace(/\s+/g, "-")}` : undefined);
+  const errorId = inputId ? `${inputId}-error` : undefined;
   return (
     <div className="mb-4">
       {label && (
@@ -68,10 +80,12 @@ export function Input({ label, error, id, className = "", ...props }: InputProps
       )}
       <input
         id={inputId}
-        className={`block w-full rounded-md border border-slate-600 bg-slate-900 text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none sm:text-sm transition-colors ${error ? "border-rose-500" : ""} ${className}`}
         {...props}
+        className={`block w-full rounded-md border border-slate-600 bg-slate-900 text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none sm:text-sm transition-colors ${error ? "border-rose-500" : ""} ${className}`}
+        aria-describedby={error ? errorId : undefined}
+        aria-invalid={error ? true : undefined}
       />
-      {error && <p className="mt-1.5 text-xs text-rose-400">{error}</p>}
+      {error && <p id={errorId} className="mt-1.5 text-xs text-rose-400">{error}</p>}
     </div>
   );
 }
@@ -101,7 +115,11 @@ export function Skeleton({
 /** Rendered command error. */
 export function ErrorDisplay({ message }: { message: string }) {
   return (
-    <div className="rounded-md border border-rose-500/50 bg-rose-900/20 p-4 text-rose-400 text-sm">
+    <div
+      role="status"
+      aria-live="polite"
+      className="rounded-md border border-rose-500/50 bg-rose-900/20 p-4 text-rose-400 text-sm"
+    >
       {message}
     </div>
   );
@@ -110,7 +128,11 @@ export function ErrorDisplay({ message }: { message: string }) {
 /** Success message banner. */
 export function SuccessDisplay({ message }: { message: string }) {
   return (
-    <div className="rounded-md border border-emerald-500/50 bg-emerald-900/20 p-4 text-emerald-400 text-sm">
+    <div
+      role="status"
+      aria-live="polite"
+      className="rounded-md border border-emerald-500/50 bg-emerald-900/20 p-4 text-emerald-400 text-sm"
+    >
       {message}
     </div>
   );
@@ -137,6 +159,7 @@ export function AddressDisplay({
           className="h-8 w-8 px-0 text-xs hover:bg-slate-800"
           onClick={onCopy}
           title="Copy address"
+          ariaLabel="Copy address to clipboard"
         >
           Copy
         </Button>
@@ -150,10 +173,12 @@ export function Badge({
   children,
   variant = "default",
   className = "",
+  ariaPressed,
 }: {
   children: ReactNode;
   variant?: "default" | "success" | "warning" | "error" | "muted";
   className?: string;
+  ariaPressed?: boolean;
 }) {
   const variants: Record<string, string> = {
     default: "bg-slate-700 text-slate-300",
@@ -164,6 +189,7 @@ export function Badge({
   };
   return (
     <span
+      aria-pressed={ariaPressed}
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border ${variants[variant]} ${className}`}
     >
       {children}
@@ -178,17 +204,21 @@ export function NavLink({
   onClick,
   icon,
   title,
+  ariaLabel,
 }: {
   children: ReactNode;
   active: boolean;
   onClick: () => void;
   icon?: ReactNode;
   title?: string;
+  ariaLabel?: string;
 }) {
   return (
     <button
       onClick={onClick}
       title={title}
+      aria-label={ariaLabel}
+      aria-pressed={active}
       className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
         active
           ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/50 shadow-sm shadow-indigo-500/10"

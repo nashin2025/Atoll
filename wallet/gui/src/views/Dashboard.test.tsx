@@ -88,7 +88,7 @@ describe("Dashboard", () => {
       />,
     );
     await waitFor(() => {
-      expect(screen.queryByText(/999/)).not.toBeNull();
+      expect(screen.getAllByText(/999/).length).toBeGreaterThanOrEqual(1);
     });
     expect(screen.queryByText(/777777/i)).not.toBeNull();
   });

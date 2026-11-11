@@ -156,11 +156,21 @@ export function Dashboard({
           </div>
           <div className="flex gap-3">
             {nodeConnected ? (
-              <Button variant="danger" onClick={onStopNode} size="sm">
+              <Button
+                variant="danger"
+                onClick={onStopNode}
+                size="sm"
+                ariaLabel={nodeConnected ? "Stop node" : "Start node"}
+              >
                 Stop node
               </Button>
             ) : (
-              <Button variant="primary" onClick={onStartNode} size="sm">
+              <Button
+                variant="primary"
+                onClick={onStartNode}
+                size="sm"
+                ariaLabel={nodeConnected ? "Stop node" : "Start node"}
+              >
                 Start node
               </Button>
             )}
@@ -246,7 +256,10 @@ export function Dashboard({
             </div>
             <div className="flex items-center justify-between pt-4 border-t border-slate-700/50">
               <div className="flex items-center gap-2">
-                <Badge variant={nodeInfo.autoMine ? "success" : "warning"}>
+                <Badge
+                  variant={nodeInfo.autoMine ? "success" : "warning"}
+                  ariaPressed={nodeInfo.autoMine}
+                >
                   {nodeInfo.autoMine ? "Auto-mine on" : "Auto-mine off"}
                 </Badge>
               </div>
@@ -277,6 +290,7 @@ export function Dashboard({
                 onClick={handleMine}
                 className="w-full"
                 disabled={mineLoading}
+                ariaBusy={mineLoading}
               >
                 {mineLoading ? (
                   <span className="flex items-center gap-2">
@@ -361,6 +375,7 @@ export function Dashboard({
                 className="h-8 w-8 px-0 text-xs"
                 onClick={() => navigator.clipboard.writeText(address)}
                 title="Copy address"
+                ariaLabel="Copy address to clipboard"
               >
                 Copy
               </Button>

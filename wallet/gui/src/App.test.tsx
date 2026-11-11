@@ -51,7 +51,7 @@ describe("App", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /unlock wallet/i }));
     await vi.waitFor(() => {
-      expect(screen.queryByRole("heading", { name: /dashboard/i })).not.toBeNull();
+      expect(screen.getAllByRole("heading", { name: /dashboard/i }).length).toBeGreaterThanOrEqual(1);
     });
     expect(walletUnlock).toHaveBeenCalledTimes(1);
   });
