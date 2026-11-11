@@ -40,7 +40,7 @@ use atoll_core::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::thread;
@@ -176,7 +176,16 @@ impl NodeManager {
         let genesis_hash = GenesisLoader::genesis_hash(&config).to_hex();
 
         let blockchain = Arc::new(RwLock::new(Blockchain::new(&config)));
-        let chain_state = Arc::new(RwLock::new(ChainState::new()));
+        let chain_state = match ChainState::load_from_file(Path::new("chain_state.json")) {
+            Ok(state) => {
+                log_msg!("Loaded chain state from disk");
+                Arc::new(RwLock::new(state))
+            }
+            Err(_) => {
+                log_msg!("No existing chain state, starting fresh");
+                Arc::new(RwLock::new(ChainState::new()))
+            }
+        };
         let peer_manager = Arc::new(RwLock::new(PeerManager::new(256)));
         let consensus = Arc::new(RwLock::new(PentaConsensus::new()));
 
@@ -192,7 +201,7 @@ impl NodeManager {
             state: RwLock::new(NodeState::Stopped),
             data_dir: None,
             block_producer_interval_ms: 10_000, // 10 second blocks
-            auto_mine: RwLock::new(true),       // auto-mine by default for solo validator
+            auto_mine: RwLock::new(false),
             genesis_hash,
             block_producer_handle: RwLock::new(None),
         }
@@ -378,6 +387,8 @@ impl NodeManager {
                 let blockchain = Arc::clone(&self.blockchain);
                 let consensus = Arc::clone(&self.consensus);
                 let mempool = Arc::clone(&self.mempool);
+                let chain_state = Arc::clone(&self.chain_state);
+                let identity = Arc::clone(&self.identity);
                 let interval_ms = self.block_producer_interval_ms;
 
                 thread::spawn(move || {
@@ -389,6 +400,24 @@ impl NodeManager {
                         }
                     };
                     rt.block_on(async move {
+                        // Derive proposer address from node identity
+                        let proposer_addr = {
+                            let ident = match identity.read() {
+                                Ok(i) => i,
+                                Err(e) => {
+                                    log_msg!("identity lock poisoned: {e}");
+                                    return;
+                                }
+                            };
+                            match ident.as_ref() {
+                                Some(ident) => Address::from_public_key(&ident.public_key()),
+                                None => {
+                                    log_msg!("node identity not initialized");
+                                    return;
+                                }
+                            }
+                        };
+
                         loop {
                             // Sleep for the block interval
                             tokio::time::sleep(Duration::from_millis(interval_ms)).await;
@@ -444,7 +473,7 @@ impl NodeManager {
                                 prev_hash,
                                 state_root: Hash512::zero(), // Phase 2: compute from state
                                 transaction_root: Hash512::zero(), // Phase 2: compute from txs
-                                proposer: Address::zero(),   // Phase 2: set to validator address
+                                proposer: proposer_addr, // derived from node identity public key
                                 difficulty: INITIAL_DIFFICULTY as u128,
                             };
 
@@ -504,6 +533,33 @@ impl NodeManager {
                                                     hex::encode(&hash.0[..8]),
                                                     tx_count
                                                 );
+                                                // Apply block rewards and persist chain state
+                                                {
+                                                    let mut state = match chain_state.write() {
+                                                        Ok(s) => s,
+                                                        Err(e) => {
+                                                            log_msg!(
+                                                                "chain_state lock poisoned: {e}"
+                                                            );
+                                                            break;
+                                                        }
+                                                    };
+                                                    if let Err(e) = apply_block_rewards(
+                                                        &mut *state,
+                                                        height,
+                                                        proposer_addr,
+                                                        None, // pouw_miner not tracked in auto-mine
+                                                        &[],  // no post_farmers in auto-mine
+                                                    ) {
+                                                        log_msg!(
+                                                            "Failed to apply block rewards: {e}"
+                                                        );
+                                                    } else if let Err(e) = state
+                                                        .save_to_file(Path::new("chain_state.json"))
+                                                    {
+                                                        log_msg!("Failed to save chain state: {e}");
+                                                    }
+                                                }
                                             }
                                             Err(e) => {
                                                 log_msg!("Failed to insert block: {e}");
@@ -788,6 +844,9 @@ impl NodeManager {
                 &[],  // no post_farmers in manual mine
             )
             .map_err(|e| format!("block reward distribution failed: {e}"))?;
+            state
+                .save_to_file(Path::new("chain_state.json"))
+                .map_err(|e| format!("failed to save chain state: {e}"))?;
         }
 
         Ok(block_hash)

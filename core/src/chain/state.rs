@@ -4,10 +4,12 @@
 
 use crate::primitives::address::Address;
 use crate::primitives::hash::Hash512;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::Path;
 
 /// Account state
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AccountState {
     pub balance: u128,
     pub nonce: u64,
@@ -20,6 +22,7 @@ pub struct AccountState {
 }
 
 /// Chain state: tracks all account states
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ChainState {
     /// Account states by address
     accounts: HashMap<Address, AccountState>,
@@ -32,6 +35,9 @@ pub struct ChainState {
     /// Block number at which PROOF decay was last applied
     last_proof_decay_block: u64,
 }
+
+/// Path to the on-disk chain state file.
+pub const CHAIN_STATE_PATH: &str = "chain_state.json";
 
 impl ChainState {
     /// Creates a new chain state
@@ -286,11 +292,25 @@ impl ChainState {
             .filter(|a| a.proof_balance > 0)
             .count() as u64
     }
-}
 
-impl Default for ChainState {
-    fn default() -> Self {
-        Self::new()
+    /// Serializes the chain state to JSON and writes it to `path`.
+    pub fn save_to_file(&self, path: &Path) -> Result<(), String> {
+        let json = serde_json::to_string_pretty(self)
+            .map_err(|e| format!("failed to serialize chain state: {e}"))?;
+        std::fs::write(path, json)
+            .map_err(|e| format!("failed to write chain state to {}: {}", path.display(), e))
+    }
+
+    /// Reads a chain state from JSON at `path`. Returns an error if the file
+    /// does not exist or cannot be parsed.
+    pub fn load_from_file(path: &Path) -> Result<Self, String> {
+        if !path.exists() {
+            return Err(format!("chain state file not found: {}", path.display()));
+        }
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| format!("failed to read chain state from {}: {}", path.display(), e))?;
+        serde_json::from_str::<ChainState>(&content)
+            .map_err(|e| format!("failed to deserialize chain state: {e}"))
     }
 }
 

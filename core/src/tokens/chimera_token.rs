@@ -142,13 +142,19 @@ pub fn apply_block_rewards(
         }
     }
 
-    // Treasury, staking rewards, public goods are minted to zero address
-    // (removed from circulation but tracked in total supply)
-    let zero_address = Address::zero();
-    for recipient in ["treasury", "staking_rewards", "public_goods"] {
+    // Mint treasury, staking rewards, public goods to designated pool
+    // addresses instead of burning to zero address.
+    let treasury_addr = Address::from_bytes([1u8; 20]);
+    let staking_addr = Address::from_bytes([9u8; 20]);
+    let public_goods_addr = Address::from_bytes([10u8; 20]);
+    for (recipient, addr) in [
+        ("treasury", treasury_addr),
+        ("staking_rewards", staking_addr),
+        ("public_goods", public_goods_addr),
+    ] {
         if let Some(amount) = distribution.get(recipient) {
             if *amount > 0 {
-                state.mint_atoll(zero_address, *amount)?;
+                state.mint_atoll(addr, *amount)?;
             }
         }
     }
@@ -193,7 +199,7 @@ mod tests {
     #[test]
     fn apply_block_rewards_test() {
         let mut state = ChainState::new();
-        let proposer = Address::from_bytes([1u8; 20]);
+        let proposer = Address::from_bytes([7u8; 20]);
         let pouw_miner = Some(Address::from_bytes([2u8; 20]));
         let post_farmers = vec![
             Address::from_bytes([3u8; 20]),
