@@ -84,6 +84,7 @@ pub mod mempool;
 pub mod network;
 pub mod primitives;
 pub mod privacy;
+pub mod staking;
 pub mod storage;
 pub mod telemetry;
 pub mod tokens;

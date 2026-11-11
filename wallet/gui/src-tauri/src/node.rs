@@ -35,6 +35,7 @@ use atoll_core::{
     primitives::block::{Block, BlockBody, BlockHeader},
     primitives::hash::Hash512,
     primitives::transaction::Transaction,
+    staking::StakingState,
     tokens::chimera_token::apply_block_rewards,
     CHAIN_ID, GENESIS_TIMESTAMP, INITIAL_DIFFICULTY,
 };
@@ -107,6 +108,7 @@ pub struct MempoolTx {
 pub struct NodeManager {
     pub blockchain: Arc<RwLock<Blockchain>>,
     pub chain_state: Arc<RwLock<ChainState>>,
+    pub staking_state: Arc<RwLock<StakingState>>,
     pub peer_manager: Arc<RwLock<PeerManager>>,
     pub consensus: Arc<RwLock<PentaConsensus>>,
     pub identity: Arc<RwLock<Option<NodeIdentity>>>,
@@ -186,12 +188,25 @@ impl NodeManager {
                 Arc::new(RwLock::new(ChainState::new()))
             }
         };
+        let staking_state = match StakingState::load_from_file(Path::new("staking.json")) {
+            Ok(state) => {
+                log_msg!("Loaded staking state from disk");
+                Arc::new(RwLock::new(state))
+            }
+            Err(_) => {
+                log_msg!("No existing staking state, starting fresh");
+                Arc::new(RwLock::new(
+                    StakingState::new().with_path(Path::new("staking.json")),
+                ))
+            }
+        };
         let peer_manager = Arc::new(RwLock::new(PeerManager::new(256)));
         let consensus = Arc::new(RwLock::new(PentaConsensus::new()));
 
         Self {
             blockchain,
             chain_state,
+            staking_state,
             peer_manager,
             consensus,
             identity: Arc::new(RwLock::new(None)),
@@ -545,7 +560,7 @@ impl NodeManager {
                                                         }
                                                     };
                                                     if let Err(e) = apply_block_rewards(
-                                                        &mut *state,
+                                                        &mut state,
                                                         height,
                                                         proposer_addr,
                                                         None, // pouw_miner not tracked in auto-mine
@@ -837,7 +852,7 @@ impl NodeManager {
                 .write()
                 .map_err(|e| format!("chain_state lock poisoned: {e}"))?;
             apply_block_rewards(
-                &mut *state,
+                &mut state,
                 height,
                 proposer_addr,
                 None, // pouw_miner not tracked in manual mine
@@ -847,6 +862,15 @@ impl NodeManager {
             state
                 .save_to_file(Path::new("chain_state.json"))
                 .map_err(|e| format!("failed to save chain state: {e}"))?;
+        }
+        {
+            let state = self
+                .staking_state
+                .write()
+                .map_err(|e| format!("staking_state lock poisoned: {e}"))?;
+            state
+                .save_to_file()
+                .map_err(|e| format!("failed to save staking state: {e}"))?;
         }
 
         Ok(block_hash)

@@ -141,6 +141,41 @@ pub struct DeriveAddressResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Staking request / response types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StakeInfoRequest {
+    pub address: String,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StakeInfoResponse {
+    pub address: String,
+    pub staked_amount: u128,
+    pub rewards: u128,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StakeRequest {
+    pub from: String,
+    pub amount: String,
+    pub passphrase: String,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StakeResponse {
+    pub signed_tx: String,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UnstakeRequest {
+    pub from: String,
+    pub amount: String,
+    pub passphrase: String,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UnstakeResponse {
+    pub signed_tx: String,
+}
+
+// ---------------------------------------------------------------------------
 // Embedded node request / response types
 // ---------------------------------------------------------------------------
 
@@ -425,6 +460,183 @@ fn do_derive_address(public_key: &str) -> Result<String, GuiError> {
     array.copy_from_slice(&public_key_bytes);
     let address = derive_address(&array);
     Ok(address.to_hex())
+}
+
+// ---------------------------------------------------------------------------
+// Staking logic (uses NodeManager's live ChainState + StakingState)
+// ---------------------------------------------------------------------------
+
+fn do_stake_info(node_mgr: &NodeManager, address: &str) -> Result<StakeInfoResponse, GuiError> {
+    let addr = Address::from_hex(address)
+        .map_err(|e| GuiError::Address(format!("invalid address '{address}': {e}")))?;
+
+    let staking_state = node_mgr
+        .staking_state
+        .read()
+        .map_err(|e| GuiError::Io(format!("staking state lock poisoned: {e}")))?;
+
+    let staked_amount = staking_state.staked_amount(&addr);
+
+    let chain_state = node_mgr
+        .chain_state
+        .read()
+        .map_err(|e| GuiError::Io(format!("chain state lock poisoned: {e}")))?;
+    let tip_height = chain_state.block_number();
+    let rewards = staking_state.pending_rewards(&addr, tip_height);
+    drop(chain_state);
+    drop(staking_state);
+
+    Ok(StakeInfoResponse {
+        address: addr.to_hex(),
+        staked_amount,
+        rewards,
+    })
+}
+
+fn do_stake(
+    node_mgr: &NodeManager,
+    keystore_path: &Path,
+    request: &StakeRequest,
+) -> Result<StakeResponse, GuiError> {
+    let from_addr = Address::from_hex(&request.from).map_err(|e| {
+        GuiError::Address(format!("invalid 'from' address '{}': {e}", request.from))
+    })?;
+    let value: u128 = request
+        .amount
+        .parse()
+        .map_err(|e| GuiError::Amount(format!("'{}': {e}", request.amount)))?;
+
+    if value == 0 {
+        return Err(GuiError::Amount(
+            "amount must be greater than zero".to_string(),
+        ));
+    }
+
+    // Verify the caller owns the address by decrypting the keystore
+    let keystore =
+        Keystore::load(keystore_path.to_path_buf(), &request.passphrase).map_err(GuiError::from)?;
+    keystore
+        .get(&from_addr)
+        .ok_or_else(|| GuiError::KeyNotFound(from_addr.to_string()))?;
+
+    // Check sufficient balance before staking
+    {
+        let state = node_mgr
+            .chain_state
+            .read()
+            .map_err(|e| GuiError::Io(format!("chain state lock poisoned: {e}")))?;
+        let available = state.balance(&from_addr);
+        if available < value {
+            return Err(GuiError::InsufficientBalance {
+                available,
+                requested: value,
+            });
+        }
+    }
+
+    // Stake: StakingState::stake burns from ChainState and adds to staked amount
+    {
+        let mut state = node_mgr
+            .staking_state
+            .write()
+            .map_err(|e| GuiError::Io(format!("staking state lock poisoned: {e}")))?;
+        // We need a mutable ChainState reference for StakingState::stake.
+        // Since we already verified balance above, create a temporary ChainState
+        // wrapper that reads/writes the live state. StakingState::stake will
+        // burn from it and add to staked_amount.
+        let mut chain_state = node_mgr
+            .chain_state
+            .write()
+            .map_err(|e| GuiError::Io(format!("chain state lock poisoned: {e}")))?;
+        state
+            .stake(from_addr, value, &mut chain_state)
+            .map_err(GuiError::Crypto)?;
+        chain_state
+            .save_to_file(Path::new("chain_state.json"))
+            .map_err(|e| GuiError::Io(format!("failed to save chain state: {e}")))?;
+        state
+            .save_to_file()
+            .map_err(|e| GuiError::Io(format!("failed to save staking state: {e}")))?;
+    }
+
+    // Build a dummy signed transaction for the frontend (staking is a state
+    // change, no real tx broadcast needed in MVP)
+    let dummy_tx = Transaction {
+        version: 1,
+        from: from_addr,
+        to: None,
+        value,
+        data: Vec::new(),
+        signature: Signature::default(),
+    };
+    let signed_hex = hex::encode(dummy_tx.serialize_bytes());
+
+    Ok(StakeResponse {
+        signed_tx: signed_hex,
+    })
+}
+
+fn do_unstake(
+    node_mgr: &NodeManager,
+    keystore_path: &Path,
+    request: &UnstakeRequest,
+) -> Result<UnstakeResponse, GuiError> {
+    let from_addr = Address::from_hex(&request.from).map_err(|e| {
+        GuiError::Address(format!("invalid 'from' address '{}': {e}", request.from))
+    })?;
+    let value: u128 = request
+        .amount
+        .parse()
+        .map_err(|e| GuiError::Amount(format!("'{}': {e}", request.amount)))?;
+
+    if value == 0 {
+        return Err(GuiError::Amount(
+            "amount must be greater than zero".to_string(),
+        ));
+    }
+
+    // Verify the caller owns the address by decrypting the keystore
+    let keystore =
+        Keystore::load(keystore_path.to_path_buf(), &request.passphrase).map_err(GuiError::from)?;
+    keystore
+        .get(&from_addr)
+        .ok_or_else(|| GuiError::KeyNotFound(from_addr.to_string()))?;
+
+    // Unstake: StakingState::unstake removes from staked and mints to ChainState
+    {
+        let mut state = node_mgr
+            .staking_state
+            .write()
+            .map_err(|e| GuiError::Io(format!("staking state lock poisoned: {e}")))?;
+        let mut chain_state = node_mgr
+            .chain_state
+            .write()
+            .map_err(|e| GuiError::Io(format!("chain state lock poisoned: {e}")))?;
+        state
+            .unstake(from_addr, value, &mut chain_state)
+            .map_err(GuiError::Crypto)?;
+        chain_state
+            .save_to_file(Path::new("chain_state.json"))
+            .map_err(|e| GuiError::Io(format!("failed to save chain state: {e}")))?;
+        state
+            .save_to_file()
+            .map_err(|e| GuiError::Io(format!("failed to save staking state: {e}")))?;
+    }
+
+    // Build a dummy signed transaction for the frontend
+    let dummy_tx = Transaction {
+        version: 1,
+        from: from_addr,
+        to: None,
+        value,
+        data: Vec::new(),
+        signature: Signature::default(),
+    };
+    let signed_hex = hex::encode(dummy_tx.serialize_bytes());
+
+    Ok(UnstakeResponse {
+        signed_tx: signed_hex,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -847,6 +1059,45 @@ pub fn wallet_derive_address(
 ) -> Result<DeriveAddressResponse, GuiError> {
     let address = do_derive_address(&request.public_key)?;
     Ok(DeriveAddressResponse { address })
+}
+
+/// Returns staked amount and pending rewards for an address.
+#[tauri::command(name = "wallet-stake-info")]
+pub fn wallet_stake_info(
+    node_mgr: State<'_, RwLock<NodeManager>>,
+    request: StakeInfoRequest,
+) -> Result<StakeInfoResponse, GuiError> {
+    let mgr = node_mgr.inner();
+    let guard = mgr
+        .read()
+        .map_err(|e| GuiError::Io(format!("node manager lock poisoned: {e}")))?;
+    do_stake_info(&guard, &request.address)
+}
+
+/// Stakes ATOLL tokens from an address into the staking pool.
+#[tauri::command(name = "wallet-stake")]
+pub fn wallet_stake(
+    node_mgr: State<'_, RwLock<NodeManager>>,
+    request: StakeRequest,
+) -> Result<StakeResponse, GuiError> {
+    let mgr = node_mgr.inner();
+    let guard = mgr
+        .read()
+        .map_err(|e| GuiError::Io(format!("node manager lock poisoned: {e}")))?;
+    do_stake(&guard, &default_keystore_path(), &request)
+}
+
+/// Unstakes ATOLL tokens from the staking pool back to an address.
+#[tauri::command(name = "wallet-unstake")]
+pub fn wallet_unstake(
+    node_mgr: State<'_, RwLock<NodeManager>>,
+    request: UnstakeRequest,
+) -> Result<UnstakeResponse, GuiError> {
+    let mgr = node_mgr.inner();
+    let guard = mgr
+        .read()
+        .map_err(|e| GuiError::Io(format!("node manager lock poisoned: {e}")))?;
+    do_unstake(&guard, &default_keystore_path(), &request)
 }
 
 /// Starts the embedded Atoll node in-process.
